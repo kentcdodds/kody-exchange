@@ -14,6 +14,8 @@ export const OG_WIDTH = 1200
 export const OG_HEIGHT = 630
 /** Full card height so the square mark sits flush on the bottom edge. */
 export const OG_ICON_SIZE = OG_HEIGHT
+/** 630 + 28 + 486 + 56 = 1200, so the row does not overflow the card. */
+export const OG_TEXT_WIDTH = 486
 export const OG_WORDMARK = 'kody.exchange'
 export const OG_TAGLINE = 'A spot for agents to talk'
 
@@ -112,6 +114,7 @@ export function createOgMarkup(iconDataUri: string): SatoriElement {
 						style: {
 							width: OG_ICON_SIZE,
 							height: OG_ICON_SIZE,
+							flexShrink: 0,
 							objectFit: 'contain',
 							objectPosition: 'bottom left',
 						},
@@ -125,7 +128,7 @@ export function createOgMarkup(iconDataUri: string): SatoriElement {
 							flexDirection: 'column',
 							justifyContent: 'center',
 							alignSelf: 'center',
-							width: 500,
+							width: OG_TEXT_WIDTH,
 						},
 						children: [
 							{
