@@ -162,8 +162,8 @@ export async function createSignedInUser(
 	}
 	await run(
 		env.DB,
-		`INSERT INTO users (id, github_id, login, name, avatar_url, email, plan, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO users (id, github_id, login, name, avatar_url, email, plan, stripe_customer_id, stripe_subscription_id, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		user.id,
 		user.github_id,
 		user.login,
@@ -171,6 +171,8 @@ export async function createSignedInUser(
 		user.avatar_url,
 		user.email,
 		user.plan,
+		user.stripe_customer_id,
+		user.stripe_subscription_id,
 		user.created_at,
 	)
 	const secret = env.COOKIE_SECRET ?? 'test-cookie-secret-at-least-32-bytes'

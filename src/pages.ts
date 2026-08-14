@@ -28,7 +28,8 @@ import {
 	threadNotFoundPage,
 	threadViewPage,
 } from '#src/html.ts'
-import { getPlan } from '#src/limits.ts'
+import { grantMaxToLogin } from '#src/grants.ts'
+import { getPlan, isOperatorLogin } from '#src/limits.ts'
 import { clientIp, limitViewPoll, workerPollCache } from '#src/rate-limit.ts'
 import {
 	countMembers,
@@ -245,8 +246,9 @@ async function accountPage(
 	const atThreadLimit = liveThreads >= plan.threads
 	const upgraded = new URL(request.url).searchParams.get('upgraded') === '1'
 	const error = accountError(new URL(request.url).searchParams.get('error'))
-	const checkoutAvailable =
-		stripeSecretConfigured(env) && env.STRIPE_PRO_PRICE_ID
+	const checkoutAvailable = Boolean(
+		stripeSecretConfigured(env) && env.STRIPE_PRO_PRICE_ID,
+	)
 	const link = paymentLinkUrl(env, user)
 
 	return `
@@ -289,22 +291,18 @@ async function accountPage(
 					)
 				).join('')
 	}
-	<h2>Billing</h2>
+	${accountBillingHtml({ user, csrf, checkoutAvailable, link })}
 	${
-		user.plan === 'pro'
-			? `<form method="post" action="/account/portal">
-				<input type="hidden" name="csrf" value="${escapeHtml(csrf)}" />
-				<button type="submit">Manage subscription</button>
-			</form>
-			<p class="tiny">If the portal is not configured, email <a href="mailto:support@kody.exchange">support@kody.exchange</a>.</p>`
-			: checkoutAvailable
-				? `<form method="post" action="/account/checkout">
-					<input type="hidden" name="csrf" value="${escapeHtml(csrf)}" />
-					<button type="submit">Upgrade to Pro · $5/mo</button>
-				</form>`
-				: link
-					? `<p><a class="btn" href="${escapeHtml(link)}">Upgrade to Pro · $5/mo</a></p>`
-					: `<p class="muted">Pro checkout is not wired yet. Email <a href="mailto:support@kody.exchange">support@kody.exchange</a>.</p>`
+		isOperatorLogin(user.login)
+			? `<h2>Operator</h2>
+	${new URL(request.url).searchParams.get('granted') === '1' ? '<p class="card">Granted.</p>' : ''}
+	<form class="card" method="post" action="/account/grants">
+		<input type="hidden" name="csrf" value="${escapeHtml(csrf)}" />
+		<label for="grant-login">GitHub login</label>
+		<input id="grant-login" name="login" maxlength="39" autocomplete="off" />
+		<p><button type="submit">Grant Max</button></p>
+	</form>`
+			: ''
 	}
 	${copyPromptScript()}
 	`
@@ -347,12 +345,45 @@ async function threadListItem(thread: ThreadListRow, baseUrl: string) {
 	</article>`
 }
 
+function accountBillingHtml(input: {
+	user: UserRow
+	csrf: string
+	checkoutAvailable: boolean
+	link: string | null
+}) {
+	const manage = `<h2>Billing</h2>
+	<form method="post" action="/account/portal">
+		<input type="hidden" name="csrf" value="${escapeHtml(input.csrf)}" />
+		<button type="submit">Manage subscription</button>
+	</form>
+	<p class="tiny">If the portal is not configured, email <a href="mailto:support@kody.exchange">support@kody.exchange</a>.</p>`
+	if (input.user.plan === 'max') {
+		return input.user.stripe_customer_id ? manage : ''
+	}
+	if (input.user.plan === 'pro') return manage
+	if (input.checkoutAvailable) {
+		return `<h2>Billing</h2>
+	<form method="post" action="/account/checkout">
+		<input type="hidden" name="csrf" value="${escapeHtml(input.csrf)}" />
+		<button type="submit">Upgrade to Pro · $5/mo</button>
+	</form>`
+	}
+	if (input.link) {
+		return `<h2>Billing</h2>
+	<p><a class="btn" href="${escapeHtml(input.link)}">Upgrade to Pro · $5/mo</a></p>`
+	}
+	return `<h2>Billing</h2>
+	<p class="muted">Pro checkout is not wired yet. Email <a href="mailto:support@kody.exchange">support@kody.exchange</a>.</p>`
+}
+
 function accountError(code: string | null) {
 	switch (code) {
 		case 'thread_limit':
 			return "You're at your live thread limit."
 		case 'create_failed':
 			return 'Could not create that thread. Try again.'
+		case 'bad_login':
+			return 'That GitHub login is not valid.'
 		default:
 			return null
 	}
@@ -399,7 +430,23 @@ export async function handleAccountAction(
 			},
 		})
 	}
+	if (url.pathname === '/account/grants') {
+		if (!isOperatorLogin(user.login)) {
+			return new Response('Not found', { status: 404 })
+		}
+		const granted = await grantMaxToLogin(
+			env.DB,
+			String(form.get('login') ?? ''),
+		)
+		const next = new URL('/account', appBaseUrl(env, request))
+		if (!granted.ok) next.searchParams.set('error', granted.code)
+		else next.searchParams.set('granted', '1')
+		return Response.redirect(next.toString(), 303)
+	}
 	if (url.pathname === '/account/checkout') {
+		if (user.plan === 'max') {
+			return Response.redirect(`${appBaseUrl(env, request)}/account`, 303)
+		}
 		const checkout = await createCheckout({ env, request, user })
 		if (checkout) return Response.redirect(checkout, 303)
 		const link = paymentLinkUrl(env, user)

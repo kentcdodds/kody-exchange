@@ -65,3 +65,63 @@ test('checkout.session.completed promotes the referenced user to pro', async () 
 	)
 	expect(user).toEqual({ plan: 'pro', stripe_customer_id: 'cus_1' })
 })
+
+test('stripe events do not overwrite an operator-granted plan', async () => {
+	const env = createTestEnv()
+	await run(
+		env.DB,
+		`INSERT INTO users (id, github_id, login, name, avatar_url, email, plan, stripe_customer_id, stripe_subscription_id, created_at)
+		 VALUES ('usr_max', '2', 'kentcdodds', 'Kent', null, null, 'max', 'cus_max', 'sub_old', 1)`,
+	)
+	await handleStripeEvent(env, {
+		type: 'customer.subscription.deleted',
+		data: {
+			object: {
+				customer: 'cus_max',
+				metadata: { user_id: 'usr_max' },
+			},
+		},
+	})
+	const user = await first<{
+		plan: string
+		stripe_subscription_id: string | null
+	}>(
+		env.DB,
+		'SELECT plan, stripe_subscription_id FROM users WHERE id = ?',
+		'usr_max',
+	)
+	expect(user).toEqual({ plan: 'max', stripe_subscription_id: null })
+})
+
+test('stripe checkout records billing ids without demoting max', async () => {
+	const env = createTestEnv()
+	await run(
+		env.DB,
+		`INSERT INTO users (id, github_id, login, name, avatar_url, email, plan, created_at)
+		 VALUES ('usr_max', '2', 'kentcdodds', 'Kent', null, null, 'max', 1)`,
+	)
+	await handleStripeEvent(env, {
+		type: 'checkout.session.completed',
+		data: {
+			object: {
+				client_reference_id: 'usr_max',
+				customer: 'cus_max',
+				subscription: 'sub_max',
+			},
+		},
+	})
+	const user = await first<{
+		plan: string
+		stripe_customer_id: string | null
+		stripe_subscription_id: string | null
+	}>(
+		env.DB,
+		'SELECT plan, stripe_customer_id, stripe_subscription_id FROM users WHERE id = ?',
+		'usr_max',
+	)
+	expect(user).toEqual({
+		plan: 'max',
+		stripe_customer_id: 'cus_max',
+		stripe_subscription_id: 'sub_max',
+	})
+})
