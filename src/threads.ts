@@ -12,6 +12,8 @@ import {
 import { createId, randomToken } from '#src/ids.ts'
 import {
 	getPlan,
+	guestLiveThreadCap,
+	pollRetryAfterSecondsFor,
 	type PlanName,
 	usageOwnerKey,
 	yearMonth,
@@ -46,6 +48,7 @@ export type ThreadRow = {
 	purpose: string | null
 	join_secret_hash: string
 	webhook_url: string | null
+	creator_ip: string | null
 	created_at: number
 	expires_at: number
 }
@@ -153,6 +156,35 @@ export async function countLiveAgents(db: D1Database, userId: string) {
 	return row?.n ?? 0
 }
 
+function sanitizeIp(value: unknown) {
+	if (typeof value !== 'string') return 'unknown'
+	const trimmed = value.trim().slice(0, 64)
+	return trimmed.length > 0 ? trimmed : 'unknown'
+}
+
+export async function countLiveGuestThreads(db: D1Database, now = Date.now()) {
+	const row = await first<{ n: number }>(
+		db,
+		'SELECT COUNT(*) AS n FROM threads WHERE owner_user_id IS NULL AND expires_at > ?',
+		now,
+	)
+	return row?.n ?? 0
+}
+
+export async function countGuestThreadsForIp(
+	db: D1Database,
+	ip: string,
+	now = Date.now(),
+) {
+	const row = await first<{ n: number }>(
+		db,
+		'SELECT COUNT(*) AS n FROM threads WHERE owner_user_id IS NULL AND creator_ip = ? AND expires_at > ?',
+		ip,
+		now,
+	)
+	return row?.n ?? 0
+}
+
 export async function countOwnedThreads(db: D1Database, userId: string) {
 	const row = await first<{ n: number }>(
 		db,
@@ -185,6 +217,7 @@ export async function createThread(input: {
 	db: D1Database
 	baseUrl: string
 	ownerUserId: string | null
+	creatorIp?: unknown
 	purpose?: unknown
 	name?: unknown
 	now?: number
@@ -204,6 +237,7 @@ export async function createThread(input: {
 	const planName = await planForOwner(input.db, input.ownerUserId)
 	const plan = getPlan(planName)
 
+	const creatorIp = input.ownerUserId ? null : sanitizeIp(input.creatorIp)
 	if (input.ownerUserId) {
 		const owned = await countOwnedThreads(input.db, input.ownerUserId)
 		if (owned >= plan.threads) {
@@ -211,6 +245,24 @@ export async function createThread(input: {
 				402,
 				'thread_limit',
 				`${plan.label} accounts can keep ${plan.threads} live thread${plan.threads === 1 ? '' : 's'}.`,
+			)
+		}
+	} else {
+		const ip = creatorIp ?? 'unknown'
+		const globalLive = await countLiveGuestThreads(input.db, now)
+		if (globalLive >= guestLiveThreadCap) {
+			return fail(
+				503,
+				'guest_capacity',
+				'Guest threads are at capacity. Try again later or sign in.',
+			)
+		}
+		const ipLive = await countGuestThreadsForIp(input.db, ip, now)
+		if (ipLive >= plan.threads) {
+			return fail(
+				429,
+				'guest_thread_limit',
+				'This IP already has a live guest thread. Wait for it to expire, or sign in.',
 			)
 		}
 	}
@@ -225,14 +277,15 @@ export async function createThread(input: {
 
 	await run(
 		input.db,
-		`INSERT INTO threads (id, owner_user_id, purpose, join_secret_hash, webhook_url, created_at, expires_at)
-		 VALUES (?, ?, ?, ?, NULL, ?, ?)`,
+		`INSERT INTO threads (id, owner_user_id, purpose, join_secret_hash, webhook_url, created_at, expires_at, creator_ip)
+		 VALUES (?, ?, ?, ?, NULL, ?, ?, ?)`,
 		threadId,
 		input.ownerUserId,
 		purpose,
 		await sha256Hex(joinToken),
 		now,
 		expiresAt,
+		creatorIp,
 	)
 	await run(
 		input.db,
@@ -556,7 +609,11 @@ export async function listMessages(input: {
 			refs: JSON.parse(row.refs) as Array<MessageRef>,
 		}),
 	)
-	return { ok: true, messages, retryAfter: 2 }
+	return {
+		ok: true,
+		messages,
+		retryAfter: pollRetryAfterSecondsFor(membership.thread),
+	}
 }
 
 export async function setWebhook(input: {

@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -8,10 +8,14 @@ import { run } from '#src/db.ts'
 import { type AppEnv } from '#src/env.ts'
 import { type UserRow } from '#src/threads.ts'
 
-const migration = readFileSync(
-	join(dirname(fileURLToPath(import.meta.url)), '../migrations/0001_init.sql'),
-	'utf8',
+const migrationsDir = join(
+	dirname(fileURLToPath(import.meta.url)),
+	'../migrations',
 )
+const migrations = readdirSync(migrationsDir)
+	.filter((name) => name.endsWith('.sql'))
+	.toSorted()
+	.map((name) => readFileSync(join(migrationsDir, name), 'utf8'))
 
 class MemoryPrepared {
 	#db: DatabaseSync
@@ -123,7 +127,7 @@ class MemoryR2 {
 
 export function createTestEnv(overrides: Partial<AppEnv> = {}): AppEnv {
 	const sqlite = new DatabaseSync(':memory:')
-	sqlite.exec(migration)
+	for (const migration of migrations) sqlite.exec(migration)
 	return {
 		DB: createD1(sqlite),
 		RATE_LIMIT: new MemoryKv() as unknown as KVNamespace,

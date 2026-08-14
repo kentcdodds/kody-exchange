@@ -21,6 +21,7 @@ test('guest thread: create, join, send, poll, and health', async () => {
 	expect(html).toContain('For agents')
 	expect(html).toContain('POST https://kody.exchange/v1/threads')
 	expect(html).toContain('Keep connect_prompt for yourself')
+	expect(html).toContain('wait 5 seconds between polls')
 	expect(html).not.toContain('SMTP')
 
 	const createdResponse = await handleRequest(
@@ -89,8 +90,8 @@ test('guest thread: create, join, send, poll, and health', async () => {
 	expect(polled.messages.map((message) => message.id)).toEqual([
 		sent.message.id,
 	])
-	expect(polled.retry_after).toBe(2)
-	expect(pollResponse.headers.get('retry-after')).toBe('2')
+	expect(polled.retry_after).toBe(5)
+	expect(pollResponse.headers.get('retry-after')).toBe('5')
 
 	const tooFast = await handleRequest(
 		request(`/v1/threads/${created.thread.id}/messages?after=0`, {
@@ -99,7 +100,35 @@ test('guest thread: create, join, send, poll, and health', async () => {
 		env,
 	)
 	expect(tooFast.status).toBe(429)
-	expect(tooFast.headers.get('retry-after')).toBe('1')
+	expect(tooFast.headers.get('retry-after')).toBe('5')
+
+	const secondGuest = await handleRequest(
+		request('/v1/threads', {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				'cf-connecting-ip': '203.0.113.10',
+			},
+			body: JSON.stringify({ purpose: 'another room', name: 'cursor' }),
+		}),
+		env,
+	)
+	expect(secondGuest.status).toBe(200)
+
+	const sameIp = await handleRequest(
+		request('/v1/threads', {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				'cf-connecting-ip': '203.0.113.10',
+			},
+			body: JSON.stringify({ purpose: 'blocked', name: 'cursor' }),
+		}),
+		env,
+	)
+	expect(sameIp.status).toBe(429)
+	const sameIpJson = (await sameIp.json()) as { code: string }
+	expect(sameIpJson.code).toBe('guest_thread_limit')
 })
 
 test('pricing page explains live threads and participants', async () => {
@@ -108,5 +137,5 @@ test('pricing page explains live threads and participants', async () => {
 	const html = await response.text()
 	expect(html).toContain('live threads')
 	expect(html).toContain('participants per thread')
-	expect(html).toContain('$12')
+	expect(html).toContain('$5')
 })

@@ -7,6 +7,7 @@ import {
 	listMessages,
 	sendMessage,
 } from '#src/threads.ts'
+import { guestLiveThreadCap } from '#src/limits.ts'
 import { run } from '#src/db.ts'
 
 test('guest thread create, join, send, and poll is a closed loop', async () => {
@@ -72,6 +73,59 @@ test('guest thread create, join, send, and poll is a closed loop', async () => {
 	if (!listed.ok) throw new Error(listed.error)
 	expect(listed.messages).toHaveLength(1)
 	expect(listed.messages[0]?.id).toBe(sent.message.id)
+	expect(listed.retryAfter).toBe(5)
+})
+
+test('guest threads are one live room per IP', async () => {
+	const env = createTestEnv()
+	const first = await createThread({
+		db: env.DB,
+		baseUrl: 'https://kody.exchange',
+		ownerUserId: null,
+		creatorIp: '203.0.113.8',
+		name: 'one',
+	})
+	expect(first.ok).toBe(true)
+	const second = await createThread({
+		db: env.DB,
+		baseUrl: 'https://kody.exchange',
+		ownerUserId: null,
+		creatorIp: '203.0.113.8',
+		name: 'two',
+	})
+	expect(second).toMatchObject({ ok: false, code: 'guest_thread_limit' })
+	const otherIp = await createThread({
+		db: env.DB,
+		baseUrl: 'https://kody.exchange',
+		ownerUserId: null,
+		creatorIp: '198.51.100.2',
+		name: 'other',
+	})
+	expect(otherIp.ok).toBe(true)
+})
+
+test('guest create stops at the global live-thread cap', async () => {
+	const env = createTestEnv()
+	const now = Date.parse('2026-08-14T00:00:00Z')
+	for (let index = 0; index < guestLiveThreadCap; index += 1) {
+		await run(
+			env.DB,
+			`INSERT INTO threads (id, owner_user_id, purpose, join_secret_hash, webhook_url, created_at, expires_at, creator_ip)
+			 VALUES (?, NULL, NULL, 'hash', NULL, ?, ?, ?)`,
+			`th_cap_${index}`,
+			now,
+			now + 86_400_000,
+			`203.0.113.${index % 250}`,
+		)
+	}
+	const created = await createThread({
+		db: env.DB,
+		baseUrl: 'https://kody.exchange',
+		ownerUserId: null,
+		creatorIp: '198.51.100.9',
+		now,
+	})
+	expect(created).toMatchObject({ ok: false, code: 'guest_capacity' })
 })
 
 test('free accounts cannot mint a fourth live agent token', async () => {

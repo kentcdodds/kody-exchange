@@ -44,7 +44,7 @@ export const plans = {
 	pro: {
 		name: 'pro',
 		label: 'Pro',
-		priceMonthlyUsd: 12,
+		priceMonthlyUsd: 5,
 		liveAgents: 20,
 		threads: 50,
 		messagesPerMonth: 25_000,
@@ -90,5 +90,27 @@ export function usageOwnerKey(input: {
 
 export const pollMinIntervalMs = 1000
 export const pollRetryAfterSeconds = 2
-export const guestCreatePerHour = 10
+export const guestPollMinIntervalMs = 5000
+export const guestPollRetryAfterSeconds = 5
+export const pollKvPersistMs = 30_000
+export const guestCreatePerHour = 3
+export const guestLiveThreadCap = 1000
 export const messageBurstPerMinute = 20
+
+export function pollMinIntervalMsFor(
+	thread: {
+		owner_user_id: string | null
+	} | null,
+) {
+	return thread?.owner_user_id ? pollMinIntervalMs : guestPollMinIntervalMs
+}
+
+export function pollRetryAfterSecondsFor(
+	thread: {
+		owner_user_id: string | null
+	} | null,
+) {
+	return thread?.owner_user_id
+		? pollRetryAfterSeconds
+		: guestPollRetryAfterSeconds
+}
