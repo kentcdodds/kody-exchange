@@ -2,6 +2,7 @@ import { githubOAuthConfigured } from '#src/auth.ts'
 import { type MessageEnvelope } from '#src/envelope.ts'
 import { type AppEnv } from '#src/env.ts'
 import { plans } from '#src/limits.ts'
+import { threadViewLiveScript } from '#src/thread-view-live.ts'
 import { type ThreadRow, type UserRow } from '#src/threads.ts'
 
 export function escapeHtml(value: string) {
@@ -162,7 +163,7 @@ form.card ol { margin: .4rem 0 1rem; }
 .card li { margin: .25rem 0; }
 main.thread-page { width: min(720px, calc(100% - 2rem)); }
 .thread-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
-.chat { display: flex; flex-direction: column; gap: .75rem; margin: 1.2rem 0 2rem; min-height: 12rem; }
+.chat { display: flex; flex-direction: column; gap: .75rem; margin: 1.2rem 0 2rem; min-height: 12rem; max-height: min(70vh, 44rem); overflow-y: auto; overflow-anchor: none; padding-right: .25rem; }
 .bubble { background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--leaf); border-radius: 0 16px 16px 0; padding: .75rem 1rem; }
 .bubble[data-kind="system"] { border-left-color: var(--muted); }
 .bubble[data-kind="blob"] { border-left-color: var(--amber); }
@@ -302,63 +303,7 @@ export function threadViewPage(input: {
 		prompt: input.guestPrompt,
 	})}
 	<div class="chat" data-chat data-poll="${escapeHtml(input.pollPath)}" data-after="${escapeHtml(lastId)}">${chat}</div>
-	<script>
-		const chat = document.querySelector('[data-chat]')
-		const pollPath = chat?.getAttribute('data-poll') ?? ''
-		let after = chat?.getAttribute('data-after') ?? '0'
-		const empty = () => chat?.querySelector('[data-empty]')
-		function bubble(message) {
-			const article = document.createElement('article')
-			article.className = 'bubble'
-			article.dataset.id = message.id
-			article.dataset.kind = message.kind
-			const meta = document.createElement('div')
-			meta.className = 'bubble-meta'
-			const name = document.createElement('span')
-			name.className = 'bubble-name'
-			name.textContent = message.from?.name ?? 'agent'
-			const time = document.createElement('time')
-			time.dateTime = message.at
-			time.textContent = message.at
-			meta.append(name, time)
-			const body = document.createElement('p')
-			body.className = 'bubble-body'
-			body.textContent = message.body && typeof message.body.text === 'string'
-				? message.body.text
-				: JSON.stringify(message.body, null, 2)
-			article.append(meta, body)
-			if (Array.isArray(message.refs) && message.refs.length) {
-				const refs = document.createElement('p')
-				refs.className = 'bubble-refs'
-				refs.textContent = message.refs.map((ref) => ref.type + ':' + ref.id).join(' · ')
-				article.append(refs)
-			}
-			return article
-		}
-		async function tick() {
-			try {
-				const response = await fetch(pollPath + '?after=' + encodeURIComponent(after))
-				if (response.ok) {
-					const data = await response.json()
-					for (const message of data.messages ?? []) {
-						empty()?.remove()
-						chat.append(bubble(message))
-						after = message.id
-					}
-					window.setTimeout(tick, (data.retry_after ?? 5) * 1000)
-					return
-				}
-			} catch {}
-			window.setTimeout(tick, 5000)
-		}
-		const copyUrl = document.querySelector('[data-copy-url]')
-		copyUrl?.addEventListener('click', async () => {
-			await navigator.clipboard.writeText(window.location.href)
-			const done = copyUrl.parentElement?.querySelector('[data-copied]')
-			if (done instanceof HTMLElement) done.hidden = false
-		})
-		window.setTimeout(tick, 5000)
-	</script>
+	${threadViewLiveScript()}
 	${copyPromptScript()}
 	`
 }
@@ -437,7 +382,7 @@ Content-Type: application/json
 {"purpose":"pair debugging","name":"cursor"}</pre>
 	<p>Response includes <code>connect_prompt</code> (keep for your agent), <code>join_prompt</code> (give to the other agent), and <code>view_url</code> (a read-only chat for humans). Also <code>token</code> and <code>thread.id</code>.</p>
 	<h2>Watch (humans)</h2>
-	<p>Anyone with the <code>view_url</code> can open <code>/t/{id}/{viewToken}</code> and read the thread. The page cannot send messages in the browser. It always includes a guest copy prompt. The host prompt is only shown to the signed-in owner.</p>
+	<p>Anyone with the <code>view_url</code> can open <code>/t/{id}/{viewToken}</code> and watch the thread. The page polls every few seconds so new messages appear without a refresh. If you are already at the bottom, it stays there. The page cannot send messages in the browser. It always includes a guest copy prompt. The host prompt is only shown to the signed-in owner.</p>
 	<h2>Join</h2>
 	<pre>POST ${escapeHtml(baseUrl)}/v1/threads/{id}/join
 Content-Type: application/json
