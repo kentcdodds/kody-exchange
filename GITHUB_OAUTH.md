@@ -1,6 +1,6 @@
-# GitHub OAuth app (do this tonight)
+# GitHub OAuth app
 
-Create a GitHub OAuth App under **kentcdodds** (or the Kody org if you prefer), then paste the client id/secret into this repo’s Actions secrets. The Worker is not live yet; these URLs are the contract.
+Callback path is `/auth/callback/github` (matches the GitHub OAuth App).
 
 ## OAuth App settings
 
@@ -8,35 +8,27 @@ Create a GitHub OAuth App under **kentcdodds** (or the Kody org if you prefer), 
 | --- | --- |
 | Application name | `kody.email` |
 | Homepage URL | `https://kody.email` |
-| Application description | HTTP mailbox for agents. Not SMTP email. |
-| Authorization callback URL | `https://kody.email/auth/github/callback` |
+| Authorization callback URL | `https://kody.email/auth/callback/github` |
+| Local callback (optional, add later) | `http://localhost:8787/auth/callback/github` |
 
-Add a second callback URL if GitHub shows “Callback URLs”:
+Expire user access tokens: fine. We only need GitHub identity at callback time.
 
-- `http://localhost:8787/auth/github/callback`
+## Worker secrets (production)
 
-Enable **Device flow** only if you want it later. v1 uses the web callback.
+After GitHub shows the Client ID and Client Secret:
 
-## Repo secrets (Actions)
-
-GitHub Actions reserves `GITHUB_*`, so use these names:
-
-| Secret | Value |
+| Worker secret | Value |
 | --- | --- |
-| `OAUTH_GITHUB_CLIENT_ID` | OAuth App client id |
-| `OAUTH_GITHUB_CLIENT_SECRET` | OAuth App client secret |
+| `GITHUB_CLIENT_ID` | Client ID |
+| `GITHUB_CLIENT_SECRET` | Client secret |
 
-Production deploy maps those to Worker secrets `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`.
+## GitHub Actions secrets
 
-You can also set them later with:
+Actions reserves `GITHUB_*`, so the deploy workflow reads:
 
-```bash
-npx wrangler secret put GITHUB_CLIENT_ID
-npx wrangler secret put GITHUB_CLIENT_SECRET
-```
+| Actions secret | Maps to Worker |
+| --- | --- |
+| `OAUTH_GITHUB_CLIENT_ID` | `GITHUB_CLIENT_ID` |
+| `OAUTH_GITHUB_CLIENT_SECRET` | `GITHUB_CLIENT_SECRET` |
 
-## What the app will do
-
-`GET /auth/github` → GitHub → `GET /auth/github/callback` → session cookie → `/account`.
-
-Anonymous threads do **not** need GitHub. Sign-in is for longer retention, more agents, blobs, and Pro.
+Do not put the homepage or callback URL in env. Those live only on the GitHub OAuth App.
