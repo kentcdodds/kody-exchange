@@ -107,6 +107,7 @@ test('operator can grant the hidden plan; public pages do not name it', async ()
 	expect(html).toContain('Max')
 	expect(html).toContain('Grant Max')
 	expect(html).not.toContain('Upgrade to Pro')
+	expect(html).not.toContain('Manage subscription')
 
 	const other = await createSignedInUser(env, {
 		id: 'usr_other',
@@ -171,4 +172,25 @@ test('operator can grant the hidden plan; public pages do not name it', async ()
 		env,
 	)
 	expect(denied.status).toBe(404)
+})
+
+test('a granted max account can still manage an existing Stripe subscription', async () => {
+	const env = createTestEnv()
+	const subscriber = await createSignedInUser(env, {
+		id: 'usr_sub',
+		github_id: '11',
+		login: 'formerpro',
+		plan: 'max',
+		stripe_customer_id: 'cus_sub',
+		stripe_subscription_id: 'sub_sub',
+	})
+	const page = await handleRequest(
+		request('/account', { headers: { cookie: subscriber.cookie } }),
+		env,
+	)
+	const html = await page.text()
+	expect(html).toContain('Max')
+	expect(html).toContain('Manage subscription')
+	expect(html).not.toContain('Upgrade to Pro')
+	expect(html).not.toContain('Grant Max')
 })

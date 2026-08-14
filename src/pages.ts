@@ -246,8 +246,9 @@ async function accountPage(
 	const atThreadLimit = liveThreads >= plan.threads
 	const upgraded = new URL(request.url).searchParams.get('upgraded') === '1'
 	const error = accountError(new URL(request.url).searchParams.get('error'))
-	const checkoutAvailable =
-		stripeSecretConfigured(env) && env.STRIPE_PRO_PRICE_ID
+	const checkoutAvailable = Boolean(
+		stripeSecretConfigured(env) && env.STRIPE_PRO_PRICE_ID,
+	)
 	const link = paymentLinkUrl(env, user)
 
 	return `
@@ -290,27 +291,7 @@ async function accountPage(
 					)
 				).join('')
 	}
-	${
-		user.plan === 'max'
-			? ''
-			: `<h2>Billing</h2>
-	${
-		user.plan === 'pro'
-			? `<form method="post" action="/account/portal">
-				<input type="hidden" name="csrf" value="${escapeHtml(csrf)}" />
-				<button type="submit">Manage subscription</button>
-			</form>
-			<p class="tiny">If the portal is not configured, email <a href="mailto:support@kody.exchange">support@kody.exchange</a>.</p>`
-			: checkoutAvailable
-				? `<form method="post" action="/account/checkout">
-					<input type="hidden" name="csrf" value="${escapeHtml(csrf)}" />
-					<button type="submit">Upgrade to Pro · $5/mo</button>
-				</form>`
-				: link
-					? `<p><a class="btn" href="${escapeHtml(link)}">Upgrade to Pro · $5/mo</a></p>`
-					: `<p class="muted">Pro checkout is not wired yet. Email <a href="mailto:support@kody.exchange">support@kody.exchange</a>.</p>`
-	}`
-	}
+	${accountBillingHtml({ user, csrf, checkoutAvailable, link })}
 	${
 		isOperatorLogin(user.login)
 			? `<h2>Operator</h2>
@@ -362,6 +343,37 @@ async function threadListItem(thread: ThreadListRow, baseUrl: string) {
 		<p class="tiny"><code>${escapeHtml(thread.id)}</code> · ${escapeHtml(memberLabel)} · expires ${escapeHtml(new Date(thread.expires_at).toISOString())}</p>
 		<p><a href="${escapeHtml(href)}">Open read-only chat</a></p>
 	</article>`
+}
+
+function accountBillingHtml(input: {
+	user: UserRow
+	csrf: string
+	checkoutAvailable: boolean
+	link: string | null
+}) {
+	const manage = `<h2>Billing</h2>
+	<form method="post" action="/account/portal">
+		<input type="hidden" name="csrf" value="${escapeHtml(input.csrf)}" />
+		<button type="submit">Manage subscription</button>
+	</form>
+	<p class="tiny">If the portal is not configured, email <a href="mailto:support@kody.exchange">support@kody.exchange</a>.</p>`
+	if (input.user.plan === 'max') {
+		return input.user.stripe_customer_id ? manage : ''
+	}
+	if (input.user.plan === 'pro') return manage
+	if (input.checkoutAvailable) {
+		return `<h2>Billing</h2>
+	<form method="post" action="/account/checkout">
+		<input type="hidden" name="csrf" value="${escapeHtml(input.csrf)}" />
+		<button type="submit">Upgrade to Pro · $5/mo</button>
+	</form>`
+	}
+	if (input.link) {
+		return `<h2>Billing</h2>
+	<p><a class="btn" href="${escapeHtml(input.link)}">Upgrade to Pro · $5/mo</a></p>`
+	}
+	return `<h2>Billing</h2>
+	<p class="muted">Pro checkout is not wired yet. Email <a href="mailto:support@kody.exchange">support@kody.exchange</a>.</p>`
 }
 
 function accountError(code: string | null) {

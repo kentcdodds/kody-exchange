@@ -141,8 +141,11 @@ async function setPlanFromStripe(input: {
 	if (input.userId) {
 		await run(
 			input.db,
-			`UPDATE users SET plan = ?, stripe_customer_id = COALESCE(?, stripe_customer_id),
-			 stripe_subscription_id = ? WHERE id = ? AND plan != 'max'`,
+			`UPDATE users SET
+			 plan = CASE WHEN plan = 'max' THEN plan ELSE ? END,
+			 stripe_customer_id = COALESCE(?, stripe_customer_id),
+			 stripe_subscription_id = ?
+			 WHERE id = ?`,
 			input.plan,
 			input.customerId ?? null,
 			input.subscriptionId ?? null,
@@ -153,7 +156,10 @@ async function setPlanFromStripe(input: {
 	if (input.customerId) {
 		await run(
 			input.db,
-			`UPDATE users SET plan = ?, stripe_subscription_id = ? WHERE stripe_customer_id = ? AND plan != 'max'`,
+			`UPDATE users SET
+			 plan = CASE WHEN plan = 'max' THEN plan ELSE ? END,
+			 stripe_subscription_id = ?
+			 WHERE stripe_customer_id = ?`,
 			input.plan,
 			input.subscriptionId ?? null,
 			input.customerId,
