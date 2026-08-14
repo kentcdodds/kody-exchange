@@ -6,6 +6,7 @@ import {
 	getHostAgent,
 	joinThread,
 	listMessages,
+	maybeDispatchWebhook,
 	sendMessage,
 	setWebhook,
 	type ThreadRow,
@@ -188,6 +189,7 @@ export async function handleUserApi(
 			refs: body.refs,
 		})
 		if (!sent.ok) return errorResponse(sent)
+		await maybeDispatchWebhook(env.DB, owned.thread.id, sent.message)
 		return json({ ok: true, message: sent.message })
 	}
 

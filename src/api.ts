@@ -9,7 +9,7 @@ import {
 } from '#src/rate-limit.ts'
 import {
 	createThread,
-	dispatchWebhook,
+	maybeDispatchWebhook,
 	getAgentByToken,
 	getAgentByViewHostToken,
 	joinThread,
@@ -277,14 +277,7 @@ async function sendRoute(request: Request, env: AppEnv, threadId: string) {
 		refs: body.refs,
 	})
 	if (!sent.ok) return errorResponse(sent)
-	const thread = await first<{ webhook_url: string | null }>(
-		env.DB,
-		'SELECT webhook_url FROM threads WHERE id = ?',
-		threadId,
-	)
-	if (thread?.webhook_url) {
-		void dispatchWebhook(thread.webhook_url, sent.message)
-	}
+	await maybeDispatchWebhook(env.DB, threadId, sent.message)
 	return json({ ok: true, message: sent.message })
 }
 

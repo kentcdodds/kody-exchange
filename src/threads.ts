@@ -928,3 +928,18 @@ export async function dispatchWebhook(
 		console.warn('webhook_failed', url, response.status)
 	}
 }
+
+export async function maybeDispatchWebhook(
+	db: D1Database,
+	threadId: string,
+	message: MessageEnvelope,
+) {
+	const thread = await first<{ webhook_url: string | null }>(
+		db,
+		'SELECT webhook_url FROM threads WHERE id = ?',
+		threadId,
+	)
+	if (thread?.webhook_url) {
+		await dispatchWebhook(thread.webhook_url, message)
+	}
+}

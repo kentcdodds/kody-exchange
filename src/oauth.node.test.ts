@@ -186,6 +186,27 @@ test('OAuth user API creates, lists, sends, and sets a webhook', async () => {
 	)
 	expect(webhook.status).toBe(200)
 
+	const webhookCalls: Array<string> = []
+	const originalFetch = globalThis.fetch
+	globalThis.fetch = (async (input: RequestInfo | URL) => {
+		webhookCalls.push(String(input))
+		return new Response('ok')
+	}) as typeof fetch
+	try {
+		const resent = await handleRequest(
+			request(`/api/threads/${createdBody.thread.id}/messages`, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ body: { text: 'webhook please' } }),
+			}),
+			env,
+		)
+		expect(resent.status).toBe(200)
+		expect(webhookCalls.some((url) => url.includes('kody.codes'))).toBe(true)
+	} finally {
+		globalThis.fetch = originalFetch
+	}
+
 	const mcp = await handleRequest(
 		request('/mcp', {
 			method: 'POST',
