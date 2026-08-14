@@ -1,3 +1,4 @@
+import { json } from '#src/api.ts'
 import {
 	clearThreadFlashCookie,
 	csrfToken,
@@ -24,11 +25,17 @@ import {
 	privacyPage,
 	promptCard,
 	termsPage,
+	threadNotFoundPage,
+	threadViewPage,
 } from '#src/html.ts'
 import { getPlan } from '#src/limits.ts'
+import { clientIp, limitViewPoll, workerPollCache } from '#src/rate-limit.ts'
 import {
+	countMembers,
 	countOwnedThreads,
 	createThread,
+	listMessagesForView,
+	threadViewUrlFor,
 	type ThreadRow,
 	type UserRow,
 } from '#src/threads.ts'
@@ -43,6 +50,15 @@ export async function renderPage(
 	const url = new URL(request.url)
 	const baseUrl = appBaseUrl(env, request)
 	const common = { user, env, path: url.pathname }
+
+	const viewMessages = url.pathname.match(/^\/t\/([^/]+)\/([^/]+)\/messages$/)
+	if (viewMessages?.[1] && viewMessages[2]) {
+		return pollThreadView(request, env, viewMessages[1], viewMessages[2])
+	}
+	const view = url.pathname.match(/^\/t\/([^/]+)\/([^/]+)$/)
+	if (view?.[1] && view[2]) {
+		return renderThreadView(request, env, user, view[1], view[2])
+	}
 
 	switch (url.pathname) {
 		case '/':
@@ -93,6 +109,94 @@ export async function renderPage(
 		default:
 			return null
 	}
+}
+
+async function renderThreadView(
+	request: Request,
+	env: AppEnv,
+	user: UserRow | null,
+	threadId: string,
+	viewToken: string,
+) {
+	const listed = await listMessagesForView({
+		db: env.DB,
+		threadId,
+		viewToken,
+	})
+	if (!listed.ok) {
+		return html(
+			layout({
+				user,
+				env,
+				path: new URL(request.url).pathname,
+				title: 'Thread not found',
+				body: threadNotFoundPage(),
+			}),
+			404,
+		)
+	}
+	const memberCount = await countMembers(env.DB, listed.thread.id)
+	return html(
+		layout({
+			user,
+			env,
+			path: new URL(request.url).pathname,
+			title: listed.thread.purpose?.trim() || 'Thread',
+			description: 'Read-only thread on kody.exchange.',
+			extraHead:
+				'<meta name="robots" content="noindex" /><meta name="referrer" content="no-referrer" />',
+			mainClass: 'thread-page',
+			body: threadViewPage({
+				thread: listed.thread,
+				messages: listed.messages,
+				memberCount,
+				pollPath: `${new URL(request.url).pathname}/messages`,
+			}),
+		}),
+	)
+}
+
+async function pollThreadView(
+	request: Request,
+	env: AppEnv,
+	threadId: string,
+	viewToken: string,
+) {
+	const limited = await limitViewPoll({
+		store: env.RATE_LIMIT,
+		cache: workerPollCache(),
+		ip: clientIp(request),
+		threadId,
+	})
+	if (!limited.ok) {
+		return json(
+			{
+				ok: false,
+				error: 'Poll at most once every five seconds.',
+				code: 'rate_limited',
+			},
+			429,
+			{ 'retry-after': String(limited.retryAfterSeconds) },
+		)
+	}
+	const listed = await listMessagesForView({
+		db: env.DB,
+		threadId,
+		viewToken,
+		after: new URL(request.url).searchParams.get('after'),
+		limit: Number(new URL(request.url).searchParams.get('limit') ?? 50),
+	})
+	if (!listed.ok) {
+		return json(
+			{ ok: false, error: listed.error, code: listed.code },
+			listed.status,
+		)
+	}
+	return json(
+		{ ok: true, messages: listed.messages, retry_after: listed.retryAfter },
+		200,
+		{ 'retry-after': String(listed.retryAfter) },
+	)
 }
 
 async function renderAccountPage(
@@ -177,7 +281,13 @@ async function accountPage(
 	${
 		threads.length === 0
 			? `<p class="muted">None yet. Create one and you'll get both prompts.</p>`
-			: threads.map((thread) => threadListItem(thread)).join('')
+			: (
+					await Promise.all(
+						threads.map((thread) =>
+							threadListItem(thread, appBaseUrl(env, request)),
+						),
+					)
+				).join('')
 	}
 	<h2>Billing</h2>
 	${
@@ -208,6 +318,7 @@ function threadFlashHtml(flash: ThreadFlash) {
 			<li>Paste the first into the agent you already use. It is already in the thread.</li>
 			<li>Send the second to the other person so their agent can join.</li>
 		</ol>
+		<p><a href="${escapeHtml(flash.viewUrl)}">Open the read-only chat</a> — share this link with humans who should watch. It cannot send messages or join agents.</p>
 	</div>
 	${promptCard({
 		id: 'connect-prompt',
@@ -224,13 +335,15 @@ function threadFlashHtml(flash: ThreadFlash) {
 	`
 }
 
-function threadListItem(thread: ThreadListRow) {
+async function threadListItem(thread: ThreadListRow, baseUrl: string) {
 	const purpose = thread.purpose?.trim() || 'Untitled thread'
 	const members = Number(thread.member_count)
 	const memberLabel = `${members} in the thread`
+	const href = await threadViewUrlFor(baseUrl, thread)
 	return `<article class="card">
-		<h3>${escapeHtml(purpose)}</h3>
+		<h3><a href="${escapeHtml(href)}">${escapeHtml(purpose)}</a></h3>
 		<p class="tiny"><code>${escapeHtml(thread.id)}</code> · ${escapeHtml(memberLabel)} · expires ${escapeHtml(new Date(thread.expires_at).toISOString())}</p>
+		<p><a href="${escapeHtml(href)}">Open read-only chat</a></p>
 	</article>`
 }
 
@@ -276,6 +389,7 @@ export async function handleAccountAction(
 			threadId: created.thread.id,
 			connectPrompt: created.connectPrompt,
 			joinPrompt: created.joinPrompt,
+			viewUrl: created.viewUrl,
 		})
 		return new Response(null, {
 			status: 303,

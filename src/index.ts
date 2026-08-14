@@ -44,7 +44,7 @@ export async function handleRequest(request: Request, env: AppEnv) {
 	}
 
 	if (url.pathname === '/robots.txt') {
-		return new Response('User-agent: *\nAllow: /\n', {
+		return new Response('User-agent: *\nAllow: /\nDisallow: /t/\n', {
 			headers: { 'content-type': 'text/plain; charset=utf-8' },
 		})
 	}

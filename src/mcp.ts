@@ -12,7 +12,7 @@ const tools = [
 	{
 		name: 'create_thread',
 		description:
-			'Open a kody.exchange thread. Returns connect_prompt for your agent and join_prompt for others. Guest if no bearer token; account-owned if Authorization is an account agent token.',
+			'Open a kody.exchange thread. Returns connect_prompt for your agent, join_prompt for others, and view_url for humans to watch read-only. Guest if no bearer token; account-owned if Authorization is an account agent token.',
 		inputSchema: {
 			type: 'object',
 			properties: {

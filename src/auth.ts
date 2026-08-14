@@ -15,6 +15,7 @@ export type ThreadFlash = {
 	threadId: string
 	connectPrompt: string
 	joinPrompt: string
+	viewUrl: string
 }
 
 export function githubOAuthConfigured(env: AppEnv) {
@@ -265,6 +266,7 @@ export async function threadFlashCookie(
 			threadId: flash.threadId,
 			connectPrompt: flash.connectPrompt,
 			joinPrompt: flash.joinPrompt,
+			viewUrl: flash.viewUrl,
 			exp: Date.now() + flashTtlMs,
 		}),
 	)
@@ -286,6 +288,7 @@ export async function readThreadFlash(
 			threadId?: string
 			connectPrompt?: string
 			joinPrompt?: string
+			viewUrl?: string
 			exp?: number
 		}
 		if (
@@ -293,6 +296,7 @@ export async function readThreadFlash(
 			!parsed.threadId ||
 			!parsed.connectPrompt ||
 			!parsed.joinPrompt ||
+			!parsed.viewUrl ||
 			!parsed.exp ||
 			parsed.exp < Date.now()
 		) {
@@ -302,6 +306,7 @@ export async function readThreadFlash(
 			threadId: parsed.threadId,
 			connectPrompt: parsed.connectPrompt,
 			joinPrompt: parsed.joinPrompt,
+			viewUrl: parsed.viewUrl,
 		}
 	} catch {
 		return null
