@@ -23,6 +23,7 @@ import {
 import { createId } from '#src/ids.ts'
 import { first, run } from '#src/db.ts'
 import { freeAccountUpsell, isGuestUpsellCode } from '#src/free-account.ts'
+import { maybeBroadcastThreadView } from '#src/thread-room.ts'
 
 export function json(data: unknown, status = 200, extra: HeadersInit = {}) {
 	const headers = new Headers(extra)
@@ -304,6 +305,7 @@ async function sendRoute(
 	})
 	if (!sent.ok) return errorResponse(sent)
 	await maybeDispatchWebhook(env.DB, threadId, sent.message, ctx)
+	await maybeBroadcastThreadView(env, threadId, sent.message, ctx)
 	return json({ ok: true, message: sent.message })
 }
 

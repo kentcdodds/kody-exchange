@@ -54,6 +54,10 @@ export async function renderPage(
 	const baseUrl = appBaseUrl(env, request)
 	const common = { user, env, path: url.pathname }
 
+	const viewLive = url.pathname.match(/^\/t\/([^/]+)\/([^/]+)\/live$/)
+	if (viewLive?.[1] && viewLive[2]) {
+		return connectThreadView(request, env, viewLive[1], viewLive[2])
+	}
 	const viewMessages = url.pathname.match(/^\/t\/([^/]+)\/([^/]+)\/messages$/)
 	if (viewMessages?.[1] && viewMessages[2]) {
 		return pollThreadView(request, env, viewMessages[1], viewMessages[2])
@@ -174,6 +178,48 @@ async function renderThreadView(
 			}),
 		}),
 	)
+}
+
+async function connectThreadView(
+	request: Request,
+	env: AppEnv,
+	threadId: string,
+	viewToken: string,
+) {
+	if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') {
+		return json(
+			{
+				ok: false,
+				error: 'Expected a WebSocket upgrade.',
+				code: 'upgrade_required',
+			},
+			426,
+		)
+	}
+	const listed = await listMessagesForView({
+		db: env.DB,
+		threadId,
+		viewToken,
+		limit: 1,
+	})
+	if (!listed.ok) {
+		return json(
+			{ ok: false, error: listed.error, code: listed.code },
+			listed.status,
+		)
+	}
+	if (!env.THREAD_ROOMS) {
+		return json(
+			{
+				ok: false,
+				error: 'Live view is unavailable.',
+				code: 'live_unavailable',
+			},
+			503,
+		)
+	}
+	const stub = env.THREAD_ROOMS.get(env.THREAD_ROOMS.idFromName(threadId))
+	return stub.fetch(request)
 }
 
 async function pollThreadView(

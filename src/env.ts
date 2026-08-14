@@ -3,6 +3,7 @@ export type AppEnv = {
 	RATE_LIMIT: KVNamespace
 	BLOBS: R2Bucket
 	ASSETS?: Fetcher
+	THREAD_ROOMS?: DurableObjectNamespace
 	OAUTH_KV?: KVNamespace
 	OAUTH_PROVIDER?: import('#src/oauth-user.ts').OAuthHelpers
 	OAUTH_USER?: import('#src/threads.ts').UserRow

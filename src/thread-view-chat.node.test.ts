@@ -1,17 +1,51 @@
 import { expect, test } from 'vitest'
 import {
-	AGENT_ACCENT_COLORS,
-	agentAccent,
+	AGENT_ACCENT_COUNT,
+	AGENT_ACCENT_DARK,
+	AGENT_ACCENT_LIGHT,
+	agentAccentCss,
+	agentAccentIndex,
+	agentAccentVar,
+	contrastRatio,
 	isMineBubble,
+	mixHex,
 } from '#src/thread-view-chat.ts'
 
-test('agentAccent is stable and splits different agents', () => {
-	expect(agentAccent('ag_host')).toBe(agentAccent('ag_host'))
-	expect(AGENT_ACCENT_COLORS).toContain(agentAccent('ag_host'))
-	const colors = new Set(
-		['cursor', 'claude', 'host', 'guest', 'codex'].map(agentAccent),
+const lightCard = '#fffaf1'
+const lightInk = '#1c1610'
+const lightMuted = '#6b5e4e'
+const darkCard = '#241e18'
+const darkInk = '#f3eadc'
+const darkMuted = '#b5a894'
+
+test('agent accents are stable indexes into the shared palette', () => {
+	expect(agentAccentIndex('ag_host')).toBe(agentAccentIndex('ag_host'))
+	expect(agentAccentIndex('ag_host')).toBeLessThan(AGENT_ACCENT_COUNT)
+	expect(agentAccentVar(0)).toBe('var(--agent-0)')
+	expect(agentAccentVar(7)).toBe('var(--agent-2)')
+	const indexes = new Set(
+		['cursor', 'claude', 'host', 'guest', 'codex'].map(agentAccentIndex),
 	)
-	expect(colors.size).toBeGreaterThan(1)
+	expect(indexes.size).toBeGreaterThan(1)
+	expect(agentAccentCss()).toContain('--agent-0:')
+	expect(agentAccentCss()).toContain('prefers-color-scheme: dark')
+})
+
+test('agent accents meet WCAG contrast in light and dark', () => {
+	expect(AGENT_ACCENT_LIGHT).toHaveLength(AGENT_ACCENT_COUNT)
+	expect(AGENT_ACCENT_DARK).toHaveLength(AGENT_ACCENT_COUNT)
+	for (const color of AGENT_ACCENT_LIGHT) {
+		expect(contrastRatio(color, lightCard)).toBeGreaterThanOrEqual(3)
+		const wash = mixHex(lightCard, color, 0.1)
+		expect(contrastRatio(lightInk, wash)).toBeGreaterThanOrEqual(4.5)
+		expect(contrastRatio(lightMuted, wash)).toBeGreaterThanOrEqual(4.5)
+	}
+	for (const color of AGENT_ACCENT_DARK) {
+		expect(contrastRatio(color, darkCard)).toBeGreaterThanOrEqual(3)
+		const wash = mixHex(darkCard, color, 0.1)
+		expect(contrastRatio(darkInk, wash)).toBeGreaterThanOrEqual(4.5)
+		expect(contrastRatio(darkMuted, wash)).toBeGreaterThanOrEqual(4.5)
+	}
 })
 
 test('host viewer pins host messages to the right', () => {

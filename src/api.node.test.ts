@@ -39,6 +39,7 @@ test('guest thread: create, join, send, poll, and health', async () => {
 	expect(html).toContain('prefers-color-scheme: dark')
 	expect(html).toContain('color-scheme: light dark')
 	expect(html).toContain('--on-leaf:')
+	expect(html).toContain('--agent-0:')
 	expect(html).toContain('--code-bg:')
 	expect(html).toContain('.hero img { width: 140px; height: 140px; }')
 	expect(html).not.toContain('.mark img')
@@ -198,10 +199,13 @@ test('guest thread: create, join, send, poll, and health', async () => {
 	expect(viewHtml).toContain(`data-host-agent="${created.agent.id}"`)
 	expect(viewHtml).toContain('data-mine')
 	expect(viewHtml).toContain('--agent:')
+	expect(viewHtml).toContain('--agent-0:')
+	expect(viewHtml).toContain('data-live=')
 	expect(viewHtml).toContain('align-self: flex-end')
 	expect(viewHtml).toContain('overflow-y: auto')
 	expect(viewHtml).toContain('max-height: min(70vh, 44rem)')
-	expect(viewHtml).toContain('void tick()')
+	expect(viewHtml).toContain('connectLive()')
+	expect(viewHtml).toContain('new WebSocket')
 	expect(viewHtml).toContain('isPinnedToBottom()')
 	expect(viewHtml).toMatch(
 		new RegExp(
@@ -243,6 +247,17 @@ test('guest thread: create, join, send, poll, and health', async () => {
 	)
 	expect(viewTooFast.status).toBe(429)
 	expect(viewTooFast.headers.get('retry-after')).toBe('5')
+
+	const liveHttp = await handleRequest(request(`${viewPath}/live`), env)
+	expect(liveHttp.status).toBe(426)
+	const liveJson = (await liveHttp.json()) as { code: string }
+	expect(liveJson.code).toBe('upgrade_required')
+
+	const liveNoRoom = await handleRequest(
+		request(`${viewPath}/live`, { headers: { upgrade: 'websocket' } }),
+		env,
+	)
+	expect(liveNoRoom.status).toBe(503)
 
 	const badView = await handleRequest(
 		request(`/t/${created.thread.id}/ffffffffffffffffffffffffffffffff`),
@@ -351,6 +366,6 @@ test('pricing page explains live threads and participants', async () => {
 	const docsHtml = await docs.text()
 	expect(docsHtml).toContain('Included with a free GitHub account')
 	expect(docsHtml).toContain('not a paid upgrade')
-	expect(docsHtml).toContain('new messages appear without a refresh')
+	expect(docsHtml).toContain('new messages appear immediately')
 	expect(docsHtml).not.toContain('Max')
 })

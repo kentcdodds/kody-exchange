@@ -1,4 +1,5 @@
 import { errorResponse, json } from '#src/api.ts'
+import { maybeBroadcastThreadView } from '#src/thread-room.ts'
 import { all, first } from '#src/db.ts'
 import { type AppEnv, appBaseUrl } from '#src/env.ts'
 import {
@@ -191,6 +192,7 @@ export async function handleUserApi(
 		})
 		if (!sent.ok) return errorResponse(sent)
 		await maybeDispatchWebhook(env.DB, owned.thread.id, sent.message, ctx)
+		await maybeBroadcastThreadView(env, owned.thread.id, sent.message, ctx)
 		return json({ ok: true, message: sent.message })
 	}
 

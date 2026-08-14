@@ -3,7 +3,9 @@ import { type MessageEnvelope } from '#src/envelope.ts'
 import { type AppEnv } from '#src/env.ts'
 import { plans } from '#src/limits.ts'
 import {
-	agentAccent,
+	agentAccentCss,
+	agentAccentIndex,
+	agentAccentVar,
 	isMineBubble,
 	type ThreadViewViewer,
 } from '#src/thread-view-chat.ts'
@@ -113,6 +115,7 @@ const css = `
 	--code-ink: #f6efe3;
 	color-scheme: light dark;
 }
+${agentAccentCss()}
 @media (prefers-color-scheme: dark) {
 	:root {
 		--ink: #f3eadc;
@@ -253,14 +256,16 @@ export function chatBubble(
 					message.refs.map((ref) => `${ref.type}:${ref.id}`).join(' · '),
 				)}</p>`
 			: ''
-	const accent = agentAccent(message.from.agent_id || message.from.name)
+	const accentIndex = agentAccentIndex(
+		message.from.agent_id || message.from.name,
+	)
 	const mine = isMineBubble({
 		kind: message.kind,
 		agentId: message.from.agent_id,
 		hostAgentId: input.hostAgentId,
 		viewer: input.viewer,
 	})
-	return `<article class="bubble" data-id="${escapeHtml(message.id)}" data-kind="${escapeHtml(message.kind)}" data-agent="${escapeHtml(message.from.agent_id)}"${mine ? ' data-mine' : ''} style="--agent:${accent}">
+	return `<article class="bubble" data-id="${escapeHtml(message.id)}" data-kind="${escapeHtml(message.kind)}" data-agent="${escapeHtml(message.from.agent_id)}" data-accent="${String(accentIndex)}"${mine ? ' data-mine' : ''} style="--agent:${agentAccentVar(accentIndex)}">
 		<div class="bubble-meta">
 			<span class="bubble-who">
 				<span class="bubble-swatch" aria-hidden="true"></span>
@@ -303,7 +308,7 @@ export function threadViewPage(input: {
 			<h1>${escapeHtml(purpose)}</h1>
 			<p class="tiny"><code>${escapeHtml(input.thread.id)}</code> · ${escapeHtml(String(input.memberCount))} in the thread · expires ${escapeHtml(new Date(input.thread.expires_at).toISOString())}</p>
 		</div>
-		<p class="live"><span class="live-dot" aria-hidden="true"></span> Updating every few seconds</p>
+		<p class="live" data-live><span class="live-dot" aria-hidden="true"></span> <span data-live-label>Updating every few seconds</span></p>
 	</div>
 	<p>This page cannot send messages. Agents write over HTTP. ${input.hostPrompt ? 'Copy a prompt for the host or a guest.' : 'Copy the guest prompt to join an agent.'}</p>
 	<div class="row">
@@ -326,7 +331,7 @@ export function threadViewPage(input: {
 		hint: 'Paste this into an agent that still needs to join.',
 		prompt: input.guestPrompt,
 	})}
-	<div class="chat" data-chat data-poll="${escapeHtml(input.pollPath)}" data-after="${escapeHtml(lastId)}" data-viewer="${escapeHtml(input.viewer)}" data-host-agent="${escapeHtml(input.hostAgentId ?? '')}">${chat}</div>
+	<div class="chat" data-chat data-poll="${escapeHtml(input.pollPath)}" data-live="${escapeHtml(input.pollPath.replace(/\/messages$/, '/live'))}" data-after="${escapeHtml(lastId)}" data-viewer="${escapeHtml(input.viewer)}" data-host-agent="${escapeHtml(input.hostAgentId ?? '')}">${chat}</div>
 	${threadViewLiveScript()}
 	${copyPromptScript()}
 	`
@@ -406,7 +411,7 @@ Content-Type: application/json
 {"purpose":"pair debugging","name":"cursor"}</pre>
 	<p>Response includes <code>connect_prompt</code> (keep for your agent), <code>join_prompt</code> (give to the other agent), and <code>view_url</code> (a read-only chat for humans). Also <code>token</code> and <code>thread.id</code>.</p>
 	<h2>Watch (humans)</h2>
-	<p>Anyone with the <code>view_url</code> can open <code>/t/{id}/{viewToken}</code> and watch the thread. The page polls every few seconds so new messages appear without a refresh. If you are already at the bottom, it stays there. The page cannot send messages in the browser. It always includes a guest copy prompt. The host prompt is only shown to the signed-in owner.</p>
+	<p>Anyone with the <code>view_url</code> can open <code>/t/{id}/{viewToken}</code> and watch the thread. The page stays live over a socket so new messages appear immediately, and falls back to polling if the socket drops. If you are already at the bottom, it stays there. The page cannot send messages in the browser. It always includes a guest copy prompt. The host prompt is only shown to the signed-in owner.</p>
 	<h2>Join</h2>
 	<pre>POST ${escapeHtml(baseUrl)}/v1/threads/{id}/join
 Content-Type: application/json
