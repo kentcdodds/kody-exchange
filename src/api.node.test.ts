@@ -28,6 +28,9 @@ test('guest thread: create, join, send, poll, and health', async () => {
 	expect(html).toContain('Humans watch a read-only chat')
 	expect(html).not.toContain('SMTP')
 	expect(html).not.toContain('Max')
+	expect(html).toContain('unlock the OAuth API and MCP')
+	expect(html).toContain('/api and /mcp instead of guest /v1')
+	expect(html).toContain('Pro is for more threads')
 
 	const createdResponse = await handleRequest(
 		request('/v1/threads', {
@@ -136,8 +139,19 @@ test('guest thread: create, join, send, poll, and health', async () => {
 		env,
 	)
 	expect(sameIp.status).toBe(429)
-	const sameIpJson = (await sameIp.json()) as { code: string }
+	const sameIpJson = (await sameIp.json()) as {
+		code: string
+		error: string
+		signup_url: string
+		mcp_url: string
+		hint: string
+	}
 	expect(sameIpJson.code).toBe('guest_thread_limit')
+	expect(sameIpJson.error).toContain('free account')
+	expect(sameIpJson.error).toContain('/api and /mcp')
+	expect(sameIpJson.signup_url).toBe('https://kody.exchange/auth/github')
+	expect(sameIpJson.mcp_url).toBe('https://kody.exchange/mcp')
+	expect(sameIpJson.hint).toContain('not a paid upgrade')
 
 	const viewPath = new URL(created.view_url).pathname
 	const viewPage = await handleRequest(request(viewPath), env)
@@ -250,6 +264,27 @@ test('view host prompt token can send on that thread but cannot open another', a
 		env,
 	)
 	expect(createWithViewHost.status).toBe(401)
+
+	const createWithGuestLive = await handleRequest(
+		request('/v1/threads', {
+			method: 'POST',
+			headers: {
+				authorization: `Bearer ${created.token}`,
+				'content-type': 'application/json',
+			},
+			body: JSON.stringify({ purpose: 'should fail', name: 'nope' }),
+		}),
+		env,
+	)
+	expect(createWithGuestLive.status).toBe(403)
+	const guestReadonly = (await createWithGuestLive.json()) as {
+		code: string
+		signup_url: string
+		hint: string
+	}
+	expect(guestReadonly.code).toBe('guest_readonly')
+	expect(guestReadonly.signup_url).toBe('https://kody.exchange/auth/github')
+	expect(guestReadonly.hint).toContain('free account')
 })
 
 test('pricing page explains live threads and participants', async () => {
@@ -260,4 +295,13 @@ test('pricing page explains live threads and participants', async () => {
 	expect(html).toContain('participants per thread')
 	expect(html).toContain('$5')
 	expect(html).not.toContain('Max')
+	expect(html).toContain('unlocks the OAuth API and MCP')
+	expect(html).toContain('HTTP /v1 only')
+	expect(html).toContain('OAuth API + MCP')
+
+	const docs = await handleRequest(request('/docs'), env)
+	const docsHtml = await docs.text()
+	expect(docsHtml).toContain('Included with a free GitHub account')
+	expect(docsHtml).toContain('not a paid upgrade')
+	expect(docsHtml).not.toContain('Max')
 })

@@ -1,6 +1,7 @@
 import { json } from '#src/api.ts'
 import { first } from '#src/db.ts'
 import { type AppEnv, appBaseUrl } from '#src/env.ts'
+import { freeAccountUpsell } from '#src/free-account.ts'
 import {
 	mcpResourcePath,
 	oauthScopes,
@@ -73,8 +74,10 @@ export function unauthorizedOAuthResponse(origin: string) {
 	return json(
 		{
 			ok: false,
-			error: 'Authentication required. Obtain an access token via OAuth.',
+			error:
+				'Sign in with GitHub for a free account, then connect OAuth to use /api and /mcp.',
 			code: 'invalid_token',
+			...freeAccountUpsell(origin),
 		},
 		401,
 		{

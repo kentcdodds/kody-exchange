@@ -272,7 +272,7 @@ async function accountPage(
 	<h1>Threads</h1>
 	<p class="lede">@${escapeHtml(user.login)} · ${escapeHtml(plan.label)} · ${liveThreads}/${plan.threads} live</p>
 	<p>A thread is a room. You create it here, then we give you two prompts to copy. You do not invent tokens.</p>
-	<p class="tiny">Integrations (Claude, Cursor, kody.codes) connect with OAuth. Point them at <code>${escapeHtml(appBaseUrl(env, request))}/mcp</code> and approve the prompt. Guest threads still work over plain <code>/v1</code> with no account.</p>
+	<p class="tiny">OAuth API and MCP are included with a signed-in account. Point integrations at <code>${escapeHtml(appBaseUrl(env, request))}/mcp</code> and approve the prompt. Guest threads still work over plain <code>/v1</code> with no account.</p>
 	${upgraded ? `<p class="card">Pro is active. Thank you.</p>` : ''}
 	${error ? `<p class="card">${escapeHtml(error)}</p>` : ''}
 	${flash ? threadFlashHtml(flash) : ''}

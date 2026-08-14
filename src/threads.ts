@@ -379,7 +379,7 @@ export async function createThread(input: {
 			return fail(
 				503,
 				'guest_capacity',
-				'Guest threads are at capacity. Try again later or sign in.',
+				'Guest threads are at capacity. Sign in with GitHub for a free account to use /api and /mcp.',
 			)
 		}
 		const ipLive = await countGuestThreadsForIp(input.db, ip, now)
@@ -387,7 +387,7 @@ export async function createThread(input: {
 			return fail(
 				429,
 				'guest_thread_limit',
-				'This IP already has a live guest thread. Wait for it to expire, or sign in.',
+				'This IP already has a live guest thread. Sign in with GitHub for a free account to use /api and /mcp.',
 			)
 		}
 	}

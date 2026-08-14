@@ -22,6 +22,7 @@ import {
 } from '#src/threads.ts'
 import { createId } from '#src/ids.ts'
 import { first, run } from '#src/db.ts'
+import { freeAccountUpsell, isGuestUpsellCode } from '#src/free-account.ts'
 
 export function json(data: unknown, status = 200, extra: HeadersInit = {}) {
 	const headers = new Headers(extra)
@@ -44,11 +45,22 @@ function bearer(request: Request) {
 	return token.length > 0 ? token : null
 }
 
-export function errorResponse(error: DomainError, retryAfter?: number) {
+export function errorResponse(
+	error: DomainError,
+	retryAfter?: number,
+	origin?: string,
+) {
 	const headers: Record<string, string> = {}
 	if (retryAfter !== undefined) headers['retry-after'] = String(retryAfter)
 	return json(
-		{ ok: false, error: error.error, code: error.code },
+		{
+			ok: false,
+			error: error.error,
+			code: error.code,
+			...(origin && isGuestUpsellCode(error.code)
+				? freeAccountUpsell(origin)
+				: {}),
+		},
 		error.status,
 		headers,
 	)
@@ -157,6 +169,7 @@ async function createThreadRoute(request: Request, env: AppEnv) {
 	if (!body)
 		return json({ ok: false, error: 'Invalid JSON.', code: 'bad_json' }, 400)
 
+	const origin = appBaseUrl(env, request)
 	const token = bearer(request)
 	let ownerUserId: string | null = null
 	if (token) {
@@ -171,8 +184,10 @@ async function createThreadRoute(request: Request, env: AppEnv) {
 			return json(
 				{
 					ok: false,
-					error: 'Guest tokens cannot open another thread.',
+					error:
+						'Guest tokens cannot open another thread. Sign in with GitHub for a free account to use /api and /mcp.',
 					code: 'guest_readonly',
+					...freeAccountUpsell(origin),
 				},
 				403,
 			)
@@ -187,8 +202,10 @@ async function createThreadRoute(request: Request, env: AppEnv) {
 			return json(
 				{
 					ok: false,
-					error: 'Too many guest threads from this IP.',
+					error:
+						'Too many guest threads from this IP. Sign in with GitHub for a free account to use /api and /mcp.',
 					code: 'rate_limited',
+					...freeAccountUpsell(origin),
 				},
 				429,
 				{ 'retry-after': String(limited.retryAfterSeconds) },
@@ -204,7 +221,7 @@ async function createThreadRoute(request: Request, env: AppEnv) {
 		purpose: body.purpose,
 		name: body.name,
 	})
-	if (!created.ok) return errorResponse(created)
+	if (!created.ok) return errorResponse(created, undefined, origin)
 	return json({
 		ok: true,
 		thread: threadJson(created.thread),

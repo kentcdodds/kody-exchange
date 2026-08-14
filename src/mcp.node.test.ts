@@ -31,6 +31,28 @@ test('MCP guest creates are no longer allowed without OAuth', async () => {
 	expect(response.headers.get('www-authenticate')).toContain(
 		'resource_metadata=',
 	)
+	const body = (await response.json()) as {
+		error: string
+		signup_url: string
+		hint: string
+	}
+	expect(body.error).toContain('free account')
+	expect(body.signup_url).toBe('https://kody.exchange/auth/github')
+	expect(body.hint).toContain('not a paid upgrade')
+	expect(body.hint).not.toContain('Pro')
+})
+
+test('MCP browser landing sells a free GitHub account', async () => {
+	const env = createTestEnv()
+	const response = await handleRequest(
+		request('/mcp', { headers: { accept: 'text/html' } }),
+		env,
+	)
+	expect(response.status).toBe(200)
+	const html = await response.text()
+	expect(html).toContain('included with a free GitHub account')
+	expect(html).toContain('/auth/github')
+	expect(html).not.toContain('Pro')
 })
 
 test('OAuth MCP create_thread opens an account-owned thread', async () => {
