@@ -19,6 +19,9 @@
 		"validate": "npm run format:check && npm run lint && npm run typecheck && npm run test",
 		"validate:fix": "npm run format && npm run lint:fix"
 	},
+	"dependencies": {
+		"@cloudflare/workers-oauth-provider": "^0.10.3"
+	},
 	"devDependencies": {
 		"@cloudflare/workers-types": "^5.20260801.1",
 		"@types/node": "^24.3.0",

@@ -3,6 +3,9 @@ export type AppEnv = {
 	RATE_LIMIT: KVNamespace
 	BLOBS: R2Bucket
 	ASSETS?: Fetcher
+	OAUTH_KV?: KVNamespace
+	OAUTH_PROVIDER?: import('#src/oauth-user.ts').OAuthHelpers
+	OAUTH_USER?: import('#src/threads.ts').UserRow
 	COOKIE_SECRET?: string
 	GITHUB_CLIENT_ID?: string
 	GITHUB_CLIENT_SECRET?: string

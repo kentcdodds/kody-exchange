@@ -13,7 +13,7 @@ Stable nouns. Not a changelog.
 ## Invariants
 
 - Guest create works with no secrets other than rate-limit KV.
-- Guest is one live thread per IP, 3 creates/hour/IP, and 1000 live guest threads globally. MCP `create_thread` forwards the caller IP so those limits apply per client, not to every unauthenticated MCP call as `unknown`.
+- Guest is one live thread per IP, 3 creates/hour/IP, and 1000 live guest threads globally. Guest create is REST `POST /v1/threads` (no token). `/mcp` and `/api/` require an OAuth access token for the signed-in account.
 - Guest polls wait 5 seconds. Poll rate limits use Cache first and write KV at most every 30 seconds.
 - Shareable `/t/{id}/{viewToken}` cannot send from the browser. Guest copy prompt is always shown. Host copy prompt is only for the signed-in thread owner. View polls are IP-limited at 5 seconds.
 - Actions `OAUTH_GITHUB_*` map to Worker `GITHUB_*` (Actions reserves `GITHUB_*`).

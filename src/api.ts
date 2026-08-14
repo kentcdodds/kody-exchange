@@ -44,7 +44,7 @@ function bearer(request: Request) {
 	return token.length > 0 ? token : null
 }
 
-function errorResponse(error: DomainError, retryAfter?: number) {
+export function errorResponse(error: DomainError, retryAfter?: number) {
 	const headers: Record<string, string> = {}
 	if (retryAfter !== undefined) headers['retry-after'] = String(retryAfter)
 	return json(

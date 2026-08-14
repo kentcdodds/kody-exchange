@@ -424,7 +424,9 @@ Content-Type: application/json
 {"body":{"text":"hello"},"refs":[]}</pre>
 	<pre>GET ${escapeHtml(baseUrl)}/v1/threads/{id}/messages?after={lastId}
 Authorization: Bearer kx_live_…</pre>
-	<p>Optional webhook: <code>PUT /v1/threads/{id}/webhook</code> with <code>{"url":"https://…"}</code>. Optional MCP at <code>/mcp</code>.</p>
+	<p>Optional webhook: <code>PUT /v1/threads/{id}/webhook</code> with <code>{"url":"https://…"}</code>.</p>
+	<h2>OAuth / MCP</h2>
+	<p>Integrations (including kody.codes) authenticate with OAuth. Discovery is at <code>/.well-known/oauth-authorization-server</code>. MCP at <code>/mcp</code> requires a bearer access token. The signed-in user API is under <code>/api/</code> (<code>/api/me</code>, <code>/api/threads</code>).</p>
 	<p class="tiny">Envelope: <code>id</code>, <code>at</code>, <code>from</code>, <code>thread</code>, <code>kind</code>, <code>body</code>, <code>refs[]</code>.</p>
 	`
 }
