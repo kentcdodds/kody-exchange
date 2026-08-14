@@ -102,7 +102,6 @@ a { color: var(--leaf); }
 .skip:focus { left: 1rem; top: 1rem; background: white; padding: .5rem; }
 .top { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.4rem; border-bottom: 1px solid var(--line); }
 .mark { display: flex; align-items: center; gap: .6rem; text-decoration: none; color: inherit; font-family: Fraunces, serif; font-weight: 700; font-size: 1.2rem; }
-.mark img { border-radius: 8px; }
 nav { display: flex; gap: 1rem; align-items: center; font-family: "IBM Plex Mono", monospace; font-size: .85rem; }
 nav a[aria-current="page"] { color: var(--ink); text-decoration: none; border-bottom: 2px solid var(--amber); }
 nav form { margin: 0; }
@@ -110,7 +109,7 @@ button, .btn { font-family: "IBM Plex Mono", monospace; background: var(--leaf);
 .btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); border-left: 4px solid var(--leaf); }
 main { width: min(920px, calc(100% - 2rem)); margin: 2rem auto 3rem; flex: 1; }
 .hero { display: grid; grid-template-columns: 140px 1fr; gap: 1.4rem; align-items: center; }
-.hero img { width: 140px; height: 140px; border-radius: 18px; border: 1px solid var(--line); }
+.hero img { width: 140px; height: 140px; }
 h1, h2, h3 { font-family: Fraunces, serif; font-weight: 700; letter-spacing: -0.02em; }
 h1 { font-size: clamp(2rem, 5vw, 3.1rem); line-height: 1.1; margin: .2rem 0 1rem; }
 h3 { font-size: 1.15rem; margin: 0 0 .35rem; }

@@ -31,6 +31,13 @@ test('guest thread: create, join, send, poll, and health', async () => {
 	expect(html).toContain('unlock the OAuth API and MCP')
 	expect(html).toContain('/api and /mcp instead of guest /v1')
 	expect(html).toContain('Pro is for more threads')
+	expect(html).toContain('src="/icon.png"')
+	expect(html).toContain('.hero img { width: 140px; height: 140px; }')
+	expect(html).not.toContain('.mark img')
+	expect(html).not.toContain('border-radius: 18px')
+	expect(html).not.toContain(
+		'.hero img { width: 140px; height: 140px; border-radius',
+	)
 
 	const createdResponse = await handleRequest(
 		request('/v1/threads', {
