@@ -5,8 +5,8 @@ import { createId } from '#src/ids.ts'
 import { isPlanName, type PlanName } from '#src/limits.ts'
 import { type UserRow } from '#src/threads.ts'
 
-const sessionCookie = 'ke_session'
-const oauthStateCookie = 'ke_oauth'
+const sessionCookie = 'kx_session'
+const oauthStateCookie = 'kx_oauth'
 const sessionTtlMs = 30 * 24 * 60 * 60 * 1000
 
 export function githubOAuthConfigured(env: AppEnv) {

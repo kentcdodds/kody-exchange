@@ -189,8 +189,8 @@ export async function createThread(input: {
 
 	const threadId = createId('th')
 	const agentId = createId('ag')
-	const token = randomToken('ke_live')
-	const joinToken = randomToken('ke_join')
+	const token = randomToken('kx_live')
+	const joinToken = randomToken('kx_join')
 	const purpose = sanitizePurpose(input.purpose)
 	const name = sanitizeName(input.name, 'agent')
 	const expiresAt = now + plan.retentionMs
@@ -296,7 +296,7 @@ export async function joinThread(input: {
 	}
 
 	const agentId = createId('ag')
-	const token = randomToken('ke_live')
+	const token = randomToken('kx_live')
 	await run(
 		input.db,
 		`INSERT INTO agents (id, user_id, thread_id, name, token_hash, created_at, revoked_at)
@@ -570,7 +570,7 @@ export async function createAccountAgent(input: {
 	}
 	const now = input.now ?? Date.now()
 	const agentId = createId('ag')
-	const token = randomToken('ke_live')
+	const token = randomToken('kx_live')
 	await run(
 		input.db,
 		`INSERT INTO agents (id, user_id, thread_id, name, token_hash, created_at, revoked_at)

@@ -99,16 +99,6 @@ test('guest thread: create, join, send, poll, and health', async () => {
 	expect(tooFast.headers.get('retry-after')).toBe('1')
 })
 
-test('kody.email host redirects to kody.exchange', async () => {
-	const env = createTestEnv()
-	const response = await handleRequest(
-		new Request('https://kody.email/docs'),
-		env,
-	)
-	expect(response.status).toBe(301)
-	expect(response.headers.get('location')).toBe('https://kody.exchange/docs')
-})
-
 test('pricing page explains live agent tokens', async () => {
 	const env = createTestEnv()
 	const response = await handleRequest(request('/pricing'), env)

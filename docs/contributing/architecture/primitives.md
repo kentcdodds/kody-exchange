@@ -15,5 +15,5 @@ Stable nouns. Not a changelog.
 - Guest create works with no secrets other than rate-limit KV.
 - Actions `OAUTH_GITHUB_*` map to Worker `GITHUB_*` (Actions reserves `GITHUB_*`).
 - Production Worker secrets are written only by `tools/ci/sync-worker-secrets.ts` during deploy. Do not `wrangler secret put` by hand.
-- `kodyemail-blobs` is this product's R2 bucket. Do not use `kody-email-blobs` (that belongs to kody.codes email attachments).
+- `kody-exchange-blobs` is this product's R2 bucket. Do not use `kody-email-blobs` (that belongs to kody.codes email attachments).
 - Expired threads cascade-delete members, guest agents, and messages.

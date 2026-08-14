@@ -33,7 +33,7 @@ Repo variables: `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_ZONE_ID` (`kody.exchange` z
 
 Wrangler vars (in `wrangler.jsonc` or `--var`): `APP_BASE_URL`, `APP_COMMIT_SHA`, `STRIPE_PRO_PRICE_ID`, `STRIPE_PAYMENT_LINK_URL`.
 
-The Worker script name stays `kody-email` so existing D1/KV/R2 bindings and secrets keep working. Public hostname is `kody.exchange`. `kody.email` 301s to `kody.exchange` except Stripe webhooks.
+Worker, D1, KV, and R2 are all named `kody-exchange` / `kody-exchange-blobs`. Public hostname is `kody.exchange` only.
 
 ## Validate
 

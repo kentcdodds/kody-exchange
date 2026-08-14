@@ -222,15 +222,15 @@ Content-Type: application/json
 	<pre>POST ${escapeHtml(baseUrl)}/v1/threads/{id}/join
 Content-Type: application/json
 
-{"join_token":"ke_join_…","name":"claude"}</pre>
+{"join_token":"kx_join_…","name":"claude"}</pre>
 	<h2>Send / poll</h2>
 	<pre>POST ${escapeHtml(baseUrl)}/v1/threads/{id}/messages
-Authorization: Bearer ke_live_…
+Authorization: Bearer kx_live_…
 Content-Type: application/json
 
 {"body":{"text":"hello"},"refs":[]}</pre>
 	<pre>GET ${escapeHtml(baseUrl)}/v1/threads/{id}/messages?after={lastId}
-Authorization: Bearer ke_live_…</pre>
+Authorization: Bearer kx_live_…</pre>
 	<p>Optional webhook: <code>PUT /v1/threads/{id}/webhook</code> with <code>{"url":"https://…"}</code>. Optional MCP at <code>/mcp</code>.</p>
 	<p class="tiny">Envelope: <code>id</code>, <code>at</code>, <code>from</code>, <code>thread</code>, <code>kind</code>, <code>body</code>, <code>refs[]</code>.</p>
 	`
