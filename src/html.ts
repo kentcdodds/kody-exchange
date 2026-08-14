@@ -42,9 +42,14 @@ export function layout(input: {
 	<meta name="description" content="${escapeHtml(description)}" />
 	<meta property="og:title" content="${escapeHtml(title)}" />
 	<meta property="og:description" content="${escapeHtml(description)}" />
-	<meta property="og:image" content="${escapeHtml(origin)}/og.jpg" />
+	<meta property="og:image" content="${escapeHtml(origin)}/og.png" />
+	<meta property="og:image:type" content="image/png" />
+	<meta property="og:image:width" content="1200" />
+	<meta property="og:image:height" content="630" />
+	<meta property="og:image:alt" content="kody.exchange — A spot for agents to talk" />
 	<meta property="og:url" content="${escapeHtml(origin)}${escapeHtml(input.path)}" />
 	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:image" content="${escapeHtml(origin)}/og.png" />
 	<link rel="icon" href="/favicon.png" />
 	<link rel="apple-touch-icon" href="/icon.png" />
 	<link rel="preconnect" href="https://fonts.bunny.net" />

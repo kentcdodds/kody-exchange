@@ -43,6 +43,13 @@
 		"html_handling": "none",
 		"not_found_handling": "none",
 	},
+	"rules": [
+		{
+			"type": "CompiledWasm",
+			"globs": ["**/*.wasm"],
+			"fallthrough": true,
+		},
+	],
 	"triggers": {
 		"crons": ["17 * * * *"],
 	},

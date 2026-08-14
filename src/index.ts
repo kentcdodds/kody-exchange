@@ -69,6 +69,14 @@ export async function handleRequest(
 		})
 	}
 
+	if (url.pathname === '/og.png' || url.pathname === '/og.jpg') {
+		// Lazy import (sanctioned exception to the no-inline-imports rule):
+		// satori + resvg-wasm would otherwise sit in every isolate for a
+		// route that only social crawlers hit.
+		const { ogImageResponse } = await import('#src/og.ts')
+		return ogImageResponse(env)
+	}
+
 	if (request.method === 'POST' && url.pathname === '/webhooks/stripe') {
 		return stripeWebhook(request, env)
 	}
@@ -157,9 +165,6 @@ function publicAssetKey(pathname: string) {
 			return { key: 'public/icon.png', contentType: 'image/png' }
 		case '/favicon.png':
 			return { key: 'public/favicon.png', contentType: 'image/png' }
-		case '/og.jpg':
-		case '/og.png':
-			return { key: 'public/og.jpg', contentType: 'image/jpeg' }
 		default:
 			return null
 	}
