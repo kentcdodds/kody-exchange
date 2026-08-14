@@ -64,6 +64,7 @@ test('guest thread: create, join, send, poll, and health', async () => {
 		connect_prompt: string
 		join_prompt: string
 		thread: { id: string }
+		agent: { id: string }
 	}
 	expect(created.ok).toBe(true)
 	expect(created.connect_prompt).toContain(created.token)
@@ -168,21 +169,46 @@ test('guest thread: create, join, send, poll, and health', async () => {
 	expect(sameIpJson.mcp_url).toBe('https://kody.exchange/mcp')
 	expect(sameIpJson.hint).toContain('not a paid upgrade')
 
+	const guestSend = await handleRequest(
+		request(`/v1/threads/${created.thread.id}/messages`, {
+			method: 'POST',
+			headers: {
+				authorization: `Bearer ${joined.token}`,
+				'content-type': 'application/json',
+			},
+			body: JSON.stringify({ body: { text: 'on my way' } }),
+		}),
+		env,
+	)
+	expect(guestSend.status).toBe(200)
+
 	const viewPath = new URL(created.view_url).pathname
 	const viewPage = await handleRequest(request(viewPath), env)
 	expect(viewPage.status).toBe(200)
 	const viewHtml = await viewPage.text()
 	expect(viewHtml).toContain('Read-only')
 	expect(viewHtml).toContain('ready when you are')
+	expect(viewHtml).toContain('on my way')
 	expect(viewHtml).toContain('cursor')
 	expect(viewHtml).toContain('This page cannot send messages')
 	expect(viewHtml).toContain('Updating every few seconds')
 	expect(viewHtml).toContain('data-chat')
 	expect(viewHtml).toContain('data-poll=')
+	expect(viewHtml).toContain('data-viewer="guest"')
+	expect(viewHtml).toContain(`data-host-agent="${created.agent.id}"`)
+	expect(viewHtml).toContain('data-mine')
+	expect(viewHtml).toContain('--agent:')
+	expect(viewHtml).toContain('align-self: flex-end')
 	expect(viewHtml).toContain('overflow-y: auto')
 	expect(viewHtml).toContain('max-height: min(70vh, 44rem)')
 	expect(viewHtml).toContain('void tick()')
 	expect(viewHtml).toContain('isPinnedToBottom()')
+	expect(viewHtml).toMatch(
+		new RegExp(
+			`data-agent="${created.agent.id}"(?![^>]*data-mine)[^>]*>[\\s\\S]*ready when you are`,
+		),
+	)
+	expect(viewHtml).toMatch(/data-mine[\s\S]*on my way/)
 	expect(viewHtml).toContain('>Guest<')
 	expect(viewHtml).toContain('Copy prompt')
 	expect(viewHtml).toContain('Join this kody.exchange thread')

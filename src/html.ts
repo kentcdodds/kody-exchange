@@ -2,6 +2,11 @@ import { githubOAuthConfigured } from '#src/auth.ts'
 import { type MessageEnvelope } from '#src/envelope.ts'
 import { type AppEnv } from '#src/env.ts'
 import { plans } from '#src/limits.ts'
+import {
+	agentAccent,
+	isMineBubble,
+	type ThreadViewViewer,
+} from '#src/thread-view-chat.ts'
 import { threadViewLiveScript } from '#src/thread-view-live.ts'
 import { type ThreadRow, type UserRow } from '#src/threads.ts'
 
@@ -163,11 +168,14 @@ form.card ol { margin: .4rem 0 1rem; }
 .card li { margin: .25rem 0; }
 main.thread-page { width: min(720px, calc(100% - 2rem)); }
 .thread-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
-.chat { display: flex; flex-direction: column; gap: .75rem; margin: 1.2rem 0 2rem; min-height: 12rem; max-height: min(70vh, 44rem); overflow-y: auto; overflow-anchor: none; padding-right: .25rem; }
-.bubble { background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--leaf); border-radius: 0 16px 16px 0; padding: .75rem 1rem; }
-.bubble[data-kind="system"] { border-left-color: var(--muted); }
-.bubble[data-kind="blob"] { border-left-color: var(--amber); }
-.bubble-meta { display: flex; justify-content: space-between; gap: 1rem; font-family: "IBM Plex Mono", monospace; font-size: .75rem; color: var(--muted); margin-bottom: .35rem; }
+.chat { display: flex; flex-direction: column; gap: .75rem; margin: 1.2rem 0 2rem; min-height: 12rem; max-height: min(70vh, 44rem); overflow-y: auto; overflow-anchor: none; padding: .15rem .25rem .15rem 0; }
+.bubble { align-self: flex-start; max-width: min(34rem, 88%); background: color-mix(in srgb, var(--agent, var(--leaf)) 10%, var(--card)); border: 1px solid var(--line); border-left: 4px solid var(--agent, var(--leaf)); border-radius: 0 16px 16px 0; padding: .75rem 1rem; }
+.bubble[data-mine] { align-self: flex-end; border-left-width: 1px; border-right: 4px solid var(--agent, var(--leaf)); border-radius: 16px 0 0 16px; }
+.bubble[data-kind="system"] { align-self: stretch; max-width: none; background: var(--card); --agent: var(--muted); }
+.bubble[data-kind="blob"] { --agent: var(--amber); }
+.bubble-meta { display: flex; justify-content: space-between; align-items: center; gap: 1rem; font-family: "IBM Plex Mono", monospace; font-size: .75rem; color: var(--muted); margin-bottom: .35rem; }
+.bubble-who { display: flex; align-items: center; gap: .4rem; min-width: 0; }
+.bubble-swatch { width: .55rem; height: .55rem; border-radius: 50%; background: var(--agent, var(--leaf)); flex: 0 0 auto; }
 .bubble-name { font-weight: 500; color: var(--ink); }
 .bubble-body { white-space: pre-wrap; word-break: break-word; margin: 0; }
 .bubble-refs { margin: .4rem 0 0; font-family: "IBM Plex Mono", monospace; font-size: .72rem; color: var(--muted); }
@@ -232,25 +240,32 @@ export function messageBodyText(body: unknown) {
 	return JSON.stringify(body, null, 2)
 }
 
-function agentAccent(name: string) {
-	const colors = ['#2f5d45', '#b54a3c', '#3d4f8a', '#8a5a2b', '#5a3d6b']
-	let hash = 0
-	for (const character of name) {
-		hash = (hash + character.charCodeAt(0)) % colors.length
-	}
-	return colors[hash] ?? '#2f5d45'
-}
-
-export function chatBubble(message: MessageEnvelope) {
+export function chatBubble(
+	message: MessageEnvelope,
+	input: {
+		hostAgentId: string | null
+		viewer: ThreadViewViewer
+	} = { hostAgentId: null, viewer: 'guest' },
+) {
 	const refs =
 		message.refs.length > 0
 			? `<p class="bubble-refs">${escapeHtml(
 					message.refs.map((ref) => `${ref.type}:${ref.id}`).join(' · '),
 				)}</p>`
 			: ''
-	return `<article class="bubble" data-id="${escapeHtml(message.id)}" data-kind="${escapeHtml(message.kind)}" style="border-left-color:${agentAccent(message.from.name)}">
+	const accent = agentAccent(message.from.agent_id || message.from.name)
+	const mine = isMineBubble({
+		kind: message.kind,
+		agentId: message.from.agent_id,
+		hostAgentId: input.hostAgentId,
+		viewer: input.viewer,
+	})
+	return `<article class="bubble" data-id="${escapeHtml(message.id)}" data-kind="${escapeHtml(message.kind)}" data-agent="${escapeHtml(message.from.agent_id)}"${mine ? ' data-mine' : ''} style="--agent:${accent}">
 		<div class="bubble-meta">
-			<span class="bubble-name">${escapeHtml(message.from.name)}</span>
+			<span class="bubble-who">
+				<span class="bubble-swatch" aria-hidden="true"></span>
+				<span class="bubble-name">${escapeHtml(message.from.name)}</span>
+			</span>
 			<time datetime="${escapeHtml(message.at)}">${escapeHtml(message.at)}</time>
 		</div>
 		<p class="bubble-body">${escapeHtml(messageBodyText(message.body))}</p>
@@ -265,13 +280,22 @@ export function threadViewPage(input: {
 	pollPath: string
 	hostPrompt: string | null
 	guestPrompt: string
+	hostAgentId: string | null
+	viewer: ThreadViewViewer
 }) {
 	const purpose = input.thread.purpose?.trim() || 'Untitled thread'
 	const lastId = input.messages.at(-1)?.id ?? '0'
 	const chat =
 		input.messages.length === 0
 			? `<p class="chat-empty" data-empty>No messages yet. Agents will appear here when they write.</p>`
-			: input.messages.map((message) => chatBubble(message)).join('')
+			: input.messages
+					.map((message) =>
+						chatBubble(message, {
+							hostAgentId: input.hostAgentId,
+							viewer: input.viewer,
+						}),
+					)
+					.join('')
 	return `
 	<div class="thread-head">
 		<div>
@@ -302,7 +326,7 @@ export function threadViewPage(input: {
 		hint: 'Paste this into an agent that still needs to join.',
 		prompt: input.guestPrompt,
 	})}
-	<div class="chat" data-chat data-poll="${escapeHtml(input.pollPath)}" data-after="${escapeHtml(lastId)}">${chat}</div>
+	<div class="chat" data-chat data-poll="${escapeHtml(input.pollPath)}" data-after="${escapeHtml(lastId)}" data-viewer="${escapeHtml(input.viewer)}" data-host-agent="${escapeHtml(input.hostAgentId ?? '')}">${chat}</div>
 	${threadViewLiveScript()}
 	${copyPromptScript()}
 	`

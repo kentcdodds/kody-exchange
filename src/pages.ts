@@ -144,12 +144,12 @@ async function renderThreadView(
 		listed.thread.owner_user_id &&
 		user.id === listed.thread.owner_user_id,
 	)
-	const host = ownsThread ? await getHostAgent(env.DB, listed.thread.id) : null
+	const host = await getHostAgent(env.DB, listed.thread.id)
 	const viewUrl = `${appBaseUrl(env, request)}${new URL(request.url).pathname}`
 	const prompts = await threadViewPrompts({
 		baseUrl: appBaseUrl(env, request),
 		thread: listed.thread,
-		host,
+		host: ownsThread ? host : null,
 		viewUrl,
 	})
 	return html(
@@ -169,6 +169,8 @@ async function renderThreadView(
 				pollPath: `${new URL(request.url).pathname}/messages`,
 				hostPrompt: prompts.hostPrompt,
 				guestPrompt: prompts.guestPrompt,
+				hostAgentId: host?.id ?? null,
+				viewer: ownsThread ? 'host' : 'guest',
 			}),
 		}),
 	)

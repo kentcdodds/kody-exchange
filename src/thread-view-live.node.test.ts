@@ -57,5 +57,8 @@ test('live script starts immediately and pins when already at the bottom', () =>
 	expect(script).toContain('isPinnedToBottom()')
 	expect(script).toContain(`const nearBottomPx = ${VIEW_POLL_NEAR_BOTTOM_PX}`)
 	expect(script).toContain('retry-after')
+	expect(script).toContain('isMineBubble')
+	expect(script).toContain('dataset.mine')
+	expect(script).toContain('--agent')
 	expect(script).not.toContain('window.setTimeout(tick, 5000)')
 })

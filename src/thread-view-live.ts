@@ -1,3 +1,5 @@
+import { AGENT_ACCENT_COLORS } from '#src/thread-view-chat.ts'
+
 export const VIEW_POLL_NEAR_BOTTOM_PX = 48
 export const VIEW_POLL_DEFAULT_SECONDS = 5
 
@@ -38,8 +40,21 @@ export function threadViewLiveScript() {
 		const chat = document.querySelector('[data-chat]')
 		const pollPath = chat?.getAttribute('data-poll') ?? ''
 		let after = chat?.getAttribute('data-after') ?? '0'
+		const hostAgentId = chat?.getAttribute('data-host-agent') ?? ''
+		const viewer = chat?.getAttribute('data-viewer') === 'host' ? 'host' : 'guest'
 		const empty = () => chat?.querySelector('[data-empty]')
 		const nearBottomPx = ${VIEW_POLL_NEAR_BOTTOM_PX}
+		const accents = ${JSON.stringify([...AGENT_ACCENT_COLORS])}
+		function agentAccent(key) {
+			let hash = 5381
+			for (const character of key) hash = (hash * 33) ^ character.charCodeAt(0)
+			return accents[Math.abs(hash) % accents.length] ?? accents[0]
+		}
+		function isMineBubble(kind, agentId) {
+			if (kind === 'system' || !hostAgentId) return false
+			const fromHost = agentId === hostAgentId
+			return viewer === 'host' ? fromHost : !fromHost
+		}
 		function isPinnedToBottom() {
 			if (!(chat instanceof HTMLElement)) return true
 			return chat.scrollTop + chat.clientHeight >= chat.scrollHeight - nearBottomPx
@@ -59,15 +74,25 @@ export function threadViewLiveScript() {
 			article.className = 'bubble'
 			article.dataset.id = message.id
 			article.dataset.kind = message.kind
+			const agentId = message.from?.agent_id ?? ''
+			article.dataset.agent = agentId
+			article.style.setProperty('--agent', agentAccent(agentId || message.from?.name || 'agent'))
+			if (isMineBubble(message.kind, agentId)) article.dataset.mine = ''
 			const meta = document.createElement('div')
 			meta.className = 'bubble-meta'
+			const who = document.createElement('span')
+			who.className = 'bubble-who'
+			const swatch = document.createElement('span')
+			swatch.className = 'bubble-swatch'
+			swatch.setAttribute('aria-hidden', 'true')
 			const name = document.createElement('span')
 			name.className = 'bubble-name'
 			name.textContent = message.from?.name ?? 'agent'
+			who.append(swatch, name)
 			const time = document.createElement('time')
 			time.dateTime = message.at
 			time.textContent = message.at
-			meta.append(name, time)
+			meta.append(who, time)
 			const body = document.createElement('p')
 			body.className = 'bubble-body'
 			body.textContent = message.body && typeof message.body.text === 'string'
