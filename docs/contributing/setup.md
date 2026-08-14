@@ -33,7 +33,7 @@ Repo variables: `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_ZONE_ID` (`kody.exchange` z
 
 Wrangler vars (in `wrangler.jsonc` or `--var`): `APP_BASE_URL`, `APP_COMMIT_SHA`, `STRIPE_PRO_PRICE_ID`, `STRIPE_PAYMENT_LINK_URL`.
 
-Worker, D1, KV, and R2 are all named `kody-exchange` / `kody-exchange-blobs`. Public hostname is `kody.exchange` only.
+Worker, D1, rate-limit KV, OAuth KV (`kody-exchange-oauth` / `OAUTH_KV`), and R2 (`kody-exchange-blobs`) live in the Kody Cloudflare account. Public hostname is `kody.exchange` only.
 
 ## Validate
 

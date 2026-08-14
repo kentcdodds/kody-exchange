@@ -25,5 +25,5 @@ This file is brief. Skills and docs:
 - No PR preview deploys. After merge, watch the production Deploy workflow and
   `GET https://kody.exchange/health` until `commit` matches the merge SHA.
 - Do not `wrangler secret put` by hand. Deploy syncs Actions secrets.
-- Guest is one live thread per IP. MCP `create_thread` must forward the caller
-  IP.
+- Guest is one live thread per IP via REST `POST /v1/threads`. `/mcp` and
+  `/api/` require an OAuth access token.

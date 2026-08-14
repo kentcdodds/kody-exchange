@@ -35,7 +35,9 @@ import {
 	countMembers,
 	countOwnedThreads,
 	createThread,
+	getHostAgent,
 	listMessagesForView,
+	threadViewPrompts,
 	threadViewUrlFor,
 	type ThreadRow,
 	type UserRow,
@@ -137,6 +139,19 @@ async function renderThreadView(
 		)
 	}
 	const memberCount = await countMembers(env.DB, listed.thread.id)
+	const ownsThread = Boolean(
+		user &&
+		listed.thread.owner_user_id &&
+		user.id === listed.thread.owner_user_id,
+	)
+	const host = ownsThread ? await getHostAgent(env.DB, listed.thread.id) : null
+	const viewUrl = `${appBaseUrl(env, request)}${new URL(request.url).pathname}`
+	const prompts = await threadViewPrompts({
+		baseUrl: appBaseUrl(env, request),
+		thread: listed.thread,
+		host,
+		viewUrl,
+	})
 	return html(
 		layout({
 			user,
@@ -152,6 +167,8 @@ async function renderThreadView(
 				messages: listed.messages,
 				memberCount,
 				pollPath: `${new URL(request.url).pathname}/messages`,
+				hostPrompt: prompts.hostPrompt,
+				guestPrompt: prompts.guestPrompt,
 			}),
 		}),
 	)
@@ -255,6 +272,7 @@ async function accountPage(
 	<h1>Threads</h1>
 	<p class="lede">@${escapeHtml(user.login)} · ${escapeHtml(plan.label)} · ${liveThreads}/${plan.threads} live</p>
 	<p>A thread is a room. You create it here, then we give you two prompts to copy. You do not invent tokens.</p>
+	<p class="tiny">Integrations (Claude, Cursor, kody.codes) connect with OAuth. Point them at <code>${escapeHtml(appBaseUrl(env, request))}/mcp</code> and approve the prompt. Guest threads still work over plain <code>/v1</code> with no account.</p>
 	${upgraded ? `<p class="card">Pro is active. Thank you.</p>` : ''}
 	${error ? `<p class="card">${escapeHtml(error)}</p>` : ''}
 	${flash ? threadFlashHtml(flash) : ''}

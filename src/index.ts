@@ -10,21 +10,41 @@ import {
 	stripeWebhookConfigured,
 	verifyStripeSignature,
 } from '#src/billing.ts'
-import { type AppEnv } from '#src/env.ts'
-import { handleMcp } from '#src/mcp.ts'
+import { type AppEnv, appBaseUrl } from '#src/env.ts'
+import {
+	handleMcp,
+	isMcpBrowserNavigation,
+	mcpBrowserLanding,
+} from '#src/mcp.ts'
+import { handleAuthorizeRequest } from '#src/oauth-authorize.ts'
+import { oauthPaths } from '#src/oauth-paths.ts'
+import {
+	handleProtectedResourceMetadata,
+	resolveOAuthUser,
+	unauthorizedOAuthResponse,
+} from '#src/oauth-user.ts'
 import { handleAccountAction, renderPage } from '#src/pages.ts'
+import { handleUserApi } from '#src/user-api.ts'
 import { purgeExpired } from '#src/threads.ts'
 
 export default {
-	async fetch(request: Request, env: AppEnv): Promise<Response> {
-		return handleRequest(request, env)
+	async fetch(
+		request: Request,
+		env: AppEnv,
+		ctx?: ExecutionContext,
+	): Promise<Response> {
+		return handleRequest(request, env, ctx)
 	},
 	async scheduled(_event: ScheduledEvent, env: AppEnv) {
 		await purgeExpired(env.DB)
 	},
 }
 
-export async function handleRequest(request: Request, env: AppEnv) {
+export async function handleRequest(
+	request: Request,
+	env: AppEnv,
+	ctx?: ExecutionContext,
+) {
 	const url = new URL(request.url)
 
 	if (url.pathname === '/health') {
@@ -63,11 +83,39 @@ export async function handleRequest(request: Request, env: AppEnv) {
 		return logoutResponse()
 	}
 
-	const api = await handleApi(request, env)
+	if (url.pathname === oauthPaths.protectedResource) {
+		return handleProtectedResourceMetadata(request, env)
+	}
+	if (url.pathname === `${oauthPaths.protectedResource}${oauthPaths.mcp}`) {
+		return handleProtectedResourceMetadata(request, env)
+	}
+	if (url.pathname === oauthPaths.authorize) {
+		return handleAuthorizeRequest(request, env)
+	}
+
+	const api = await handleApi(request, env, ctx)
 	if (api) return api
 
-	const mcp = await handleMcp(request, env)
-	if (mcp) return mcp
+	if (url.pathname === oauthPaths.mcp) {
+		if (isMcpBrowserNavigation(request)) {
+			const sessionUser = await readSessionUser(request, env)
+			return mcpBrowserLanding(request, env, sessionUser)
+		}
+		const oauthUser = await resolveOAuthUser(request, env)
+		if (!oauthUser) {
+			return unauthorizedOAuthResponse(appBaseUrl(env, request))
+		}
+		const mcp = await handleMcp(request, env, oauthUser, ctx)
+		if (mcp) return mcp
+	}
+
+	if (url.pathname.startsWith(oauthPaths.apiPrefix)) {
+		const oauthUser = await resolveOAuthUser(request, env)
+		if (!oauthUser) {
+			return unauthorizedOAuthResponse(appBaseUrl(env, request))
+		}
+		return handleUserApi(request, env, oauthUser, ctx)
+	}
 
 	const user = await readSessionUser(request, env)
 	if (request.method === 'POST' && url.pathname.startsWith('/account')) {

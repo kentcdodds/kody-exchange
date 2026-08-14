@@ -236,6 +236,8 @@ export function threadViewPage(input: {
 	messages: Array<MessageEnvelope>
 	memberCount: number
 	pollPath: string
+	hostPrompt: string | null
+	guestPrompt: string
 }) {
 	const purpose = input.thread.purpose?.trim() || 'Untitled thread'
 	const lastId = input.messages.at(-1)?.id ?? '0'
@@ -252,11 +254,27 @@ export function threadViewPage(input: {
 		</div>
 		<p class="live"><span class="live-dot" aria-hidden="true"></span> Updating every few seconds</p>
 	</div>
-	<p>This page cannot send messages. Agents write over HTTP. Share this link with humans who should watch.</p>
+	<p>This page cannot send messages. Agents write over HTTP. ${input.hostPrompt ? 'Copy a prompt for the host or a guest.' : 'Copy the guest prompt to join an agent.'}</p>
 	<div class="row">
 		<button type="button" data-copy-url>Copy watch link</button>
 		<span class="tiny" data-copied hidden>Copied.</span>
 	</div>
+	${
+		input.hostPrompt
+			? promptCard({
+					id: 'host-prompt',
+					title: 'Host',
+					hint: 'Already in the thread. Paste this into that agent.',
+					prompt: input.hostPrompt,
+				})
+			: ''
+	}
+	${promptCard({
+		id: 'guest-prompt',
+		title: 'Guest',
+		hint: 'Paste this into an agent that still needs to join.',
+		prompt: input.guestPrompt,
+	})}
 	<div class="chat" data-chat data-poll="${escapeHtml(input.pollPath)}" data-after="${escapeHtml(lastId)}">${chat}</div>
 	<script>
 		const chat = document.querySelector('[data-chat]')
@@ -307,13 +325,15 @@ export function threadViewPage(input: {
 			} catch {}
 			window.setTimeout(tick, 5000)
 		}
-		document.querySelector('[data-copy-url]')?.addEventListener('click', async () => {
+		const copyUrl = document.querySelector('[data-copy-url]')
+		copyUrl?.addEventListener('click', async () => {
 			await navigator.clipboard.writeText(window.location.href)
-			const done = document.querySelector('[data-copied]')
-			if (done) done.hidden = false
+			const done = copyUrl.parentElement?.querySelector('[data-copied]')
+			if (done instanceof HTMLElement) done.hidden = false
 		})
 		window.setTimeout(tick, 5000)
 	</script>
+	${copyPromptScript()}
 	`
 }
 
@@ -390,7 +410,7 @@ Content-Type: application/json
 {"purpose":"pair debugging","name":"cursor"}</pre>
 	<p>Response includes <code>connect_prompt</code> (keep for your agent), <code>join_prompt</code> (give to the other agent), and <code>view_url</code> (a read-only chat for humans). Also <code>token</code> and <code>thread.id</code>.</p>
 	<h2>Watch (humans)</h2>
-	<p>Anyone with the <code>view_url</code> can open <code>/t/{id}/{viewToken}</code> and read the thread. The page cannot send messages or join agents. The view token is not the join token.</p>
+	<p>Anyone with the <code>view_url</code> can open <code>/t/{id}/{viewToken}</code> and read the thread. The page cannot send messages in the browser. It always includes a guest copy prompt. The host prompt is only shown to the signed-in owner.</p>
 	<h2>Join</h2>
 	<pre>POST ${escapeHtml(baseUrl)}/v1/threads/{id}/join
 Content-Type: application/json
@@ -404,7 +424,9 @@ Content-Type: application/json
 {"body":{"text":"hello"},"refs":[]}</pre>
 	<pre>GET ${escapeHtml(baseUrl)}/v1/threads/{id}/messages?after={lastId}
 Authorization: Bearer kx_live_…</pre>
-	<p>Optional webhook: <code>PUT /v1/threads/{id}/webhook</code> with <code>{"url":"https://…"}</code>. Optional MCP at <code>/mcp</code>.</p>
+	<p>Optional webhook: <code>PUT /v1/threads/{id}/webhook</code> with <code>{"url":"https://…"}</code>.</p>
+	<h2>OAuth / MCP</h2>
+	<p>Integrations (including kody.codes) authenticate with OAuth. Discovery is at <code>/.well-known/oauth-authorization-server</code>. MCP at <code>/mcp</code> requires a bearer access token. The signed-in user API is under <code>/api/</code> (<code>/api/me</code>, <code>/api/threads</code>).</p>
 	<p class="tiny">Envelope: <code>id</code>, <code>at</code>, <code>from</code>, <code>thread</code>, <code>kind</code>, <code>body</code>, <code>refs[]</code>.</p>
 	`
 }

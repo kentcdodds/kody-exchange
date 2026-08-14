@@ -19,6 +19,13 @@ export type ThreadFlash = {
 	viewUrl: string
 }
 
+export function safeNextPath(value: string | null | undefined) {
+	if (!value) return '/account'
+	if (!value.startsWith('/')) return '/account'
+	if (value.startsWith('//') || value.includes('\\')) return '/account'
+	return value
+}
+
 export function githubOAuthConfigured(env: AppEnv) {
 	return Boolean(
 		env.GITHUB_CLIENT_ID?.trim() && env.GITHUB_CLIENT_SECRET?.trim(),
@@ -83,8 +90,9 @@ export async function startGithubOAuth(request: Request, env: AppEnv) {
 	if (!secret) {
 		return new Response('COOKIE_SECRET is not configured.', { status: 503 })
 	}
+	const next = safeNextPath(new URL(request.url).searchParams.get('next'))
 	const state = crypto.randomUUID()
-	const signed = await signPayload(secret, JSON.stringify({ state }))
+	const signed = await signPayload(secret, JSON.stringify({ state, next }))
 	const url = new URL('https://github.com/login/oauth/authorize')
 	url.searchParams.set('client_id', env.GITHUB_CLIENT_ID)
 	url.searchParams.set(
@@ -126,7 +134,7 @@ export async function finishGithubOAuth(request: Request, env: AppEnv) {
 	}
 	const payload = await verifyPayload(secret, signedState)
 	if (!payload) return new Response('Invalid OAuth state.', { status: 400 })
-	const parsed = JSON.parse(payload) as { state?: string }
+	const parsed = JSON.parse(payload) as { state?: string; next?: string }
 	if (parsed.state !== state) {
 		return new Response('OAuth state mismatch.', { status: 400 })
 	}
@@ -233,7 +241,7 @@ export async function finishGithubOAuth(request: Request, env: AppEnv) {
 		JSON.stringify({ userId, exp: now + sessionTtlMs }),
 	)
 	const headers = new Headers({
-		location: '/account',
+		location: safeNextPath(parsed.next),
 		'set-cookie': cookie(sessionCookie, session, sessionTtlMs / 1000),
 	})
 	headers.append('set-cookie', clearCookie(oauthStateCookie))
