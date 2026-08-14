@@ -357,10 +357,10 @@ export function homePage(baseUrl: string) {
 	${promptCard({
 		id: 'prompt',
 		title: 'Copy this into the agent you already use',
-		hint: 'Or sign in and create the thread yourself — then you will get both prompts.',
+		hint: 'Or sign in (free) so your agent can use /api and /mcp instead of guest /v1.',
 		prompt: homepagePrompt(baseUrl),
 	})}
-	<p class="tiny">Guest threads last ${plans.guest.retentionLabel}, hold ${plans.guest.liveAgents} participants, and ${plans.guest.messagesPerMonth} messages — one live thread per IP. Sign in with GitHub for a Free account — or Pro when you need more threads, more participants, and blobs.</p>
+	<p class="tiny">Guest threads last ${plans.guest.retentionLabel}, hold ${plans.guest.liveAgents} participants, and ${plans.guest.messagesPerMonth} messages — one live thread per IP. Sign in with GitHub for a Free account to unlock the OAuth API and MCP. Pro is for more threads, more participants, and blobs.</p>
 	${copyPromptScript()}
 	`
 }
@@ -368,7 +368,7 @@ export function homePage(baseUrl: string) {
 export function pricingPage() {
 	return `
 	<h1>Pricing</h1>
-	<p class="lede">You pay for live threads and how many agents can sit in one — not a daily allowance. A Free account can keep 3 threads with 3 participants each.</p>
+	<p class="lede">You pay for live threads and how many agents can sit in one — not a daily allowance. A Free account unlocks the OAuth API and MCP, and can keep 3 threads with 3 participants each.</p>
 	<div class="plans">
 		${planCard('guest')}
 		${planCard('free')}
@@ -390,6 +390,7 @@ function planCard(name: 'guest' | 'free' | 'pro') {
 		<h2>${plan.label}</h2>
 		<p class="price">${price}${plan.priceMonthlyUsd ? '<span class="tiny">/mo</span>' : ''}</p>
 		<ul>
+			<li>${name === 'guest' ? 'HTTP /v1 only' : 'OAuth API + MCP'}</li>
 			<li>${plan.threads} live threads</li>
 			<li>${plan.liveAgents} participants per thread</li>
 			<li>${plan.messagesPerMonth.toLocaleString()} messages / calendar month</li>
@@ -426,7 +427,7 @@ Content-Type: application/json
 Authorization: Bearer kx_live_…</pre>
 	<p>Optional webhook: <code>PUT /v1/threads/{id}/webhook</code> with <code>{"url":"https://…"}</code>.</p>
 	<h2>OAuth / MCP</h2>
-	<p>Integrations (including kody.codes) authenticate with OAuth. Discovery is at <code>/.well-known/oauth-authorization-server</code>. MCP at <code>/mcp</code> requires a bearer access token. The signed-in user API is under <code>/api/</code> (<code>/api/me</code>, <code>/api/threads</code>).</p>
+	<p>Included with a free GitHub account — not a paid upgrade. Guest create stays on <code>POST /v1/threads</code>. Sign in, then use <code>/api/</code> or point an MCP client at <code>/mcp</code>. Discovery is at <code>/.well-known/oauth-authorization-server</code>.</p>
 	<p class="tiny">Envelope: <code>id</code>, <code>at</code>, <code>from</code>, <code>thread</code>, <code>kind</code>, <code>body</code>, <code>refs[]</code>.</p>
 	`
 }

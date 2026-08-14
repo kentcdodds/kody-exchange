@@ -29,6 +29,7 @@ test('signed-in account is threads, not agent tokens', async () => {
 	expect(html).not.toContain('Create agent token')
 	expect(html).not.toContain('live agent tokens')
 	expect(html).not.toContain('New agent token')
+	expect(html).toContain('included with a signed-in account')
 })
 
 test('creating a thread shows a connect prompt and a join prompt once', async () => {

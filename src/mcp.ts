@@ -1,6 +1,6 @@
 import { json } from '#src/api.ts'
 import { type AppEnv, appBaseUrl } from '#src/env.ts'
-import { layout } from '#src/html.ts'
+import { escapeHtml, layout } from '#src/html.ts'
 import { createOwnedThread, handleUserApi, joinAsUser } from '#src/user-api.ts'
 import { type UserRow } from '#src/threads.ts'
 
@@ -107,7 +107,9 @@ export function mcpBrowserLanding(
 			env,
 			path: '/mcp',
 			title: 'MCP',
-			body: `<h1>kody.exchange MCP</h1><p>This endpoint is OAuth-protected. Point an MCP client at <code>${appBaseUrl(env, request)}/mcp</code> and complete the authorization prompt.</p>`,
+			body: user
+				? `<h1>kody.exchange MCP</h1><p>Point an MCP client at <code>${appBaseUrl(env, request)}/mcp</code> and approve the prompt as @${escapeHtml(user.login)}. This is included with your free account.</p>`
+				: `<h1>kody.exchange MCP</h1><p>MCP is included with a free GitHub account. <a href="/auth/github">Sign in</a>, then point an MCP client at <code>${appBaseUrl(env, request)}/mcp</code> and complete the authorization prompt.</p>`,
 		}),
 		{ headers: { 'content-type': 'text/html; charset=utf-8' } },
 	)

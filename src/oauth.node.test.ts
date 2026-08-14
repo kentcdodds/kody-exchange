@@ -75,6 +75,17 @@ test('unauthenticated MCP and /api return 401 with WWW-Authenticate', async () =
 
 	const api = await handleRequest(request('/api/me'), env)
 	expect(api.status).toBe(401)
+	const apiBody = (await api.json()) as {
+		error: string
+		signup_url: string
+		mcp_url: string
+		hint: string
+	}
+	expect(apiBody.error).toContain('free account')
+	expect(apiBody.error).not.toContain('Pro')
+	expect(apiBody.signup_url).toBe('https://kody.exchange/auth/github')
+	expect(apiBody.mcp_url).toBe('https://kody.exchange/mcp')
+	expect(apiBody.hint).toContain('not a paid upgrade')
 })
 
 test('authorize redirects signed-out users to GitHub with next', async () => {
