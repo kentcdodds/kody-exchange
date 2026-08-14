@@ -16,6 +16,7 @@ import {
 	requireMember,
 	sendMessage,
 	setWebhook,
+	threadViewUrlFor,
 	type DomainError,
 } from '#src/threads.ts'
 import { createId } from '#src/ids.ts'
@@ -203,6 +204,7 @@ async function createThreadRoute(request: Request, env: AppEnv) {
 		agent: { id: created.agent.id, name: created.agent.name },
 		token: created.token,
 		join_token: created.joinToken,
+		view_url: created.viewUrl,
 		connect_prompt: created.connectPrompt,
 		join_prompt: created.joinPrompt,
 		plan: created.plan,
@@ -237,6 +239,7 @@ async function joinThreadRoute(
 		thread: threadJson(joined.thread),
 		agent: { id: joined.agent.id, name: joined.agent.name },
 		token: joined.token,
+		view_url: await threadViewUrlFor(appBaseUrl(env, request), joined.thread),
 		plan: joined.plan,
 	})
 }

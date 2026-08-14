@@ -5,7 +5,9 @@ import {
 	createThread,
 	joinThread,
 	listMessages,
+	listMessagesForView,
 	sendMessage,
+	viewTokenFor,
 } from '#src/threads.ts'
 import { guestLiveThreadCap } from '#src/limits.ts'
 import { run } from '#src/db.ts'
@@ -34,6 +36,13 @@ test('guest thread create, join, send, and poll is a closed loop', async () => {
 	expect(created.joinPrompt).toContain('kody.exchange')
 	expect(created.connectPrompt).not.toContain(created.joinToken)
 	expect(created.joinPrompt).not.toContain(created.token)
+	expect(created.viewUrl).toMatch(
+		new RegExp(`^https://kody.exchange/t/${created.thread.id}/[0-9a-f]{32}$`),
+	)
+	expect(created.connectPrompt).toContain(created.viewUrl)
+	expect(created.joinPrompt).toContain(created.viewUrl)
+	expect(created.viewUrl).not.toContain(created.joinToken)
+	expect(created.viewUrl).not.toContain(created.token)
 
 	const joined = await joinThread({
 		db: env.DB,
@@ -74,6 +83,29 @@ test('guest thread create, join, send, and poll is a closed loop', async () => {
 	expect(listed.messages).toHaveLength(1)
 	expect(listed.messages[0]?.id).toBe(sent.message.id)
 	expect(listed.retryAfter).toBe(5)
+
+	const viewToken = await viewTokenFor(created.thread)
+	expect(viewToken).toHaveLength(32)
+	const viewed = await listMessagesForView({
+		db: env.DB,
+		threadId: created.thread.id,
+		viewToken,
+	})
+	if (!viewed.ok) throw new Error(viewed.error)
+	expect(viewed.messages).toHaveLength(1)
+	expect(viewed.messages[0]?.body).toEqual({ text: 'hello from cursor' })
+	expect(viewed.retryAfter).toBe(5)
+
+	const badView = await listMessagesForView({
+		db: env.DB,
+		threadId: created.thread.id,
+		viewToken: created.joinToken,
+	})
+	expect(badView).toMatchObject({
+		ok: false,
+		status: 404,
+		code: 'thread_not_found',
+	})
 })
 
 test('guest threads are one live room per IP', async () => {

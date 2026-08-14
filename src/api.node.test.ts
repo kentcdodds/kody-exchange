@@ -22,6 +22,8 @@ test('guest thread: create, join, send, poll, and health', async () => {
 	expect(html).toContain('POST https://kody.exchange/v1/threads')
 	expect(html).toContain('Keep connect_prompt for yourself')
 	expect(html).toContain('wait 5 seconds between polls')
+	expect(html).toContain('Share view_url with humans')
+	expect(html).toContain('Humans watch a read-only chat')
 	expect(html).not.toContain('SMTP')
 
 	const createdResponse = await handleRequest(
@@ -37,6 +39,7 @@ test('guest thread: create, join, send, poll, and health', async () => {
 		ok: boolean
 		token: string
 		join_token: string
+		view_url: string
 		connect_prompt: string
 		join_prompt: string
 		thread: { id: string }
@@ -44,6 +47,9 @@ test('guest thread: create, join, send, poll, and health', async () => {
 	expect(created.ok).toBe(true)
 	expect(created.connect_prompt).toContain(created.token)
 	expect(created.join_prompt).toContain(created.join_token)
+	expect(created.view_url).toContain(`/t/${created.thread.id}/`)
+	expect(created.connect_prompt).toContain(created.view_url)
+	expect(created.join_prompt).toContain(created.view_url)
 
 	const joinResponse = await handleRequest(
 		request(`/v1/threads/${created.thread.id}/join`, {
@@ -129,6 +135,52 @@ test('guest thread: create, join, send, poll, and health', async () => {
 	expect(sameIp.status).toBe(429)
 	const sameIpJson = (await sameIp.json()) as { code: string }
 	expect(sameIpJson.code).toBe('guest_thread_limit')
+
+	const viewPath = new URL(created.view_url).pathname
+	const viewPage = await handleRequest(request(viewPath), env)
+	expect(viewPage.status).toBe(200)
+	const viewHtml = await viewPage.text()
+	expect(viewHtml).toContain('Read-only')
+	expect(viewHtml).toContain('ready when you are')
+	expect(viewHtml).toContain('cursor')
+	expect(viewHtml).toContain('This page cannot send messages')
+	expect(viewHtml).not.toContain('kx_live_')
+	expect(viewHtml).not.toContain('kx_join_')
+	expect(viewHtml).not.toContain('name="body"')
+	expect(viewHtml).not.toMatch(/<textarea/)
+	expect(viewHtml).not.toContain('action="/v1/threads')
+
+	const viewPoll = await handleRequest(
+		request(`${viewPath}/messages?after=0`),
+		env,
+	)
+	expect(viewPoll.status).toBe(200)
+	const viewJson = (await viewPoll.json()) as {
+		ok: boolean
+		messages: Array<{ body: { text: string } }>
+		retry_after: number
+	}
+	expect(viewJson.ok).toBe(true)
+	expect(viewJson.messages[0]?.body.text).toBe('ready when you are')
+	expect(viewJson.retry_after).toBe(5)
+	expect(viewPoll.headers.get('retry-after')).toBe('5')
+
+	const viewTooFast = await handleRequest(
+		request(`${viewPath}/messages?after=0`),
+		env,
+	)
+	expect(viewTooFast.status).toBe(429)
+	expect(viewTooFast.headers.get('retry-after')).toBe('5')
+
+	const badView = await handleRequest(
+		request(`/t/${created.thread.id}/ffffffffffffffffffffffffffffffff`),
+		env,
+	)
+	expect(badView.status).toBe(404)
+	expect(await badView.text()).toContain('Thread not found')
+
+	const robots = await handleRequest(request('/robots.txt'), env)
+	expect(await robots.text()).toContain('Disallow: /t/')
 })
 
 test('pricing page explains live threads and participants', async () => {
