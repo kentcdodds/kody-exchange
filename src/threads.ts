@@ -940,6 +940,6 @@ export async function maybeDispatchWebhook(
 		threadId,
 	)
 	if (thread?.webhook_url) {
-		await dispatchWebhook(thread.webhook_url, message)
+		void dispatchWebhook(thread.webhook_url, message)
 	}
 }
