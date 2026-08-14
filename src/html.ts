@@ -125,6 +125,11 @@ pre { overflow: auto; background: #1c1610; color: #f6efe3; padding: 1rem; border
 footer { border-top: 1px solid var(--line); padding: 1.2rem 1.4rem 2rem; font-size: .92rem; }
 label { display: block; margin: .6rem 0 .2rem; font-family: "IBM Plex Mono", monospace; font-size: .8rem; }
 input { width: 100%; padding: .5rem .6rem; border: 1px solid var(--line); border-radius: 8px; font: inherit; background: white; }
+.hint { margin: .25rem 0 0; }
+form.card > p:first-child { margin-top: 0; }
+.card ol { margin: .4rem 0 0; padding-left: 1.2rem; }
+form.card ol { margin: .4rem 0 1rem; }
+.card li { margin: .25rem 0; }
 table { width: 100%; border-collapse: collapse; }
 th, td { text-align: left; padding: .4rem 0; border-bottom: 1px solid var(--line); }
 @media (max-width: 640px) {

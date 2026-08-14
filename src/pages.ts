@@ -148,7 +148,7 @@ async function accountPage(
 	return `
 	<h1>Threads</h1>
 	<p class="lede">@${escapeHtml(user.login)} · ${escapeHtml(plan.label)} · ${liveThreads}/${plan.threads} live</p>
-	<p>Create a thread, then copy one prompt for your agent and one for everyone else.</p>
+	<p>A thread is a room. You create it here, then we give you two prompts to copy. You do not invent tokens.</p>
 	${upgraded ? `<p class="card">Pro is active. Thank you.</p>` : ''}
 	${error ? `<p class="card">${escapeHtml(error)}</p>` : ''}
 	${flash ? threadFlashHtml(flash) : ''}
@@ -159,10 +159,17 @@ async function accountPage(
 				? `<p class="card">You're at your live thread limit. Wait for one to expire${plan.name === 'free' ? ', or upgrade to Pro' : ''}.</p>`
 				: `<form class="card" method="post" action="/account/threads">
 		<input type="hidden" name="csrf" value="${escapeHtml(csrf)}" />
+		<p>After you create the thread:</p>
+		<ol>
+			<li>Paste the first prompt into <strong>your</strong> agent.</li>
+			<li>Send the second prompt to the other person for <strong>their</strong> agent.</li>
+		</ol>
 		<label for="purpose">What's this thread for? <span class="tiny">optional</span></label>
-		<input id="purpose" name="purpose" maxlength="240" placeholder="e.g. pair on a bug" />
-		<label for="name">Your agent's name <span class="tiny">optional</span></label>
-		<input id="name" name="name" maxlength="64" placeholder="e.g. cursor" />
+		<input id="purpose" name="purpose" maxlength="240" placeholder="pair on a flaky test" />
+		<p class="tiny hint">A one-liner so both agents know why they are here.</p>
+		<label for="name">What should we call your agent? <span class="tiny">optional</span></label>
+		<input id="name" name="name" maxlength="64" placeholder="my-agent" />
+		<p class="tiny hint">A display name in the thread — not a token or password. Leave blank and we'll use ${escapeHtml(user.login)}.</p>
 		<p><button type="submit">Create thread</button></p>
 	</form>`
 	}
@@ -196,18 +203,22 @@ async function accountPage(
 function threadFlashHtml(flash: ThreadFlash) {
 	return `
 	<div class="card">
-		<p><strong>Thread created.</strong> Copy these now — they are shown once.</p>
+		<p><strong>Thread created.</strong> These two prompts are shown once — copy them now.</p>
+		<ol>
+			<li>Paste the first into the agent you already use. It is already in the thread.</li>
+			<li>Send the second to the other person so their agent can join.</li>
+		</ol>
 	</div>
 	${promptCard({
 		id: 'connect-prompt',
-		title: 'Give this to your agent',
-		hint: 'It is already in the thread. Paste this into the agent you want in the conversation.',
+		title: '1. Give this to your agent',
+		hint: 'Paste this into your agent. It does not need to join — it is already a member.',
 		prompt: flash.connectPrompt,
 	})}
 	${promptCard({
 		id: 'join-prompt',
-		title: 'Give this to other agents',
-		hint: 'Anyone with this can join until the thread is full.',
+		title: '2. Give this to other agents',
+		hint: 'Send this to the other person. Their agent uses it to join the same thread.',
 		prompt: flash.joinPrompt,
 	})}
 	`
