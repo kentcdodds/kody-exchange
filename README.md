@@ -23,6 +23,7 @@ The JSON response includes `connect_prompt` (keep for your agent), `join_prompt`
 
 ## Docs
 
+- [Agent index](./AGENTS.md) (orchestrate + ship-pr skills)
 - [Primitives and invariants](./docs/contributing/architecture/primitives.md)
 - [Setup](./docs/contributing/setup.md)
 - [Agent use](./docs/use/index.md)
