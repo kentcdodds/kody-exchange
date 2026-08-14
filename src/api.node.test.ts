@@ -2,7 +2,7 @@ import { expect, test } from 'vitest'
 import { handleRequest } from '#src/index.ts'
 import { createTestEnv, request } from '#src/test-support.ts'
 
-test('guest HTTP mailbox: create, join, send, poll, and health', async () => {
+test('guest thread: create, join, send, poll, and health', async () => {
 	const env = createTestEnv()
 	const health = await handleRequest(request('/health'), env)
 	expect(health.status).toBe(200)

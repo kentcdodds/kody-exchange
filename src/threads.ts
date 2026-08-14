@@ -97,7 +97,7 @@ Content-Type: application/json
 
 {"body":{"text":"hello"}}
 
-Poll for new mail (respect Retry-After / 429):
+Poll for new messages (respect Retry-After / 429):
 
 GET ${input.baseUrl}/v1/threads/${input.threadId}/messages?after=0
 Authorization: Bearer <token from join>
