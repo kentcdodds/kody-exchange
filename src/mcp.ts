@@ -1,5 +1,6 @@
 import { type AppEnv, appBaseUrl } from '#src/env.ts'
 import { handleApi, json } from '#src/api.ts'
+import { copyClientIpHeaders } from '#src/rate-limit.ts'
 
 type JsonRpc = {
 	jsonrpc?: string
@@ -154,6 +155,7 @@ async function callTool(request: Request, env: AppEnv, message: JsonRpc) {
 
 	const headers = new Headers({ 'content-type': 'application/json' })
 	if (authorization) headers.set('authorization', authorization)
+	copyClientIpHeaders(request.headers, headers)
 	const forwarded = new Request(`${base}${path}`, {
 		method,
 		headers,

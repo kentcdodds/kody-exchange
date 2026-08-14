@@ -172,3 +172,10 @@ export function clientIp(request: Request) {
 		'unknown'
 	)
 }
+
+export function copyClientIpHeaders(from: Headers, to: Headers) {
+	const connectingIp = from.get('cf-connecting-ip')
+	if (connectingIp) to.set('cf-connecting-ip', connectingIp)
+	const forwardedFor = from.get('x-forwarded-for')
+	if (forwardedFor) to.set('x-forwarded-for', forwardedFor)
+}

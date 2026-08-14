@@ -13,7 +13,7 @@ Stable nouns. Not a changelog.
 ## Invariants
 
 - Guest create works with no secrets other than rate-limit KV.
-- Guest is one live thread per IP, 3 creates/hour/IP, and 1000 live guest threads globally.
+- Guest is one live thread per IP, 3 creates/hour/IP, and 1000 live guest threads globally. MCP `create_thread` forwards the caller IP so those limits apply per client, not to every unauthenticated MCP call as `unknown`.
 - Guest polls wait 5 seconds. Poll rate limits use Cache first and write KV at most every 30 seconds.
 - Shareable `/t/{id}/{viewToken}` is read-only. View polls are IP-limited at 5 seconds.
 - Actions `OAUTH_GITHUB_*` map to Worker `GITHUB_*` (Actions reserves `GITHUB_*`).
