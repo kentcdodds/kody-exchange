@@ -9,6 +9,7 @@ import {
 	loadIconDataUri,
 	OG_HEIGHT,
 	OG_ICON_SIZE,
+	OG_TEXT_WIDTH,
 	OG_TAGLINE,
 	OG_WIDTH,
 	OG_WORDMARK,
@@ -50,12 +51,26 @@ test('OG markup keeps Kody square and uses the site copy', () => {
 	const markup = createOgMarkup('data:image/png;base64,abc')
 	const icon = findOgIconElement(markup)
 	expect(icon).not.toBeNull()
+	expect(OG_ICON_SIZE).toBe(OG_HEIGHT)
 	expect(icon?.props.width).toBe(OG_ICON_SIZE)
 	expect(icon?.props.height).toBe(OG_ICON_SIZE)
 	expect(icon?.props.width).toBe(icon?.props.height)
 	expect(icon?.props.style?.width).toBe(OG_ICON_SIZE)
 	expect(icon?.props.style?.height).toBe(OG_ICON_SIZE)
 	expect(icon?.props.style?.objectFit).toBe('contain')
+	expect(icon?.props.style?.objectPosition).toBe('bottom left')
+	expect(icon?.props.style?.flexShrink).toBe(0)
+	expect(markup.props.style?.alignItems).toBe('flex-end')
+	expect(markup.props.style?.paddingBottom ?? 0).toBe(0)
+	const children = markup.props.children
+	const text = Array.isArray(children) ? children[1] : null
+	expect(
+		text && typeof text !== 'string' ? text.props.style?.alignSelf : null,
+	).toBe('center')
+	expect(
+		text && typeof text !== 'string' ? text.props.style?.width : null,
+	).toBe(OG_TEXT_WIDTH)
+	expect(OG_ICON_SIZE + 28 + OG_TEXT_WIDTH + 56).toBe(OG_WIDTH)
 
 	const tree = JSON.stringify(markup)
 	expect(tree).toContain(OG_WORDMARK)
