@@ -35,7 +35,9 @@ import {
 	countMembers,
 	countOwnedThreads,
 	createThread,
+	getHostAgent,
 	listMessagesForView,
+	threadViewPrompts,
 	threadViewUrlFor,
 	type ThreadRow,
 	type UserRow,
@@ -137,6 +139,14 @@ async function renderThreadView(
 		)
 	}
 	const memberCount = await countMembers(env.DB, listed.thread.id)
+	const host = await getHostAgent(env.DB, listed.thread.id)
+	const viewUrl = `${appBaseUrl(env, request)}${new URL(request.url).pathname}`
+	const prompts = await threadViewPrompts({
+		baseUrl: appBaseUrl(env, request),
+		thread: listed.thread,
+		host,
+		viewUrl,
+	})
 	return html(
 		layout({
 			user,
@@ -152,6 +162,8 @@ async function renderThreadView(
 				messages: listed.messages,
 				memberCount,
 				pollPath: `${new URL(request.url).pathname}/messages`,
+				hostPrompt: prompts.hostPrompt,
+				guestPrompt: prompts.guestPrompt,
 			}),
 		}),
 	)

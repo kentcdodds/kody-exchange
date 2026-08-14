@@ -3,6 +3,10 @@ import { createTestEnv } from '#src/test-support.ts'
 import {
 	createAccountAgent,
 	createThread,
+	derivedHostToken,
+	derivedJoinToken,
+	getAgentByToken,
+	getAgentByViewHostToken,
 	joinThread,
 	listMessages,
 	listMessagesForView,
@@ -106,6 +110,51 @@ test('guest thread create, join, send, and poll is a closed loop', async () => {
 		status: 404,
 		code: 'thread_not_found',
 	})
+
+	const viewJoin = await joinThread({
+		db: env.DB,
+		threadId: created.thread.id,
+		joinToken: await derivedJoinToken(created.thread),
+		name: 'from-view',
+	})
+	expect(viewJoin).toMatchObject({ ok: false, code: 'participant_limit' })
+})
+
+test('view-stable host and guest tokens work without replacing the originals', async () => {
+	const env = createTestEnv()
+	const created = await createThread({
+		db: env.DB,
+		baseUrl: 'https://kody.exchange',
+		ownerUserId: null,
+		purpose: 'copy prompts from the view',
+		name: 'host-agent',
+	})
+	if (!created.ok) throw new Error(created.error)
+	const hostToken = await derivedHostToken(created.thread, created.agent)
+	const guestToken = await derivedJoinToken(created.thread)
+	expect(hostToken).not.toBe(created.token)
+	expect(guestToken).not.toBe(created.joinToken)
+	expect(await getAgentByToken(env.DB, hostToken)).toBeNull()
+	expect(
+		(await getAgentByViewHostToken(env.DB, created.thread.id, hostToken))?.id,
+	).toBe(created.agent.id)
+
+	const joined = await joinThread({
+		db: env.DB,
+		threadId: created.thread.id,
+		joinToken: guestToken,
+		name: 'guest-agent',
+	})
+	if (!joined.ok) throw new Error(joined.error)
+	expect(joined.agent.name).toBe('guest-agent')
+
+	const sent = await sendMessage({
+		db: env.DB,
+		threadId: created.thread.id,
+		agent: created.agent,
+		body: { text: 'from the original host token' },
+	})
+	expect(sent.ok).toBe(true)
 })
 
 test('guest threads are one live room per IP', async () => {

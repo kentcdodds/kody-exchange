@@ -106,6 +106,84 @@ export async function threadViewUrlFor(
 	return threadViewUrl(baseUrl, thread.id, await viewTokenFor(thread))
 }
 
+export async function derivedJoinToken(
+	thread: Pick<ThreadRow, 'id' | 'join_secret_hash'>,
+) {
+	const digest = await sha256Hex(`join:${thread.id}:${thread.join_secret_hash}`)
+	return `kx_join_${digest.slice(0, 48)}`
+}
+
+export async function derivedHostToken(
+	thread: Pick<ThreadRow, 'id' | 'join_secret_hash'>,
+	agent: Pick<AgentRow, 'id'>,
+) {
+	const digest = await sha256Hex(
+		`host:${thread.id}:${agent.id}:${thread.join_secret_hash}`,
+	)
+	return `kx_live_${digest.slice(0, 48)}`
+}
+
+async function tokenEquals(left: string, right: string) {
+	return timingSafeEqualHex(await sha256Hex(left), await sha256Hex(right))
+}
+
+export async function getHostAgent(db: D1Database, threadId: string) {
+	return first<AgentRow>(
+		db,
+		`SELECT a.* FROM thread_members m
+		 JOIN agents a ON a.id = m.agent_id
+		 WHERE m.thread_id = ? AND a.revoked_at IS NULL
+		 ORDER BY m.joined_at ASC, a.id ASC
+		 LIMIT 1`,
+		threadId,
+	)
+}
+
+export async function getAgentByViewHostToken(
+	db: D1Database,
+	threadId: string,
+	token: string,
+) {
+	const thread = await first<ThreadRow>(
+		db,
+		'SELECT * FROM threads WHERE id = ?',
+		threadId,
+	)
+	if (!thread) return null
+	const host = await getHostAgent(db, threadId)
+	if (!host) return null
+	const expected = await derivedHostToken(thread, host)
+	if (!(await tokenEquals(token, expected))) return null
+	return host
+}
+
+export async function threadViewPrompts(input: {
+	baseUrl: string
+	thread: ThreadRow
+	host: Pick<AgentRow, 'id' | 'name'> | null
+	viewUrl: string
+}) {
+	const guestPrompt = joinPrompt({
+		baseUrl: input.baseUrl,
+		threadId: input.thread.id,
+		joinToken: await derivedJoinToken(input.thread),
+		purpose: input.thread.purpose,
+		viewUrl: input.viewUrl,
+	})
+	if (!input.host) return { hostPrompt: null, guestPrompt }
+	return {
+		hostPrompt: connectPrompt({
+			baseUrl: input.baseUrl,
+			threadId: input.thread.id,
+			token: await derivedHostToken(input.thread, input.host),
+			name: input.host.name,
+			purpose: input.thread.purpose,
+			viewUrl: input.viewUrl,
+		}),
+		guestPrompt,
+	}
+}
+
 function watchLine(viewUrl: string) {
 	return `Humans can watch this thread (read-only):\n${viewUrl}\n\n`
 }
@@ -402,8 +480,15 @@ export async function joinThread(input: {
 	if (!thread || thread.expires_at <= now) {
 		return fail(404, 'thread_not_found', 'Thread not found or expired.')
 	}
-	const expected = await sha256Hex(input.joinToken)
-	if (expected !== thread.join_secret_hash) {
+	const originalOk = timingSafeEqualHex(
+		await sha256Hex(input.joinToken),
+		thread.join_secret_hash,
+	)
+	const derivedOk = await tokenEquals(
+		input.joinToken,
+		await derivedJoinToken(thread),
+	)
+	if (!originalOk && !derivedOk) {
 		return fail(401, 'bad_join_token', 'Join token is invalid.')
 	}
 

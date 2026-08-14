@@ -11,6 +11,7 @@ import {
 	createThread,
 	dispatchWebhook,
 	getAgentByToken,
+	getAgentByViewHostToken,
 	joinThread,
 	listMessages,
 	requireMember,
@@ -63,7 +64,7 @@ async function readJson(request: Request) {
 	}
 }
 
-async function requireAgent(request: Request, env: AppEnv) {
+async function requireAgent(request: Request, env: AppEnv, threadId?: string) {
 	const token = bearer(request)
 	if (!token) {
 		return {
@@ -74,7 +75,9 @@ async function requireAgent(request: Request, env: AppEnv) {
 			),
 		}
 	}
-	const agent = await getAgentByToken(env.DB, token)
+	const agent =
+		(await getAgentByToken(env.DB, token)) ??
+		(threadId ? await getAgentByViewHostToken(env.DB, threadId, token) : null)
 	if (!agent) {
 		return {
 			ok: false as const,
@@ -245,7 +248,7 @@ async function joinThreadRoute(
 }
 
 async function sendRoute(request: Request, env: AppEnv, threadId: string) {
-	const auth = await requireAgent(request, env)
+	const auth = await requireAgent(request, env, threadId)
 	if (!auth.ok) return auth.response
 	const burst = await limitMessageBurst({
 		store: env.RATE_LIMIT,
@@ -286,7 +289,7 @@ async function sendRoute(request: Request, env: AppEnv, threadId: string) {
 }
 
 async function pollRoute(request: Request, env: AppEnv, threadId: string) {
-	const auth = await requireAgent(request, env)
+	const auth = await requireAgent(request, env, threadId)
 	if (!auth.ok) return auth.response
 	const thread = await first<{ owner_user_id: string | null }>(
 		env.DB,
@@ -328,7 +331,7 @@ async function pollRoute(request: Request, env: AppEnv, threadId: string) {
 }
 
 async function webhookRoute(request: Request, env: AppEnv, threadId: string) {
-	const auth = await requireAgent(request, env)
+	const auth = await requireAgent(request, env, threadId)
 	if (!auth.ok) return auth.response
 	const body = await readJson(request)
 	if (!body)
@@ -344,7 +347,7 @@ async function webhookRoute(request: Request, env: AppEnv, threadId: string) {
 }
 
 async function uploadBlob(request: Request, env: AppEnv, threadId: string) {
-	const auth = await requireAgent(request, env)
+	const auth = await requireAgent(request, env, threadId)
 	if (!auth.ok) return auth.response
 	const membership = await requireMember({
 		db: env.DB,
@@ -413,8 +416,12 @@ async function uploadBlob(request: Request, env: AppEnv, threadId: string) {
 }
 
 async function getBlob(request: Request, env: AppEnv, blobId: string) {
-	const auth = await requireAgent(request, env)
-	if (!auth.ok) return auth.response
+	if (!bearer(request)) {
+		return json(
+			{ ok: false, error: 'Missing bearer token.', code: 'unauthorized' },
+			401,
+		)
+	}
 	const blob = await first<{
 		id: string
 		user_id: string
@@ -422,6 +429,8 @@ async function getBlob(request: Request, env: AppEnv, blobId: string) {
 	}>(env.DB, 'SELECT id, user_id, thread_id FROM blobs WHERE id = ?', blobId)
 	if (!blob)
 		return json({ ok: false, error: 'Not found.', code: 'not_found' }, 404)
+	const auth = await requireAgent(request, env, blob.thread_id ?? undefined)
+	if (!auth.ok) return auth.response
 	if (blob.thread_id) {
 		const membership = await requireMember({
 			db: env.DB,
