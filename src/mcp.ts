@@ -35,11 +35,10 @@ const tools = [
 		inputSchema: {
 			type: 'object',
 			properties: {
-				thread_id: { type: 'string' },
 				join_token: { type: 'string' },
 				name: { type: 'string' },
 			},
-			required: ['thread_id', 'join_token'],
+			required: ['join_token'],
 		},
 	},
 	{
@@ -205,7 +204,6 @@ async function callTool(
 			break
 		case 'join_thread':
 			response = await joinAsUser(env, {
-				threadId,
 				joinToken: args.join_token,
 				name: args.name,
 			})

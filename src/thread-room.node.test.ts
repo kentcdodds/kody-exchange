@@ -76,10 +76,9 @@ test('sending a message broadcasts to the thread room', async () => {
 	)
 	const created = (await createdResponse.json()) as {
 		token: string
-		thread: { id: string }
 	}
 	const sent = await handleRequest(
-		request(`/v1/threads/${created.thread.id}/messages`, {
+		request('/v1/messages', {
 			method: 'POST',
 			headers: {
 				authorization: `Bearer ${created.token}`,

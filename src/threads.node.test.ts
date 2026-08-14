@@ -3,13 +3,12 @@ import { createTestEnv } from '#src/test-support.ts'
 import {
 	createAccountAgent,
 	createThread,
-	derivedHostToken,
-	derivedJoinToken,
 	getAgentByToken,
-	getAgentByViewHostToken,
 	joinThread,
+	joinTokenFor,
 	listMessages,
 	listMessagesForView,
+	liveTokenFor,
 	maybeDispatchWebhook,
 	sendMessage,
 	setWebhook,
@@ -32,27 +31,29 @@ test('guest thread create, join, send, and poll is a closed loop', async () => {
 	expect(created.plan).toBe('guest')
 	expect(created.connectPrompt).toContain(created.token)
 	expect(created.connectPrompt).toContain(
-		`POST https://kody.exchange/v1/threads/${created.thread.id}/messages`,
+		'POST https://kody.exchange/v1/messages',
 	)
+	expect(created.connectPrompt).not.toContain(created.thread.id)
 	expect(created.connectPrompt).toContain(
 		'already in this kody.exchange thread',
 	)
-	expect(created.joinPrompt).toContain('POST https://kody.exchange/v1/threads/')
+	expect(created.joinPrompt).toContain('POST https://kody.exchange/v1/join')
 	expect(created.joinPrompt).toContain(created.joinToken)
+	expect(created.joinPrompt).not.toContain(created.thread.id)
 	expect(created.joinPrompt).toContain('kody.exchange')
 	expect(created.connectPrompt).not.toContain(created.joinToken)
 	expect(created.joinPrompt).not.toContain(created.token)
 	expect(created.viewUrl).toMatch(
-		new RegExp(`^https://kody.exchange/t/${created.thread.id}/[0-9a-f]{32}$`),
+		/^https:\/\/kody\.exchange\/t\/kx_view_[0-9a-f]{48}$/,
 	)
 	expect(created.connectPrompt).toContain(created.viewUrl)
 	expect(created.joinPrompt).toContain(created.viewUrl)
 	expect(created.viewUrl).not.toContain(created.joinToken)
 	expect(created.viewUrl).not.toContain(created.token)
+	expect(created.viewUrl).not.toContain(created.thread.id)
 
 	const joined = await joinThread({
 		db: env.DB,
-		threadId: created.thread.id,
 		joinToken: created.joinToken,
 		name: 'claude',
 		now: Date.parse('2026-08-14T00:00:01Z'),
@@ -62,7 +63,6 @@ test('guest thread create, join, send, and poll is a closed loop', async () => {
 
 	const third = await joinThread({
 		db: env.DB,
-		threadId: created.thread.id,
 		joinToken: created.joinToken,
 		name: 'extra',
 	})
@@ -91,10 +91,9 @@ test('guest thread create, join, send, and poll is a closed loop', async () => {
 	expect(listed.retryAfter).toBe(5)
 
 	const viewToken = await viewTokenFor(created.thread)
-	expect(viewToken).toHaveLength(32)
+	expect(viewToken).toMatch(/^kx_view_[0-9a-f]{48}$/)
 	const viewed = await listMessagesForView({
 		db: env.DB,
-		threadId: created.thread.id,
 		viewToken,
 	})
 	if (!viewed.ok) throw new Error(viewed.error)
@@ -104,7 +103,6 @@ test('guest thread create, join, send, and poll is a closed loop', async () => {
 
 	const badView = await listMessagesForView({
 		db: env.DB,
-		threadId: created.thread.id,
 		viewToken: created.joinToken,
 	})
 	expect(badView).toMatchObject({
@@ -115,14 +113,13 @@ test('guest thread create, join, send, and poll is a closed loop', async () => {
 
 	const viewJoin = await joinThread({
 		db: env.DB,
-		threadId: created.thread.id,
-		joinToken: await derivedJoinToken(created.thread),
+		joinToken: await joinTokenFor(created.thread),
 		name: 'from-view',
 	})
 	expect(viewJoin).toMatchObject({ ok: false, code: 'participant_limit' })
 })
 
-test('view-stable host and guest tokens work without replacing the originals', async () => {
+test('HMAC-derived live and join tokens match the minted secrets', async () => {
 	const env = createTestEnv()
 	const created = await createThread({
 		db: env.DB,
@@ -132,29 +129,26 @@ test('view-stable host and guest tokens work without replacing the originals', a
 		name: 'host-agent',
 	})
 	if (!created.ok) throw new Error(created.error)
-	const hostToken = await derivedHostToken(created.thread, created.agent)
-	const guestToken = await derivedJoinToken(created.thread)
-	expect(hostToken).not.toBe(created.token)
-	expect(guestToken).not.toBe(created.joinToken)
-	expect(await getAgentByToken(env.DB, hostToken)).toBeNull()
-	expect(
-		(await getAgentByViewHostToken(env.DB, created.thread.id, hostToken))?.id,
-	).toBe(created.agent.id)
+	const hostToken = await liveTokenFor(created.thread, created.agent.id)
+	const guestToken = await joinTokenFor(created.thread)
+	expect(hostToken).toBe(created.token)
+	expect(guestToken).toBe(created.joinToken)
+	expect((await getAgentByToken(env.DB, hostToken))?.id).toBe(created.agent.id)
 
 	const joined = await joinThread({
 		db: env.DB,
-		threadId: created.thread.id,
 		joinToken: guestToken,
 		name: 'guest-agent',
 	})
 	if (!joined.ok) throw new Error(joined.error)
 	expect(joined.agent.name).toBe('guest-agent')
+	expect(joined.token).toBe(await liveTokenFor(created.thread, joined.agent.id))
 
 	const sent = await sendMessage({
 		db: env.DB,
 		threadId: created.thread.id,
 		agent: created.agent,
-		body: { text: 'from the original host token' },
+		body: { text: 'from the host live token' },
 	})
 	expect(sent.ok).toBe(true)
 })
@@ -193,9 +187,11 @@ test('guest create stops at the global live-thread cap', async () => {
 	for (let index = 0; index < guestLiveThreadCap; index += 1) {
 		await run(
 			env.DB,
-			`INSERT INTO threads (id, owner_user_id, purpose, join_secret_hash, webhook_url, created_at, expires_at, creator_ip)
-			 VALUES (?, NULL, NULL, 'hash', NULL, ?, ?, ?)`,
+			`INSERT INTO threads (id, owner_user_id, purpose, thread_secret, view_token_hash, join_token_hash, webhook_url, created_at, expires_at, creator_ip)
+			 VALUES (?, NULL, NULL, 'secret', ?, ?, NULL, ?, ?, ?)`,
 			`th_cap_${index}`,
+			`view_cap_${index}`,
+			`join_cap_${index}`,
 			now,
 			now + 86_400_000,
 			`203.0.113.${index % 250}`,

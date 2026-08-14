@@ -11,13 +11,13 @@ import {
 	createThread,
 	maybeDispatchWebhook,
 	getAgentByToken,
-	getAgentByViewHostToken,
 	joinThread,
 	listMessages,
 	requireMember,
 	sendMessage,
 	setWebhook,
 	threadViewUrlFor,
+	type AgentRow,
 	type DomainError,
 } from '#src/threads.ts'
 import { createId } from '#src/ids.ts'
@@ -77,7 +77,7 @@ async function readJson(request: Request) {
 	}
 }
 
-async function requireAgent(request: Request, env: AppEnv, threadId?: string) {
+async function requireAgent(request: Request, env: AppEnv) {
 	const token = bearer(request)
 	if (!token) {
 		return {
@@ -88,9 +88,7 @@ async function requireAgent(request: Request, env: AppEnv, threadId?: string) {
 			),
 		}
 	}
-	const agent =
-		(await getAgentByToken(env.DB, token)) ??
-		(threadId ? await getAgentByViewHostToken(env.DB, threadId, token) : null)
+	const agent = await getAgentByToken(env.DB, token)
 	if (!agent) {
 		return {
 			ok: false as const,
@@ -103,18 +101,21 @@ async function requireAgent(request: Request, env: AppEnv, threadId?: string) {
 	return { ok: true as const, agent }
 }
 
-function threadJson(thread: {
-	id: string
-	purpose: string | null
-	created_at: number
-	expires_at: number
-}) {
-	return {
-		id: thread.id,
-		purpose: thread.purpose,
-		created_at: new Date(thread.created_at).toISOString(),
-		expires_at: new Date(thread.expires_at).toISOString(),
+function threadIdForAgent(agent: AgentRow) {
+	if (!agent.thread_id) {
+		return {
+			ok: false as const,
+			response: json(
+				{
+					ok: false,
+					error: 'This agent is not in a thread.',
+					code: 'not_a_member',
+				},
+				403,
+			),
+		}
 	}
+	return { ok: true as const, threadId: agent.thread_id }
 }
 
 export async function handleApi(
@@ -131,27 +132,23 @@ export async function handleApi(
 		return createThreadRoute(request, env)
 	}
 
-	const join = url.pathname.match(/^\/v1\/threads\/([^/]+)\/join$/)
-	if (join?.[1] && request.method === 'POST') {
-		return joinThreadRoute(request, env, join[1])
+	if (url.pathname === '/v1/join' && request.method === 'POST') {
+		return joinThreadRoute(request, env)
 	}
 
-	const messages = url.pathname.match(/^\/v1\/threads\/([^/]+)\/messages$/)
-	if (messages?.[1] && request.method === 'POST') {
-		return sendRoute(request, env, messages[1], ctx)
+	if (url.pathname === '/v1/messages' && request.method === 'POST') {
+		return sendRoute(request, env, ctx)
 	}
-	if (messages?.[1] && request.method === 'GET') {
-		return pollRoute(request, env, messages[1])
-	}
-
-	const webhook = url.pathname.match(/^\/v1\/threads\/([^/]+)\/webhook$/)
-	if (webhook?.[1] && request.method === 'PUT') {
-		return webhookRoute(request, env, webhook[1])
+	if (url.pathname === '/v1/messages' && request.method === 'GET') {
+		return pollRoute(request, env)
 	}
 
-	const blobs = url.pathname.match(/^\/v1\/threads\/([^/]+)\/blobs$/)
-	if (blobs?.[1] && request.method === 'POST') {
-		return uploadBlob(request, env, blobs[1])
+	if (url.pathname === '/v1/webhook' && request.method === 'PUT') {
+		return webhookRoute(request, env)
+	}
+
+	if (url.pathname === '/v1/blobs' && request.method === 'POST') {
+		return uploadBlob(request, env)
 	}
 
 	const blobGet = url.pathname.match(/^\/v1\/blobs\/([^/]+)$/)
@@ -225,7 +222,7 @@ async function createThreadRoute(request: Request, env: AppEnv) {
 	if (!created.ok) return errorResponse(created, undefined, origin)
 	return json({
 		ok: true,
-		thread: threadJson(created.thread),
+		thread: guestThreadJson(created.thread),
 		agent: { id: created.agent.id, name: created.agent.name },
 		token: created.token,
 		join_token: created.joinToken,
@@ -236,11 +233,19 @@ async function createThreadRoute(request: Request, env: AppEnv) {
 	})
 }
 
-async function joinThreadRoute(
-	request: Request,
-	env: AppEnv,
-	threadId: string,
-) {
+function guestThreadJson(thread: {
+	purpose: string | null
+	created_at: number
+	expires_at: number
+}) {
+	return {
+		purpose: thread.purpose,
+		created_at: new Date(thread.created_at).toISOString(),
+		expires_at: new Date(thread.expires_at).toISOString(),
+	}
+}
+
+async function joinThreadRoute(request: Request, env: AppEnv) {
 	const body = await readJson(request)
 	if (!body)
 		return json({ ok: false, error: 'Invalid JSON.', code: 'bad_json' }, 400)
@@ -254,14 +259,13 @@ async function joinThreadRoute(
 	}
 	const joined = await joinThread({
 		db: env.DB,
-		threadId,
 		joinToken,
 		name: body.name,
 	})
 	if (!joined.ok) return errorResponse(joined)
 	return json({
 		ok: true,
-		thread: threadJson(joined.thread),
+		thread: guestThreadJson(joined.thread),
 		agent: { id: joined.agent.id, name: joined.agent.name },
 		token: joined.token,
 		view_url: await threadViewUrlFor(appBaseUrl(env, request), joined.thread),
@@ -272,11 +276,12 @@ async function joinThreadRoute(
 async function sendRoute(
 	request: Request,
 	env: AppEnv,
-	threadId: string,
 	ctx?: ExecutionContext,
 ) {
-	const auth = await requireAgent(request, env, threadId)
+	const auth = await requireAgent(request, env)
 	if (!auth.ok) return auth.response
+	const scoped = threadIdForAgent(auth.agent)
+	if (!scoped.ok) return scoped.response
 	const burst = await limitMessageBurst({
 		store: env.RATE_LIMIT,
 		agentId: auth.agent.id,
@@ -297,31 +302,33 @@ async function sendRoute(
 		return json({ ok: false, error: 'Invalid JSON.', code: 'bad_json' }, 400)
 	const sent = await sendMessage({
 		db: env.DB,
-		threadId,
+		threadId: scoped.threadId,
 		agent: auth.agent,
 		kind: body.kind,
 		body: body.body,
 		refs: body.refs,
 	})
 	if (!sent.ok) return errorResponse(sent)
-	await maybeDispatchWebhook(env.DB, threadId, sent.message, ctx)
-	await maybeBroadcastThreadView(env, threadId, sent.message, ctx)
+	await maybeDispatchWebhook(env.DB, scoped.threadId, sent.message, ctx)
+	await maybeBroadcastThreadView(env, scoped.threadId, sent.message, ctx)
 	return json({ ok: true, message: sent.message })
 }
 
-async function pollRoute(request: Request, env: AppEnv, threadId: string) {
-	const auth = await requireAgent(request, env, threadId)
+async function pollRoute(request: Request, env: AppEnv) {
+	const auth = await requireAgent(request, env)
 	if (!auth.ok) return auth.response
+	const scoped = threadIdForAgent(auth.agent)
+	if (!scoped.ok) return scoped.response
 	const thread = await first<{ owner_user_id: string | null }>(
 		env.DB,
 		'SELECT owner_user_id FROM threads WHERE id = ?',
-		threadId,
+		scoped.threadId,
 	)
 	const limited = await limitPoll({
 		store: env.RATE_LIMIT,
 		cache: workerPollCache(),
 		agentId: auth.agent.id,
-		threadId,
+		threadId: scoped.threadId,
 		minIntervalMs: pollMinIntervalMsFor(thread),
 	})
 	if (!limited.ok) {
@@ -338,7 +345,7 @@ async function pollRoute(request: Request, env: AppEnv, threadId: string) {
 	const url = new URL(request.url)
 	const listed = await listMessages({
 		db: env.DB,
-		threadId,
+		threadId: scoped.threadId,
 		agent: auth.agent,
 		after: url.searchParams.get('after'),
 		limit: Number(url.searchParams.get('limit') ?? 50),
@@ -351,15 +358,17 @@ async function pollRoute(request: Request, env: AppEnv, threadId: string) {
 	)
 }
 
-async function webhookRoute(request: Request, env: AppEnv, threadId: string) {
-	const auth = await requireAgent(request, env, threadId)
+async function webhookRoute(request: Request, env: AppEnv) {
+	const auth = await requireAgent(request, env)
 	if (!auth.ok) return auth.response
+	const scoped = threadIdForAgent(auth.agent)
+	if (!scoped.ok) return scoped.response
 	const body = await readJson(request)
 	if (!body)
 		return json({ ok: false, error: 'Invalid JSON.', code: 'bad_json' }, 400)
 	const result = await setWebhook({
 		db: env.DB,
-		threadId,
+		threadId: scoped.threadId,
 		agent: auth.agent,
 		url: body.url,
 	})
@@ -367,12 +376,14 @@ async function webhookRoute(request: Request, env: AppEnv, threadId: string) {
 	return json({ ok: true, url: result.url })
 }
 
-async function uploadBlob(request: Request, env: AppEnv, threadId: string) {
-	const auth = await requireAgent(request, env, threadId)
+async function uploadBlob(request: Request, env: AppEnv) {
+	const auth = await requireAgent(request, env)
 	if (!auth.ok) return auth.response
+	const scoped = threadIdForAgent(auth.agent)
+	if (!scoped.ok) return scoped.response
 	const membership = await requireMember({
 		db: env.DB,
-		threadId,
+		threadId: scoped.threadId,
 		agent: auth.agent,
 	})
 	if (!membership.ok) return errorResponse(membership)
@@ -425,7 +436,7 @@ async function uploadBlob(request: Request, env: AppEnv, threadId: string) {
 		 VALUES (?, ?, ?, ?, ?, ?)`,
 		id,
 		ownerId,
-		threadId,
+		scoped.threadId,
 		contentType,
 		bytes.byteLength,
 		Date.now(),
@@ -450,7 +461,7 @@ async function getBlob(request: Request, env: AppEnv, blobId: string) {
 	}>(env.DB, 'SELECT id, user_id, thread_id FROM blobs WHERE id = ?', blobId)
 	if (!blob)
 		return json({ ok: false, error: 'Not found.', code: 'not_found' }, 404)
-	const auth = await requireAgent(request, env, blob.thread_id ?? undefined)
+	const auth = await requireAgent(request, env)
 	if (!auth.ok) return auth.response
 	if (blob.thread_id) {
 		const membership = await requireMember({

@@ -218,7 +218,7 @@ export async function handleUserApi(
 
 export async function joinAsUser(
 	env: AppEnv,
-	input: { threadId: string; joinToken: unknown; name?: unknown },
+	input: { joinToken: unknown; name?: unknown },
 ) {
 	if (typeof input.joinToken !== 'string') {
 		return json(
@@ -228,7 +228,6 @@ export async function joinAsUser(
 	}
 	const joined = await joinThread({
 		db: env.DB,
-		threadId: input.threadId,
 		joinToken: input.joinToken,
 		name: input.name,
 	})

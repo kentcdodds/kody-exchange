@@ -230,7 +230,7 @@ test('thread view shows host prompt only to the signed-in owner', async () => {
 		env,
 	)
 	const accountHtml = await withPrompts.text()
-	const viewPath = /\/t\/th_[a-f0-9]+\/[a-f0-9]+/.exec(accountHtml)?.[0]
+	const viewPath = /\/t\/kx_view_[a-f0-9]+/.exec(accountHtml)?.[0]
 	expect(viewPath).toBeTruthy()
 
 	const ownerView = await (
@@ -296,13 +296,13 @@ test('thread view aligns host messages right for the owner and guest messages ri
 			env,
 		)
 	).text()
-	const viewPath = /\/t\/th_[a-f0-9]+\/[a-f0-9]+/.exec(accountHtml)?.[0]
+	const viewPath = /\/t\/kx_view_[a-f0-9]+/.exec(accountHtml)?.[0]
 	const hostToken = /kx_live_[a-f0-9]+/.exec(accountHtml)?.[0]
 	const joinToken = /kx_join_[a-f0-9]+/.exec(accountHtml)?.[0]
 	expect(viewPath && hostToken && joinToken).toBeTruthy()
 
 	const hostSend = await handleRequest(
-		request(`/v1/threads/${viewPath?.split('/')[2]}/messages`, {
+		request('/v1/messages', {
 			method: 'POST',
 			headers: {
 				authorization: `Bearer ${hostToken}`,
@@ -315,7 +315,7 @@ test('thread view aligns host messages right for the owner and guest messages ri
 	expect(hostSend.status).toBe(200)
 
 	const joined = await handleRequest(
-		request(`/v1/threads/${viewPath?.split('/')[2]}/join`, {
+		request('/v1/join', {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify({ join_token: joinToken, name: 'guest-agent' }),
@@ -324,7 +324,7 @@ test('thread view aligns host messages right for the owner and guest messages ri
 	)
 	const joinedBody = (await joined.json()) as { token: string }
 	const guestSend = await handleRequest(
-		request(`/v1/threads/${viewPath?.split('/')[2]}/messages`, {
+		request('/v1/messages', {
 			method: 'POST',
 			headers: {
 				authorization: `Bearer ${joinedBody.token}`,

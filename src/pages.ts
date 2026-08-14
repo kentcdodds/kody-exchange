@@ -54,17 +54,17 @@ export async function renderPage(
 	const baseUrl = appBaseUrl(env, request)
 	const common = { user, env, path: url.pathname }
 
-	const viewLive = url.pathname.match(/^\/t\/([^/]+)\/([^/]+)\/live$/)
-	if (viewLive?.[1] && viewLive[2]) {
-		return connectThreadView(request, env, viewLive[1], viewLive[2])
+	const viewLive = url.pathname.match(/^\/t\/([^/]+)\/live$/)
+	if (viewLive?.[1]) {
+		return connectThreadView(request, env, viewLive[1])
 	}
-	const viewMessages = url.pathname.match(/^\/t\/([^/]+)\/([^/]+)\/messages$/)
-	if (viewMessages?.[1] && viewMessages[2]) {
-		return pollThreadView(request, env, viewMessages[1], viewMessages[2])
+	const viewMessages = url.pathname.match(/^\/t\/([^/]+)\/messages$/)
+	if (viewMessages?.[1]) {
+		return pollThreadView(request, env, viewMessages[1])
 	}
-	const view = url.pathname.match(/^\/t\/([^/]+)\/([^/]+)$/)
-	if (view?.[1] && view[2]) {
-		return renderThreadView(request, env, user, view[1], view[2])
+	const view = url.pathname.match(/^\/t\/([^/]+)$/)
+	if (view?.[1]) {
+		return renderThreadView(request, env, user, view[1])
 	}
 
 	switch (url.pathname) {
@@ -122,12 +122,10 @@ async function renderThreadView(
 	request: Request,
 	env: AppEnv,
 	user: UserRow | null,
-	threadId: string,
 	viewToken: string,
 ) {
 	const listed = await listMessagesForView({
 		db: env.DB,
-		threadId,
 		viewToken,
 	})
 	if (!listed.ok) {
@@ -183,7 +181,6 @@ async function renderThreadView(
 async function connectThreadView(
 	request: Request,
 	env: AppEnv,
-	threadId: string,
 	viewToken: string,
 ) {
 	if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') {
@@ -198,7 +195,6 @@ async function connectThreadView(
 	}
 	const listed = await listMessagesForView({
 		db: env.DB,
-		threadId,
 		viewToken,
 		limit: 1,
 	})
@@ -218,21 +214,22 @@ async function connectThreadView(
 			503,
 		)
 	}
-	const stub = env.THREAD_ROOMS.get(env.THREAD_ROOMS.idFromName(threadId))
+	const stub = env.THREAD_ROOMS.get(
+		env.THREAD_ROOMS.idFromName(listed.thread.id),
+	)
 	return stub.fetch(request)
 }
 
 async function pollThreadView(
 	request: Request,
 	env: AppEnv,
-	threadId: string,
 	viewToken: string,
 ) {
 	const limited = await limitViewPoll({
 		store: env.RATE_LIMIT,
 		cache: workerPollCache(),
 		ip: clientIp(request),
-		threadId,
+		threadId: viewToken,
 	})
 	if (!limited.ok) {
 		return json(
@@ -247,7 +244,6 @@ async function pollThreadView(
 	}
 	const listed = await listMessagesForView({
 		db: env.DB,
-		threadId,
 		viewToken,
 		after: new URL(request.url).searchParams.get('after'),
 		limit: Number(new URL(request.url).searchParams.get('limit') ?? 50),

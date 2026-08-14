@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import { handleRequest } from '#src/index.ts'
 import { createTestEnv, request } from '#src/test-support.ts'
-import { derivedHostToken } from '#src/threads.ts'
+import { liveTokenFor } from '#src/threads.ts'
 import { first } from '#src/db.ts'
 
 test('guest thread: create, join, send, poll, and health', async () => {
@@ -64,18 +64,25 @@ test('guest thread: create, join, send, poll, and health', async () => {
 		view_url: string
 		connect_prompt: string
 		join_prompt: string
-		thread: { id: string }
+		thread: { purpose: string }
 		agent: { id: string }
 	}
 	expect(created.ok).toBe(true)
+	expect(created.thread).not.toHaveProperty('id')
 	expect(created.connect_prompt).toContain(created.token)
 	expect(created.join_prompt).toContain(created.join_token)
-	expect(created.view_url).toContain(`/t/${created.thread.id}/`)
+	expect(created.view_url).toMatch(/\/t\/kx_view_[0-9a-f]{48}$/)
 	expect(created.connect_prompt).toContain(created.view_url)
 	expect(created.join_prompt).toContain(created.view_url)
+	expect(created.connect_prompt).toContain(
+		'POST https://kody.exchange/v1/messages',
+	)
+	expect(created.join_prompt).toContain('POST https://kody.exchange/v1/join')
+	expect(created.connect_prompt).not.toContain('/v1/threads/')
+	expect(created.join_prompt).not.toContain('/v1/threads/')
 
 	const joinResponse = await handleRequest(
-		request(`/v1/threads/${created.thread.id}/join`, {
+		request('/v1/join', {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify({ join_token: created.join_token, name: 'claude' }),
@@ -87,7 +94,7 @@ test('guest thread: create, join, send, poll, and health', async () => {
 	expect(joined.ok).toBe(true)
 
 	const sendResponse = await handleRequest(
-		request(`/v1/threads/${created.thread.id}/messages`, {
+		request('/v1/messages', {
 			method: 'POST',
 			headers: {
 				authorization: `Bearer ${created.token}`,
@@ -105,7 +112,7 @@ test('guest thread: create, join, send, poll, and health', async () => {
 	expect(sent.message.body.text).toBe('ready when you are')
 
 	const pollResponse = await handleRequest(
-		request(`/v1/threads/${created.thread.id}/messages?after=0`, {
+		request('/v1/messages?after=0', {
 			headers: { authorization: `Bearer ${joined.token}` },
 		}),
 		env,
@@ -123,7 +130,7 @@ test('guest thread: create, join, send, poll, and health', async () => {
 	expect(pollResponse.headers.get('retry-after')).toBe('5')
 
 	const tooFast = await handleRequest(
-		request(`/v1/threads/${created.thread.id}/messages?after=0`, {
+		request('/v1/messages?after=0', {
 			headers: { authorization: `Bearer ${joined.token}` },
 		}),
 		env,
@@ -171,7 +178,7 @@ test('guest thread: create, join, send, poll, and health', async () => {
 	expect(sameIpJson.hint).toContain('not a paid upgrade')
 
 	const guestSend = await handleRequest(
-		request(`/v1/threads/${created.thread.id}/messages`, {
+		request('/v1/messages', {
 			method: 'POST',
 			headers: {
 				authorization: `Bearer ${joined.token}`,
@@ -217,11 +224,11 @@ test('guest thread: create, join, send, poll, and health', async () => {
 	expect(viewHtml).toContain('Copy prompt')
 	expect(viewHtml).toContain('Join this kody.exchange thread')
 	expect(viewHtml).toContain('kx_join_')
+	expect(viewHtml).toContain(created.join_token)
 	expect(viewHtml).not.toContain('>Host<')
 	expect(viewHtml).not.toContain('already in this kody.exchange thread')
 	expect(viewHtml).not.toContain('kx_live_')
 	expect(viewHtml).not.toContain(created.token)
-	expect(viewHtml).not.toContain(created.join_token)
 	expect(viewHtml).not.toContain('name="body"')
 	expect(viewHtml).not.toMatch(/<textarea/)
 	expect(viewHtml).not.toContain('action="/v1/threads')
@@ -260,11 +267,21 @@ test('guest thread: create, join, send, poll, and health', async () => {
 	expect(liveNoRoom.status).toBe(503)
 
 	const badView = await handleRequest(
-		request(`/t/${created.thread.id}/ffffffffffffffffffffffffffffffff`),
+		request(`/t/kx_view_${'f'.repeat(48)}`),
 		env,
 	)
 	expect(badView.status).toBe(404)
 	expect(await badView.text()).toContain('Thread not found')
+
+	const oldJoin = await handleRequest(
+		request('/v1/threads/th_old/join', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ join_token: created.join_token, name: 'old' }),
+		}),
+		env,
+	)
+	expect(oldJoin.status).toBe(404)
 
 	const robots = await handleRequest(request('/robots.txt'), env)
 	expect(await robots.text()).toContain('Disallow: /t/')
@@ -286,24 +303,19 @@ test('view host prompt token can send on that thread but cannot open another', a
 	const created = (await createdResponse.json()) as {
 		ok: boolean
 		token: string
-		thread: { id: string }
 		agent: { id: string }
 		view_url: string
 	}
 	const thread = await first<{
 		id: string
-		join_secret_hash: string
-	}>(
-		env.DB,
-		'SELECT id, join_secret_hash FROM threads WHERE id = ?',
-		created.thread.id,
-	)
+		thread_secret: string
+	}>(env.DB, 'SELECT id, thread_secret FROM threads LIMIT 1')
 	if (!thread) throw new Error('missing thread')
-	const hostToken = await derivedHostToken(thread, created.agent)
-	expect(hostToken).not.toBe(created.token)
+	const hostToken = await liveTokenFor(thread, created.agent.id)
+	expect(hostToken).toBe(created.token)
 
 	const sent = await handleRequest(
-		request(`/v1/threads/${created.thread.id}/messages`, {
+		request('/v1/messages', {
 			method: 'POST',
 			headers: {
 				authorization: `Bearer ${hostToken}`,
@@ -326,7 +338,7 @@ test('view host prompt token can send on that thread but cannot open another', a
 		}),
 		env,
 	)
-	expect(createWithViewHost.status).toBe(401)
+	expect(createWithViewHost.status).toBe(403)
 
 	const createWithGuestLive = await handleRequest(
 		request('/v1/threads', {
