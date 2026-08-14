@@ -28,15 +28,23 @@ import { handleUserApi } from '#src/user-api.ts'
 import { purgeExpired } from '#src/threads.ts'
 
 export default {
-	async fetch(request: Request, env: AppEnv): Promise<Response> {
-		return handleRequest(request, env)
+	async fetch(
+		request: Request,
+		env: AppEnv,
+		ctx?: ExecutionContext,
+	): Promise<Response> {
+		return handleRequest(request, env, ctx)
 	},
 	async scheduled(_event: ScheduledEvent, env: AppEnv) {
 		await purgeExpired(env.DB)
 	},
 }
 
-export async function handleRequest(request: Request, env: AppEnv) {
+export async function handleRequest(
+	request: Request,
+	env: AppEnv,
+	ctx?: ExecutionContext,
+) {
 	const url = new URL(request.url)
 
 	if (url.pathname === '/health') {
@@ -85,7 +93,7 @@ export async function handleRequest(request: Request, env: AppEnv) {
 		return handleAuthorizeRequest(request, env)
 	}
 
-	const api = await handleApi(request, env)
+	const api = await handleApi(request, env, ctx)
 	if (api) return api
 
 	if (url.pathname === oauthPaths.mcp) {
@@ -97,7 +105,7 @@ export async function handleRequest(request: Request, env: AppEnv) {
 		if (!oauthUser) {
 			return unauthorizedOAuthResponse(appBaseUrl(env, request))
 		}
-		const mcp = await handleMcp(request, env, oauthUser)
+		const mcp = await handleMcp(request, env, oauthUser, ctx)
 		if (mcp) return mcp
 	}
 
@@ -106,7 +114,7 @@ export async function handleRequest(request: Request, env: AppEnv) {
 		if (!oauthUser) {
 			return unauthorizedOAuthResponse(appBaseUrl(env, request))
 		}
-		return handleUserApi(request, env, oauthUser)
+		return handleUserApi(request, env, oauthUser, ctx)
 	}
 
 	const user = await readSessionUser(request, env)

@@ -104,7 +104,11 @@ function threadJson(thread: {
 	}
 }
 
-export async function handleApi(request: Request, env: AppEnv) {
+export async function handleApi(
+	request: Request,
+	env: AppEnv,
+	ctx?: ExecutionContext,
+) {
 	const url = new URL(request.url)
 	if (request.method === 'OPTIONS' && url.pathname.startsWith('/v1/')) {
 		return corsPreflight()
@@ -121,7 +125,7 @@ export async function handleApi(request: Request, env: AppEnv) {
 
 	const messages = url.pathname.match(/^\/v1\/threads\/([^/]+)\/messages$/)
 	if (messages?.[1] && request.method === 'POST') {
-		return sendRoute(request, env, messages[1])
+		return sendRoute(request, env, messages[1], ctx)
 	}
 	if (messages?.[1] && request.method === 'GET') {
 		return pollRoute(request, env, messages[1])
@@ -247,7 +251,12 @@ async function joinThreadRoute(
 	})
 }
 
-async function sendRoute(request: Request, env: AppEnv, threadId: string) {
+async function sendRoute(
+	request: Request,
+	env: AppEnv,
+	threadId: string,
+	ctx?: ExecutionContext,
+) {
 	const auth = await requireAgent(request, env, threadId)
 	if (!auth.ok) return auth.response
 	const burst = await limitMessageBurst({
@@ -277,7 +286,7 @@ async function sendRoute(request: Request, env: AppEnv, threadId: string) {
 		refs: body.refs,
 	})
 	if (!sent.ok) return errorResponse(sent)
-	await maybeDispatchWebhook(env.DB, threadId, sent.message)
+	await maybeDispatchWebhook(env.DB, threadId, sent.message, ctx)
 	return json({ ok: true, message: sent.message })
 }
 

@@ -933,13 +933,15 @@ export async function maybeDispatchWebhook(
 	db: D1Database,
 	threadId: string,
 	message: MessageEnvelope,
+	ctx?: ExecutionContext,
 ) {
 	const thread = await first<{ webhook_url: string | null }>(
 		db,
 		'SELECT webhook_url FROM threads WHERE id = ?',
 		threadId,
 	)
-	if (thread?.webhook_url) {
-		void dispatchWebhook(thread.webhook_url, message)
-	}
+	if (!thread?.webhook_url) return
+	const pending = dispatchWebhook(thread.webhook_url, message)
+	if (ctx) ctx.waitUntil(pending)
+	else void pending
 }

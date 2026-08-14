@@ -187,6 +187,12 @@ test('OAuth user API creates, lists, sends, and sets a webhook', async () => {
 	expect(webhook.status).toBe(200)
 
 	const webhookCalls: Array<string> = []
+	const waited: Array<Promise<unknown>> = []
+	const ctx = {
+		waitUntil(promise: Promise<unknown>) {
+			waited.push(promise)
+		},
+	} as ExecutionContext
 	const originalFetch = globalThis.fetch
 	globalThis.fetch = (async (input: RequestInfo | URL) => {
 		webhookCalls.push(String(input))
@@ -200,8 +206,11 @@ test('OAuth user API creates, lists, sends, and sets a webhook', async () => {
 				body: JSON.stringify({ body: { text: 'webhook please' } }),
 			}),
 			env,
+			ctx,
 		)
 		expect(resent.status).toBe(200)
+		expect(waited).toHaveLength(1)
+		await waited[0]
 		expect(webhookCalls.some((url) => url.includes('kody.codes'))).toBe(true)
 	} finally {
 		globalThis.fetch = originalFetch

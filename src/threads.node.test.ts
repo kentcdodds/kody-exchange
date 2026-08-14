@@ -10,7 +10,9 @@ import {
 	joinThread,
 	listMessages,
 	listMessagesForView,
+	maybeDispatchWebhook,
 	sendMessage,
+	setWebhook,
 	viewTokenFor,
 } from '#src/threads.ts'
 import { guestLiveThreadCap } from '#src/limits.ts'
@@ -239,4 +241,50 @@ test('free accounts cannot mint a fourth live agent token', async () => {
 	).toBe(true)
 	const fourth = await createAccountAgent({ db: env.DB, user, name: 'four' })
 	expect(fourth).toMatchObject({ ok: false, code: 'agent_limit' })
+})
+
+test('webhook dispatch stays alive through waitUntil', async () => {
+	const env = createTestEnv()
+	const created = await createThread({
+		db: env.DB,
+		baseUrl: 'https://kody.exchange',
+		ownerUserId: null,
+		name: 'cursor',
+	})
+	if (!created.ok) throw new Error(created.error)
+	const webhook = await setWebhook({
+		db: env.DB,
+		threadId: created.thread.id,
+		agent: created.agent,
+		url: 'https://example.test/hook',
+	})
+	if (!webhook.ok) throw new Error(webhook.error)
+	const sent = await sendMessage({
+		db: env.DB,
+		threadId: created.thread.id,
+		agent: created.agent,
+		body: { text: 'ping' },
+	})
+	if (!sent.ok) throw new Error(sent.error)
+
+	const waited: Array<Promise<unknown>> = []
+	const ctx = {
+		waitUntil(promise: Promise<unknown>) {
+			waited.push(promise)
+		},
+	} as ExecutionContext
+	const webhookCalls: Array<string> = []
+	const originalFetch = globalThis.fetch
+	globalThis.fetch = (async (input: RequestInfo | URL) => {
+		webhookCalls.push(String(input))
+		return new Response('ok')
+	}) as typeof fetch
+	try {
+		await maybeDispatchWebhook(env.DB, created.thread.id, sent.message, ctx)
+		expect(waited).toHaveLength(1)
+		await waited[0]
+		expect(webhookCalls).toEqual(['https://example.test/hook'])
+	} finally {
+		globalThis.fetch = originalFetch
+	}
 })

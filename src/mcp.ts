@@ -121,7 +121,12 @@ export function isMcpBrowserNavigation(request: Request) {
 	)
 }
 
-export async function handleMcp(request: Request, env: AppEnv, user: UserRow) {
+export async function handleMcp(
+	request: Request,
+	env: AppEnv,
+	user: UserRow,
+	ctx?: ExecutionContext,
+) {
 	const url = new URL(request.url)
 	if (url.pathname !== '/mcp') return null
 	if (request.method === 'GET') {
@@ -159,7 +164,7 @@ export async function handleMcp(request: Request, env: AppEnv, user: UserRow) {
 		case 'tools/list':
 			return rpcResult(message.id, { tools })
 		case 'tools/call':
-			return callTool(request, env, user, message)
+			return callTool(request, env, user, message, ctx)
 		case 'ping':
 			return rpcResult(message.id, {})
 		default:
@@ -176,6 +181,7 @@ async function callTool(
 	env: AppEnv,
 	user: UserRow,
 	message: JsonRpc,
+	ctx?: ExecutionContext,
 ) {
 	const params = message.params ?? {}
 	const name = typeof params.name === 'string' ? params.name : ''
@@ -192,6 +198,7 @@ async function callTool(
 				new Request(new URL('/api/threads', request.url), { method: 'GET' }),
 				env,
 				user,
+				ctx,
 			)
 			break
 		case 'join_thread':
@@ -214,6 +221,7 @@ async function callTool(
 				}),
 				env,
 				user,
+				ctx,
 			)
 			break
 		case 'list_messages':
@@ -227,6 +235,7 @@ async function callTool(
 				),
 				env,
 				user,
+				ctx,
 			)
 			break
 		case 'set_webhook':
@@ -238,6 +247,7 @@ async function callTool(
 				}),
 				env,
 				user,
+				ctx,
 			)
 			break
 		default:

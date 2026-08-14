@@ -16,13 +16,13 @@ const apiHandler = {
 				{ status: 401 },
 			)
 		}
-		return handleUserApi(request, env, user)
+		return handleUserApi(request, env, user, ctx)
 	},
 }
 
 const defaultHandler = {
-	async fetch(request: Request, env: AppEnv) {
-		return handleRequest(request, env)
+	async fetch(request: Request, env: AppEnv, ctx: ExecutionContext) {
+		return handleRequest(request, env, ctx)
 	},
 }
 

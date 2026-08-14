@@ -117,6 +117,7 @@ export async function handleUserApi(
 	request: Request,
 	env: AppEnv,
 	user: UserRow,
+	ctx?: ExecutionContext,
 ) {
 	const url = new URL(request.url)
 	if (url.pathname === '/api/me' && request.method === 'GET') {
@@ -189,7 +190,7 @@ export async function handleUserApi(
 			refs: body.refs,
 		})
 		if (!sent.ok) return errorResponse(sent)
-		await maybeDispatchWebhook(env.DB, owned.thread.id, sent.message)
+		await maybeDispatchWebhook(env.DB, owned.thread.id, sent.message, ctx)
 		return json({ ok: true, message: sent.message })
 	}
 
