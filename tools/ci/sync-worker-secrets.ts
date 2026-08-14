@@ -86,13 +86,14 @@ async function main() {
 		`wrangler-secrets-${Date.now()}-${crypto.randomUUID()}.env`,
 	)
 	await writeFile(secretsFilePath, dotenvText, { mode: 0o600 })
-	const args = ['wrangler', 'secret', 'bulk', secretsFilePath]
+	const wranglerBin = join(process.cwd(), 'node_modules', '.bin', 'wrangler')
+	const args = [wranglerBin, 'secret', 'bulk', secretsFilePath]
 	if (options.env) args.push('--env', options.env)
 	if (options.name) args.push('--name', options.name)
 	if (options.config) args.push('--config', options.config)
 	try {
 		const exitCode = await new Promise<number>((resolve, reject) => {
-			const child = spawn(args[0] ?? 'wrangler', args.slice(1), {
+			const child = spawn(args[0] ?? wranglerBin, args.slice(1), {
 				stdio: 'inherit',
 				env: process.env,
 			})
