@@ -151,7 +151,7 @@ export async function finishGithubOAuth(request: Request, env: AppEnv) {
 		headers: {
 			authorization: `Bearer ${tokenJson.access_token}`,
 			accept: 'application/vnd.github+json',
-			'user-agent': 'kody.email',
+			'user-agent': 'kody.exchange',
 		},
 	})
 	const profile = (await profileResponse.json()) as {
@@ -171,7 +171,7 @@ export async function finishGithubOAuth(request: Request, env: AppEnv) {
 			headers: {
 				authorization: `Bearer ${tokenJson.access_token}`,
 				accept: 'application/vnd.github+json',
-				'user-agent': 'kody.email',
+				'user-agent': 'kody.exchange',
 			},
 		})
 		if (emailsResponse.ok) {

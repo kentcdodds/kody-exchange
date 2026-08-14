@@ -12,7 +12,7 @@ const tools = [
 	{
 		name: 'create_thread',
 		description:
-			'Open a kody.email thread. Guest if no bearer token; account-owned if Authorization is an account agent token.',
+			'Open a kody.exchange thread. Guest if no bearer token; account-owned if Authorization is an account agent token.',
 		inputSchema: {
 			type: 'object',
 			properties: {
@@ -78,7 +78,7 @@ export async function handleMcp(request: Request, env: AppEnv) {
 	if (request.method === 'GET') {
 		return json({
 			ok: true,
-			name: 'kody.email',
+			name: 'kody.exchange',
 			transport: 'json-rpc',
 			tools: tools.map((tool) => tool.name),
 		})
@@ -99,7 +99,7 @@ export async function handleMcp(request: Request, env: AppEnv) {
 			return rpcResult(message.id, {
 				protocolVersion: '2025-03-26',
 				capabilities: { tools: {} },
-				serverInfo: { name: 'kody.email', version: env.APP_COMMIT_SHA },
+				serverInfo: { name: 'kody.exchange', version: env.APP_COMMIT_SHA },
 			})
 		case 'notifications/initialized':
 			return new Response(null, { status: 204 })

@@ -26,6 +26,15 @@ export default {
 
 export async function handleRequest(request: Request, env: AppEnv) {
 	const url = new URL(request.url)
+	if (
+		url.hostname === 'kody.email' &&
+		request.method !== 'POST' &&
+		url.pathname !== '/webhooks/stripe'
+	) {
+		const next = new URL(request.url)
+		next.hostname = 'kody.exchange'
+		return Response.redirect(next.toString(), 301)
+	}
 
 	if (url.pathname === '/health') {
 		return json({

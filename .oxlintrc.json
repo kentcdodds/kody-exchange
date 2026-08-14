@@ -10,5 +10,12 @@
 		"typescript/no-explicit-any": "error",
 		"eslint/no-await-in-loop": "off"
 	},
-	"ignorePatterns": ["node_modules", "dist", ".wrangler", "coverage", "public"]
+	"ignorePatterns": [
+		"node_modules",
+		"dist",
+		".wrangler",
+		"coverage",
+		"public",
+		"tools/ci/worker-bundle.js"
+	]
 }

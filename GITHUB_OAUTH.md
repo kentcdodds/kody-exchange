@@ -6,9 +6,9 @@ Callback path is `/auth/callback/github` (matches the GitHub OAuth App).
 
 | Field                                | Value                                        |
 | ------------------------------------ | -------------------------------------------- |
-| Application name                     | `kody.email`                                 |
-| Homepage URL                         | `https://kody.email`                         |
-| Authorization callback URL           | `https://kody.email/auth/callback/github`    |
+| Application name                     | `kody.exchange`                              |
+| Homepage URL                         | `https://kody.exchange`                      |
+| Authorization callback URL           | `https://kody.exchange/auth/callback/github` |
 | Local callback (optional, add later) | `http://localhost:8787/auth/callback/github` |
 
 Expire user access tokens: fine. We only need GitHub identity at callback time.

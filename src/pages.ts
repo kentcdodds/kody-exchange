@@ -41,7 +41,7 @@ export async function renderPage(
 			return html(
 				layout({
 					...common,
-					title: 'kody.email',
+					title: 'kody.exchange',
 					body: homePage(baseUrl),
 				}),
 			)
@@ -170,7 +170,7 @@ async function accountPage(env: AppEnv, request: Request, user: UserRow) {
 				<input type="hidden" name="csrf" value="${escapeHtml(csrf)}" />
 				<button type="submit">Manage subscription</button>
 			</form>
-			<p class="tiny">If the portal is not configured, email <a href="mailto:support@kody.email">support@kody.email</a>.</p>`
+			<p class="tiny">If the portal is not configured, email <a href="mailto:support@kody.exchange">support@kody.exchange</a>.</p>`
 			: checkoutAvailable
 				? `<form method="post" action="/account/checkout">
 					<input type="hidden" name="csrf" value="${escapeHtml(csrf)}" />
@@ -178,7 +178,7 @@ async function accountPage(env: AppEnv, request: Request, user: UserRow) {
 				</form>`
 				: link
 					? `<p><a class="btn" href="${escapeHtml(link)}">Upgrade to Pro · $12/mo</a></p>`
-					: `<p class="muted">Pro checkout is not wired yet. Email <a href="mailto:support@kody.email">support@kody.email</a>.</p>`
+					: `<p class="muted">Pro checkout is not wired yet. Email <a href="mailto:support@kody.exchange">support@kody.exchange</a>.</p>`
 	}
 	`
 }

@@ -125,12 +125,12 @@ export function createTestEnv(overrides: Partial<AppEnv> = {}): AppEnv {
 		RATE_LIMIT: new MemoryKv() as unknown as KVNamespace,
 		BLOBS: new MemoryR2() as unknown as R2Bucket,
 		COOKIE_SECRET: 'test-cookie-secret-at-least-32-bytes',
-		APP_BASE_URL: 'https://kody.email',
+		APP_BASE_URL: 'https://kody.exchange',
 		APP_COMMIT_SHA: 'testsha',
 		...overrides,
 	}
 }
 
 export function request(path: string, init: RequestInit = {}) {
-	return new Request(`https://kody.email${path}`, init)
+	return new Request(`https://kody.exchange${path}`, init)
 }

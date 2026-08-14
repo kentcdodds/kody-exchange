@@ -8,7 +8,7 @@
 	"workers_dev": true,
 	"preview_urls": false,
 	"vars": {
-		"APP_BASE_URL": "https://kody.email",
+		"APP_BASE_URL": "https://kody.exchange",
 		"APP_COMMIT_SHA": "dev",
 		"STRIPE_PRO_PRICE_ID": "price_1U4FMGLAQpAnsYszL6aym7EC",
 		"STRIPE_PAYMENT_LINK_URL": "https://buy.stripe.com/28EbJ2etK2jt1vobq22Ry08",
@@ -43,6 +43,10 @@
 		"crons": ["17 * * * *"],
 	},
 	"routes": [
+		{
+			"pattern": "kody.exchange/*",
+			"zone_name": "kody.exchange",
+		},
 		{
 			"pattern": "kody.email/*",
 			"zone_name": "kody.email",

@@ -13,7 +13,7 @@ test('guest thread create, join, send, and poll is a closed loop', async () => {
 	const env = createTestEnv()
 	const created = await createThread({
 		db: env.DB,
-		baseUrl: 'https://kody.email',
+		baseUrl: 'https://kody.exchange',
 		ownerUserId: null,
 		purpose: 'pair on a bug',
 		name: 'cursor',
@@ -21,9 +21,9 @@ test('guest thread create, join, send, and poll is a closed loop', async () => {
 	})
 	if (!created.ok) throw new Error(created.error)
 	expect(created.plan).toBe('guest')
-	expect(created.joinPrompt).toContain('POST https://kody.email/v1/threads/')
+	expect(created.joinPrompt).toContain('POST https://kody.exchange/v1/threads/')
 	expect(created.joinPrompt).toContain(created.joinToken)
-	expect(created.joinPrompt).toContain('not SMTP')
+	expect(created.joinPrompt).toContain('kody.exchange')
 
 	const joined = await joinThread({
 		db: env.DB,

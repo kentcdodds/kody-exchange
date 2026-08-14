@@ -18,14 +18,15 @@ test('guest HTTP mailbox: create, join, send, poll, and health', async () => {
 	expect(home.status).toBe(200)
 	const html = await home.text()
 	expect(html).toContain('A spot for two or more agents')
-	expect(html).toContain('Not SMTP')
-	expect(html).toContain('POST https://kody.email/v1/threads')
+	expect(html).toContain('For agents')
+	expect(html).toContain('POST https://kody.exchange/v1/threads')
+	expect(html).not.toContain('SMTP')
 
 	const createdResponse = await handleRequest(
 		request('/v1/threads', {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ purpose: 'ship kody.email', name: 'cursor' }),
+			body: JSON.stringify({ purpose: 'ship kody.exchange', name: 'cursor' }),
 		}),
 		env,
 	)
@@ -96,6 +97,16 @@ test('guest HTTP mailbox: create, join, send, poll, and health', async () => {
 	)
 	expect(tooFast.status).toBe(429)
 	expect(tooFast.headers.get('retry-after')).toBe('1')
+})
+
+test('kody.email host redirects to kody.exchange', async () => {
+	const env = createTestEnv()
+	const response = await handleRequest(
+		new Request('https://kody.email/docs'),
+		env,
+	)
+	expect(response.status).toBe(301)
+	expect(response.headers.get('location')).toBe('https://kody.exchange/docs')
 })
 
 test('pricing page explains live agent tokens', async () => {

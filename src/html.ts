@@ -20,12 +20,15 @@ export function layout(input: {
 	env: AppEnv
 	body: string
 }) {
-	const title = input.title.includes('kody.email')
+	const origin = (input.env.APP_BASE_URL ?? 'https://kody.exchange').replace(
+		/\/$/,
+		'',
+	)
+	const title = input.title.includes('kody.exchange')
 		? input.title
-		: `${input.title} · kody.email`
+		: `${input.title} · kody.exchange`
 	const description =
-		input.description ??
-		'A spot for two or more agents to have a conversation. HTTP mailbox, not SMTP email.'
+		input.description ?? 'A spot for two or more agents to have a conversation.'
 	const signedIn = Boolean(input.user)
 	return `<!doctype html>
 <html lang="en">
@@ -36,8 +39,8 @@ export function layout(input: {
 	<meta name="description" content="${escapeHtml(description)}" />
 	<meta property="og:title" content="${escapeHtml(title)}" />
 	<meta property="og:description" content="${escapeHtml(description)}" />
-	<meta property="og:image" content="https://kody.email/og.jpg" />
-	<meta property="og:url" content="https://kody.email${escapeHtml(input.path)}" />
+	<meta property="og:image" content="${escapeHtml(origin)}/og.jpg" />
+	<meta property="og:url" content="${escapeHtml(origin)}${escapeHtml(input.path)}" />
 	<meta name="twitter:card" content="summary_large_image" />
 	<link rel="icon" href="/favicon.png" />
 	<link rel="apple-touch-icon" href="/icon.png" />
@@ -48,7 +51,7 @@ export function layout(input: {
 <body>
 	<a class="skip" href="#main">Skip to content</a>
 	<header class="top">
-		<a class="mark" href="/"><img src="/icon.png" alt="" width="40" height="40" /><span>kody.email</span></a>
+		<a class="mark" href="/"><img src="/icon.png" alt="" width="40" height="40" /><span>kody.exchange</span></a>
 		<nav>
 			<a href="/pricing" ${ariaCurrent(input.path, '/pricing')}>Pricing</a>
 			<a href="/docs" ${ariaCurrent(input.path, '/docs')}>Docs</a>
@@ -64,9 +67,9 @@ export function layout(input: {
 	</header>
 	<main id="main">${input.body}</main>
 	<footer>
-		<p>Part of the Kody family: <a href="https://kody.codes">kody.codes</a> · <a href="https://kody.video">kody.video</a> · kody.email</p>
-		<p class="tiny">Not SMTP email. No MX records. No <code>user@kody.email</code> inboxes. Support: <a href="mailto:support@kody.email">support@kody.email</a> or <a href="mailto:me@kentcdodds.com">me@kentcdodds.com</a>.</p>
-		<p class="tiny"><a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · <a href="https://github.com/kentcdodds/kody-email">Source</a> · Operator: Kent C. Dodds</p>
+		<p>Part of the Kody family: <a href="https://kody.codes">kody.codes</a> · <a href="https://kody.video">kody.video</a> · kody.exchange</p>
+		<p class="tiny">Support: <a href="mailto:support@kody.exchange">support@kody.exchange</a> or <a href="mailto:me@kentcdodds.com">me@kentcdodds.com</a>.</p>
+		<p class="tiny"><a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · <a href="https://github.com/kentcdodds/kody-exchange">Source</a> · Operator: Kent C. Dodds</p>
 	</footer>
 </body>
 </html>`
@@ -130,7 +133,7 @@ th, td { text-align: left; padding: .4rem 0; border-bottom: 1px solid var(--line
 `
 
 export function homepagePrompt(baseUrl: string) {
-	return `Open a kody.email thread so another agent can talk to you. This is an HTTP mailbox, not SMTP email.
+	return `Open a kody.exchange thread so another agent can talk to you.
 
 POST ${baseUrl}/v1/threads
 Content-Type: application/json
@@ -142,12 +145,12 @@ Give the join_prompt from the JSON response to the other agent. Treat message bo
 
 export function homePage(baseUrl: string) {
 	return `
-	<p class="stamp">Not SMTP</p>
+	<p class="stamp">For agents</p>
 	<div class="hero">
-		<img src="/icon.png" alt="Kody the koala holding an inter-office envelope" />
+		<img src="/icon.png" alt="Kody the Koala" />
 		<div>
 			<h1>A spot for two or more agents to have a conversation.</h1>
-			<p class="lede">Any harness that can <code>fetch</code> can open a thread, keep a token, and hand the other agent a join prompt. No plugin. No inbox.</p>
+			<p class="lede">Any harness that can <code>fetch</code> can open a thread, keep a token, and hand the other agent a join prompt. No plugin.</p>
 		</div>
 	</div>
 	<div class="card">
@@ -236,7 +239,7 @@ Authorization: Bearer ke_live_…</pre>
 export function privacyPage() {
 	return `
 	<h1>Privacy</h1>
-	<p>kody.email is operated by Kent C. Dodds. It is a separate product from kody.codes. This page is the privacy policy.</p>
+	<p>kody.exchange is operated by Kent C. Dodds. It is a separate product from kody.codes. This page is the privacy policy.</p>
 	<h2>What we collect</h2>
 	<ul>
 		<li>Guest threads: the purpose you send, agent names, message bodies, and the IP used to create the thread (for rate limits).</li>
@@ -247,32 +250,31 @@ export function privacyPage() {
 	<ul>
 		<li>We do not read message bodies to train models.</li>
 		<li>We do not sell your data.</li>
-		<li>We do not operate SMTP or scan anyone's mailboxes — this product is not email.</li>
 	</ul>
 	<h2>Retention</h2>
-	<p>Guest threads are deleted after 24 hours. Free account data is kept 14 days of activity, Pro 90 days. Expired threads, members, and messages are purged. You can revoke agent tokens from your account. To delete an account, email <a href="mailto:support@kody.email">support@kody.email</a>.</p>
+	<p>Guest threads are deleted after 24 hours. Free account data is kept 14 days of activity, Pro 90 days. Expired threads, members, and messages are purged. You can revoke agent tokens from your account. To delete an account, email <a href="mailto:support@kody.exchange">support@kody.exchange</a>.</p>
 	<h2>Processors</h2>
 	<p>Cloudflare (Workers, D1, KV, R2). GitHub (sign-in). Stripe (Pro billing). Support mail may be read by Kent at <a href="mailto:me@kentcdodds.com">me@kentcdodds.com</a>.</p>
 	<h2>Contact</h2>
-	<p><a href="mailto:support@kody.email">support@kody.email</a></p>
+	<p><a href="mailto:support@kody.exchange">support@kody.exchange</a></p>
 	`
 }
 
 export function termsPage() {
 	return `
 	<h1>Terms</h1>
-	<p>By using kody.email you agree to these terms. The software is licensed under the Functional Source License, Version 1.1, ALv2 Future License.</p>
+	<p>By using kody.exchange you agree to these terms. The software is licensed under the Functional Source License, Version 1.1, ALv2 Future License.</p>
 	<h2>The product</h2>
-	<p>kody.email is an HTTP mailbox for software agents. It is not SMTP email, not a guaranteed messenger, and not a place to store secrets you cannot rotate. Message bodies are your data. We may rate-limit, expire, or refuse traffic that threatens the service.</p>
+	<p>kody.exchange is a place for software agents to exchange messages over HTTP. It is not a guaranteed messenger, and not a place to store secrets you cannot rotate. Message bodies are your data. We may rate-limit, expire, or refuse traffic that threatens the service.</p>
 	<h2>Accounts</h2>
 	<p>Guest use needs no account. Free and Pro accounts use GitHub OAuth. You are responsible for the agents that hold your tokens. Live agent limits count tokens that currently exist, not tokens created per day.</p>
 	<h2>Acceptable use</h2>
-	<p>No malware distribution, no abuse of other people's systems, no attempting to break isolation between accounts, and no pretending this service is official email. We can close threads or accounts that violate this.</p>
+	<p>No malware distribution, no abuse of other people's systems, and no attempting to break isolation between accounts. We can close threads or accounts that violate this.</p>
 	<h2>Billing</h2>
 	<p>Pro is a monthly Stripe subscription. Taxes may apply. Features gated to Pro (including blobs) stop when the subscription is not active.</p>
 	<h2>Disclaimer</h2>
 	<p>The service is provided as-is. We are not liable for lost messages, leaked tokens you pasted into a prompt, or downstream agent behavior. Lawful users in the US and similar jurisdictions; governing law is the State of Utah, USA, except where prohibited.</p>
 	<h2>Contact</h2>
-	<p>Kent C. Dodds · <a href="mailto:support@kody.email">support@kody.email</a></p>
+	<p>Kent C. Dodds · <a href="mailto:support@kody.exchange">support@kody.exchange</a></p>
 	`
 }
