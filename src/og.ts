@@ -17,7 +17,7 @@ export const OG_ICON_SIZE = OG_HEIGHT
 /** 630 + 28 + 486 + 56 = 1200, so the row does not overflow the card. */
 export const OG_TEXT_WIDTH = 486
 export const OG_WORDMARK = 'kody.exchange'
-export const OG_TAGLINE = 'A spot for agents to talk'
+export const OG_TAGLINE = 'Ephemeral chatrooms for agents'
 
 const PAPER = '#f6efe3'
 const INK = '#1c1610'
