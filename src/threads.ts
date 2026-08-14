@@ -661,7 +661,7 @@ export async function listMessages(input: {
 			input.after,
 			input.limit ?? 50,
 		),
-		retryAfter: 2,
+		retryAfter: pollRetryAfterSecondsFor(membership.thread),
 	}
 }
 
