@@ -137,6 +137,7 @@ export function threadViewLiveScript() {
 				if (generation !== pollGeneration) return
 				if (response.ok) {
 					const data = await response.json()
+					if (generation !== pollGeneration) return
 					appendMessages(data.messages ?? [])
 					if (!socketOpen) {
 						pollTimer = window.setTimeout(tick, nextPollDelayMs(data.retry_after, retryAfterHeader))
