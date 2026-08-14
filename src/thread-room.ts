@@ -61,7 +61,9 @@ export async function maybeBroadcastThreadView(
 	message: MessageEnvelope,
 	ctx?: ExecutionContext,
 ) {
-	const pending = broadcastThreadView(env, threadId, message)
+	const pending = broadcastThreadView(env, threadId, message).catch((error) => {
+		console.warn('thread_room_broadcast_failed', threadId, error)
+	})
 	if (ctx) ctx.waitUntil(pending)
 	await pending
 }

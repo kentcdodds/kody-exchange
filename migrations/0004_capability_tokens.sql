@@ -1,8 +1,10 @@
 -- Pre-launch cutover: capability tokens replace public thread ids.
 -- Existing rows cannot be rewritten without their plaintext secrets.
+-- Owned hosts used to have thread_id NULL, so delete by membership first.
 DELETE FROM messages;
-DELETE FROM thread_members;
 DELETE FROM blobs;
+DELETE FROM agents WHERE id IN (SELECT agent_id FROM thread_members);
+DELETE FROM thread_members;
 DELETE FROM agents WHERE thread_id IS NOT NULL;
 DELETE FROM threads;
 

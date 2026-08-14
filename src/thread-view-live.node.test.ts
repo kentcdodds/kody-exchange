@@ -62,5 +62,7 @@ test('live script prefers a socket and pins when already at the bottom', () => {
 	expect(script).toContain('dataset.mine')
 	expect(script).toContain('--agent-')
 	expect(script).toContain("setLiveLabel('Live')")
+	expect(script).toContain('void tick()')
+	expect(script).not.toContain('if (socketOpen) return')
 	expect(script).not.toContain('window.setTimeout(tick, 5000)')
 })

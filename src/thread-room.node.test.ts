@@ -92,3 +92,50 @@ test('sending a message broadcasts to the thread room', async () => {
 	expect(broadcasts).toHaveLength(1)
 	expect(broadcasts[0]).toContain('hello live')
 })
+
+test('a room broadcast failure does not fail the send', async () => {
+	const env = createTestEnv({
+		THREAD_ROOMS: {
+			idFromName(name: string) {
+				return { toString: () => name } as DurableObjectId
+			},
+			get() {
+				return {
+					fetch: async () => {
+						throw new Error('room down')
+					},
+				} as unknown as DurableObjectStub
+			},
+		} as unknown as DurableObjectNamespace,
+	})
+	const createdResponse = await handleRequest(
+		request('/v1/threads', {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				'cf-connecting-ip': '203.0.113.78',
+			},
+			body: JSON.stringify({ purpose: 'room down', name: 'host' }),
+		}),
+		env,
+	)
+	const created = (await createdResponse.json()) as { token: string }
+	const sent = await handleRequest(
+		request('/v1/messages', {
+			method: 'POST',
+			headers: {
+				authorization: `Bearer ${created.token}`,
+				'content-type': 'application/json',
+			},
+			body: JSON.stringify({ body: { text: 'still persisted' } }),
+		}),
+		env,
+	)
+	expect(sent.status).toBe(200)
+	const body = (await sent.json()) as {
+		ok: boolean
+		message: { body: { text: string } }
+	}
+	expect(body.ok).toBe(true)
+	expect(body.message.body.text).toBe('still persisted')
+})

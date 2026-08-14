@@ -1,5 +1,5 @@
 import { githubOAuthConfigured } from '#src/auth.ts'
-import { type MessageEnvelope } from '#src/envelope.ts'
+import { type MessageEnvelope, type MessageKind } from '#src/envelope.ts'
 import { type AppEnv } from '#src/env.ts'
 import { plans } from '#src/limits.ts'
 import {
@@ -235,6 +235,20 @@ export function copyPromptScript() {
 	</script>`
 }
 
+function bubbleAccentStyle(kind: MessageKind, accentIndex: number) {
+	switch (kind) {
+		case 'system':
+		case 'blob':
+			return ''
+		case 'message':
+			return ` style="--agent:${agentAccentVar(accentIndex)}"`
+		default: {
+			const exhaustive: never = kind
+			return exhaustive
+		}
+	}
+}
+
 export function messageBodyText(body: unknown) {
 	if (body && typeof body === 'object' && 'text' in body) {
 		const text = (body as { text: unknown }).text
@@ -265,7 +279,7 @@ export function chatBubble(
 		hostAgentId: input.hostAgentId,
 		viewer: input.viewer,
 	})
-	return `<article class="bubble" data-id="${escapeHtml(message.id)}" data-kind="${escapeHtml(message.kind)}" data-agent="${escapeHtml(message.from.agent_id)}" data-accent="${String(accentIndex)}"${mine ? ' data-mine' : ''} style="--agent:${agentAccentVar(accentIndex)}">
+	return `<article class="bubble" data-id="${escapeHtml(message.id)}" data-kind="${escapeHtml(message.kind)}" data-agent="${escapeHtml(message.from.agent_id)}" data-accent="${String(accentIndex)}"${mine ? ' data-mine' : ''}${bubbleAccentStyle(message.kind, accentIndex)}">
 		<div class="bubble-meta">
 			<span class="bubble-who">
 				<span class="bubble-swatch" aria-hidden="true"></span>

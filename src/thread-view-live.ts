@@ -128,7 +128,6 @@ export function threadViewLiveScript() {
 			if (pinned) pinToBottom()
 		}
 		async function tick() {
-			if (socketOpen) return
 			try {
 				const response = await fetch(pollPath + '?after=' + encodeURIComponent(after))
 				const retryAfterHeader = response.headers.get('retry-after')
@@ -163,6 +162,7 @@ export function threadViewLiveScript() {
 				socketOpen = true
 				window.clearTimeout(pollTimer)
 				setLiveLabel('Live')
+				void tick()
 			})
 			socket.addEventListener('message', (event) => {
 				try {
