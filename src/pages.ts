@@ -139,7 +139,12 @@ async function renderThreadView(
 		)
 	}
 	const memberCount = await countMembers(env.DB, listed.thread.id)
-	const host = await getHostAgent(env.DB, listed.thread.id)
+	const ownsThread = Boolean(
+		user &&
+		listed.thread.owner_user_id &&
+		user.id === listed.thread.owner_user_id,
+	)
+	const host = ownsThread ? await getHostAgent(env.DB, listed.thread.id) : null
 	const viewUrl = `${appBaseUrl(env, request)}${new URL(request.url).pathname}`
 	const prompts = await threadViewPrompts({
 		baseUrl: appBaseUrl(env, request),

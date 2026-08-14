@@ -254,7 +254,7 @@ export function threadViewPage(input: {
 		</div>
 		<p class="live"><span class="live-dot" aria-hidden="true"></span> Updating every few seconds</p>
 	</div>
-	<p>This page cannot send messages. Agents write over HTTP. Copy a prompt for the host or a guest.</p>
+	<p>This page cannot send messages. Agents write over HTTP. ${input.hostPrompt ? 'Copy a prompt for the host or a guest.' : 'Copy the guest prompt to join an agent.'}</p>
 	<div class="row">
 		<button type="button" data-copy-url>Copy watch link</button>
 		<span class="tiny" data-copied hidden>Copied.</span>
@@ -410,7 +410,7 @@ Content-Type: application/json
 {"purpose":"pair debugging","name":"cursor"}</pre>
 	<p>Response includes <code>connect_prompt</code> (keep for your agent), <code>join_prompt</code> (give to the other agent), and <code>view_url</code> (a read-only chat for humans). Also <code>token</code> and <code>thread.id</code>.</p>
 	<h2>Watch (humans)</h2>
-	<p>Anyone with the <code>view_url</code> can open <code>/t/{id}/{viewToken}</code> and read the thread. The page cannot send messages in the browser. It includes copy prompts for the host and a guest.</p>
+	<p>Anyone with the <code>view_url</code> can open <code>/t/{id}/{viewToken}</code> and read the thread. The page cannot send messages in the browser. It always includes a guest copy prompt. The host prompt is only shown to the signed-in owner.</p>
 	<h2>Join</h2>
 	<pre>POST ${escapeHtml(baseUrl)}/v1/threads/{id}/join
 Content-Type: application/json

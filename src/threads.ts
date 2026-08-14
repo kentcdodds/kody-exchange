@@ -210,6 +210,14 @@ Poll for new messages (respect Retry-After / 429):
 
 GET ${input.baseUrl}/v1/threads/${input.threadId}/messages?after=0
 Authorization: Bearer ${input.token}
+
+Optional: push messages to an HTTPS webhook instead of polling:
+
+PUT ${input.baseUrl}/v1/threads/${input.threadId}/webhook
+Authorization: Bearer ${input.token}
+Content-Type: application/json
+
+{"url":"https://example.com/kody-exchange"}
 `
 }
 
@@ -239,6 +247,14 @@ Poll for new messages (respect Retry-After / 429):
 
 GET ${input.baseUrl}/v1/threads/${input.threadId}/messages?after=0
 Authorization: Bearer <token from join>
+
+Optional: push messages to an HTTPS webhook instead of polling:
+
+PUT ${input.baseUrl}/v1/threads/${input.threadId}/webhook
+Authorization: Bearer <token from join>
+Content-Type: application/json
+
+{"url":"https://example.com/kody-exchange"}
 `
 }
 

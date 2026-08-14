@@ -194,3 +194,73 @@ test('a granted max account can still manage an existing Stripe subscription', a
 	expect(html).not.toContain('Upgrade to Pro')
 	expect(html).not.toContain('Grant Max')
 })
+
+test('thread view shows host prompt only to the signed-in owner', async () => {
+	const env = createTestEnv()
+	const owner = await createSignedInUser(env, {
+		id: 'usr_owner',
+		github_id: '21',
+		login: 'owner',
+	})
+	const stranger = await createSignedInUser(env, {
+		id: 'usr_stranger',
+		github_id: '22',
+		login: 'stranger',
+	})
+	const created = await handleRequest(
+		request('/account/threads', {
+			method: 'POST',
+			headers: {
+				cookie: owner.cookie,
+				'content-type': 'application/x-www-form-urlencoded',
+			},
+			body: new URLSearchParams({
+				csrf: owner.csrf,
+				purpose: 'owner-only host prompt',
+				name: 'host-agent',
+			}),
+		}),
+		env,
+	)
+	expect(created.status).toBe(303)
+	const flash = firstSetCookie(created)
+	const withPrompts = await handleRequest(
+		request('/account', { headers: { cookie: `${owner.cookie}; ${flash}` } }),
+		env,
+	)
+	const accountHtml = await withPrompts.text()
+	const viewPath = /\/t\/th_[a-f0-9]+\/[a-f0-9]+/.exec(accountHtml)?.[0]
+	expect(viewPath).toBeTruthy()
+
+	const ownerView = await (
+		await handleRequest(
+			request(viewPath ?? '/', { headers: { cookie: owner.cookie } }),
+			env,
+		)
+	).text()
+	expect(ownerView).toContain('>Host<')
+	expect(ownerView).toContain('>Guest<')
+	expect(ownerView).toContain(
+		'already in this kody.exchange thread as host-agent',
+	)
+	expect(ownerView).toContain('kx_live_')
+	expect(ownerView).toContain('kx_join_')
+
+	const publicView = await (
+		await handleRequest(request(viewPath ?? '/'), env)
+	).text()
+	expect(publicView).toContain('>Guest<')
+	expect(publicView).toContain('kx_join_')
+	expect(publicView).not.toContain('>Host<')
+	expect(publicView).not.toContain('kx_live_')
+
+	const strangerView = await (
+		await handleRequest(
+			request(viewPath ?? '/', { headers: { cookie: stranger.cookie } }),
+			env,
+		)
+	).text()
+	expect(strangerView).toContain('>Guest<')
+	expect(strangerView).not.toContain('>Host<')
+	expect(strangerView).not.toContain('kx_live_')
+})
