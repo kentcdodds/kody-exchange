@@ -49,6 +49,7 @@ export function threadViewLiveScript() {
 		const accentCount = ${AGENT_ACCENT_COUNT}
 		let socketOpen = false
 		let pollTimer = 0
+		let pollGeneration = 0
 		function setLiveLabel(text) {
 			if (liveLabel) liveLabel.textContent = text
 		}
@@ -128,9 +129,12 @@ export function threadViewLiveScript() {
 			if (pinned) pinToBottom()
 		}
 		async function tick() {
+			const generation = ++pollGeneration
+			window.clearTimeout(pollTimer)
 			try {
 				const response = await fetch(pollPath + '?after=' + encodeURIComponent(after))
 				const retryAfterHeader = response.headers.get('retry-after')
+				if (generation !== pollGeneration) return
 				if (response.ok) {
 					const data = await response.json()
 					appendMessages(data.messages ?? [])
@@ -142,6 +146,7 @@ export function threadViewLiveScript() {
 				if (!socketOpen) pollTimer = window.setTimeout(tick, nextPollDelayMs(null, retryAfterHeader))
 				return
 			} catch {}
+			if (generation !== pollGeneration) return
 			if (!socketOpen) pollTimer = window.setTimeout(tick, nextPollDelayMs())
 		}
 		function connectLive() {
