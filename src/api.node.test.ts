@@ -32,6 +32,8 @@ test('guest thread: create, join, send, poll, and health', async () => {
 	expect(html).toContain('/api and /mcp instead of guest /v1')
 	expect(html).toContain('Pro is for more threads')
 	expect(html).toContain('src="/icon.png"')
+	expect(html).toContain('content="https://kody.exchange/og.png"')
+	expect(html).not.toContain('/og.jpg')
 	expect(html).toContain('.hero img { width: 140px; height: 140px; }')
 	expect(html).not.toContain('.mark img')
 	expect(html).not.toContain('border-radius: 18px')

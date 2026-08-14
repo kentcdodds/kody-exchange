@@ -6,8 +6,16 @@ export default defineConfig({
 		environment: 'node',
 	},
 	resolve: {
-		alias: {
-			'#src': new URL('./src', import.meta.url).pathname,
-		},
+		alias: [
+			{
+				find: '#src/og-assets.ts',
+				replacement: new URL('./src/og-assets.node.ts', import.meta.url)
+					.pathname,
+			},
+			{
+				find: '#src',
+				replacement: new URL('./src', import.meta.url).pathname,
+			},
+		],
 	},
 })

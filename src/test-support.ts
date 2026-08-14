@@ -121,6 +121,9 @@ class MemoryR2 {
 		return {
 			body: item.body,
 			httpMetadata: { contentType: item.contentType },
+			async arrayBuffer() {
+				return item.body
+			},
 		}
 	}
 }
