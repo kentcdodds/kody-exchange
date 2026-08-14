@@ -11,6 +11,7 @@ import {
 } from '#src/envelope.ts'
 import { createId, randomToken } from '#src/ids.ts'
 import {
+	accountPlan,
 	getPlan,
 	guestLiveThreadCap,
 	guestPollRetryAfterSeconds,
@@ -239,7 +240,7 @@ async function planForOwner(
 ): Promise<PlanName> {
 	if (!ownerUserId) return 'guest'
 	const user = await getUser(db, ownerUserId)
-	return user?.plan === 'pro' ? 'pro' : 'free'
+	return accountPlan(user?.plan ?? 'free')
 }
 
 export async function createThread(input: {
@@ -742,7 +743,7 @@ export async function createAccountAgent(input: {
 	name?: unknown
 	now?: number
 }): Promise<DomainError | DomainOk<{ agent: AgentRow; token: string }>> {
-	const plan = getPlan(input.user.plan === 'pro' ? 'pro' : 'free')
+	const plan = getPlan(accountPlan(input.user.plan))
 	const live = await countLiveAgents(input.db, input.user.id)
 	if (live >= plan.liveAgents) {
 		return fail(

@@ -1,4 +1,6 @@
-export type PlanName = 'guest' | 'free' | 'pro'
+export type PlanName = 'guest' | 'free' | 'pro' | 'max'
+
+export type AccountPlanName = Exclude<PlanName, 'guest'>
 
 export type PlanLimits = {
 	name: PlanName
@@ -54,10 +56,40 @@ export const plans = {
 		blobBytes: 1024 * 1024 * 1024,
 		maxFileBytes: 25 * 1024 * 1024,
 	},
+	max: {
+		name: 'max',
+		label: 'Max',
+		priceMonthlyUsd: null,
+		liveAgents: 100,
+		threads: 500,
+		messagesPerMonth: 250_000,
+		retentionMs: 2 * 365 * 24 * 60 * 60 * 1000,
+		retentionLabel: '2 years',
+		blobs: true,
+		blobBytes: 10 * 1024 * 1024 * 1024,
+		maxFileBytes: 100 * 1024 * 1024,
+	},
 } as const satisfies Record<PlanName, PlanLimits>
 
 export function isPlanName(value: string): value is PlanName {
-	return value === 'guest' || value === 'free' || value === 'pro'
+	return (
+		value === 'guest' || value === 'free' || value === 'pro' || value === 'max'
+	)
+}
+
+export function accountPlan(plan: string): AccountPlanName {
+	switch (plan) {
+		case 'max':
+			return 'max'
+		case 'pro':
+			return 'pro'
+		default:
+			return 'free'
+	}
+}
+
+export function isOperatorLogin(login: string) {
+	return login.toLowerCase() === 'kentcdodds'
 }
 
 export function getPlan(name: PlanName): PlanLimits {
@@ -68,6 +100,8 @@ export function getPlan(name: PlanName): PlanLimits {
 			return plans.free
 		case 'pro':
 			return plans.pro
+		case 'max':
+			return plans.max
 		default: {
 			const exhaustive: never = name
 			throw new Error(`Unknown plan: ${String(exhaustive)}`)

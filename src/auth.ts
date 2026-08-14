@@ -2,7 +2,8 @@ import { hmacSha256Hex, signPayload, verifyPayload } from '#src/crypto.ts'
 import { first, run } from '#src/db.ts'
 import { type AppEnv, appBaseUrl } from '#src/env.ts'
 import { createId } from '#src/ids.ts'
-import { isPlanName, type PlanName } from '#src/limits.ts'
+import { applyGrantedPlan } from '#src/grants.ts'
+import { accountPlan, type AccountPlanName } from '#src/limits.ts'
 import { type UserRow } from '#src/threads.ts'
 
 const sessionCookie = 'kx_session'
@@ -68,9 +69,7 @@ export async function readSessionUser(request: Request, env: AppEnv) {
 	if (!user) return null
 	return {
 		...user,
-		plan: (isPlanName(user.plan) && user.plan !== 'guest'
-			? user.plan
-			: 'free') as 'free' | 'pro',
+		plan: accountPlan(user.plan),
 	}
 }
 
@@ -227,6 +226,7 @@ export async function finishGithubOAuth(request: Request, env: AppEnv) {
 			now,
 		)
 	}
+	await applyGrantedPlan(env.DB, userId, profile.login)
 
 	const session = await signPayload(
 		secret,
@@ -317,6 +317,6 @@ export function clearThreadFlashCookie() {
 	return clearCookie(flashCookie)
 }
 
-export function planOf(user: UserRow): Exclude<PlanName, 'guest'> {
-	return user.plan === 'pro' ? 'pro' : 'free'
+export function planOf(user: UserRow): AccountPlanName {
+	return accountPlan(user.plan)
 }

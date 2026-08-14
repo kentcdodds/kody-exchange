@@ -28,7 +28,8 @@ import {
 	threadNotFoundPage,
 	threadViewPage,
 } from '#src/html.ts'
-import { getPlan } from '#src/limits.ts'
+import { grantMaxToLogin } from '#src/grants.ts'
+import { getPlan, isOperatorLogin } from '#src/limits.ts'
 import { clientIp, limitViewPoll, workerPollCache } from '#src/rate-limit.ts'
 import {
 	countMembers,
@@ -289,7 +290,10 @@ async function accountPage(
 					)
 				).join('')
 	}
-	<h2>Billing</h2>
+	${
+		user.plan === 'max'
+			? ''
+			: `<h2>Billing</h2>
 	${
 		user.plan === 'pro'
 			? `<form method="post" action="/account/portal">
@@ -305,6 +309,19 @@ async function accountPage(
 				: link
 					? `<p><a class="btn" href="${escapeHtml(link)}">Upgrade to Pro · $5/mo</a></p>`
 					: `<p class="muted">Pro checkout is not wired yet. Email <a href="mailto:support@kody.exchange">support@kody.exchange</a>.</p>`
+	}`
+	}
+	${
+		isOperatorLogin(user.login)
+			? `<h2>Operator</h2>
+	${new URL(request.url).searchParams.get('granted') === '1' ? '<p class="card">Granted.</p>' : ''}
+	<form class="card" method="post" action="/account/grants">
+		<input type="hidden" name="csrf" value="${escapeHtml(csrf)}" />
+		<label for="grant-login">GitHub login</label>
+		<input id="grant-login" name="login" maxlength="39" autocomplete="off" />
+		<p><button type="submit">Grant Max</button></p>
+	</form>`
+			: ''
 	}
 	${copyPromptScript()}
 	`
@@ -353,6 +370,8 @@ function accountError(code: string | null) {
 			return "You're at your live thread limit."
 		case 'create_failed':
 			return 'Could not create that thread. Try again.'
+		case 'bad_login':
+			return 'That GitHub login is not valid.'
 		default:
 			return null
 	}
@@ -399,7 +418,23 @@ export async function handleAccountAction(
 			},
 		})
 	}
+	if (url.pathname === '/account/grants') {
+		if (!isOperatorLogin(user.login)) {
+			return new Response('Not found', { status: 404 })
+		}
+		const granted = await grantMaxToLogin(
+			env.DB,
+			String(form.get('login') ?? ''),
+		)
+		const next = new URL('/account', appBaseUrl(env, request))
+		if (!granted.ok) next.searchParams.set('error', granted.code)
+		else next.searchParams.set('granted', '1')
+		return Response.redirect(next.toString(), 303)
+	}
 	if (url.pathname === '/account/checkout') {
+		if (user.plan === 'max') {
+			return Response.redirect(`${appBaseUrl(env, request)}/account`, 303)
+		}
 		const checkout = await createCheckout({ env, request, user })
 		if (checkout) return Response.redirect(checkout, 303)
 		const link = paymentLinkUrl(env, user)

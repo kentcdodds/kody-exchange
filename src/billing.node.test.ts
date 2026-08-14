@@ -65,3 +65,27 @@ test('checkout.session.completed promotes the referenced user to pro', async () 
 	)
 	expect(user).toEqual({ plan: 'pro', stripe_customer_id: 'cus_1' })
 })
+
+test('stripe events do not overwrite an operator-granted plan', async () => {
+	const env = createTestEnv()
+	await run(
+		env.DB,
+		`INSERT INTO users (id, github_id, login, name, avatar_url, email, plan, stripe_customer_id, created_at)
+		 VALUES ('usr_max', '2', 'kentcdodds', 'Kent', null, null, 'max', 'cus_max', 1)`,
+	)
+	await handleStripeEvent(env, {
+		type: 'customer.subscription.deleted',
+		data: {
+			object: {
+				customer: 'cus_max',
+				metadata: { user_id: 'usr_max' },
+			},
+		},
+	})
+	const user = await first<{ plan: string }>(
+		env.DB,
+		'SELECT plan FROM users WHERE id = ?',
+		'usr_max',
+	)
+	expect(user?.plan).toBe('max')
+})

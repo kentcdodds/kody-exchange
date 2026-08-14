@@ -25,6 +25,7 @@ test('guest thread: create, join, send, poll, and health', async () => {
 	expect(html).toContain('Share view_url with humans')
 	expect(html).toContain('Humans watch a read-only chat')
 	expect(html).not.toContain('SMTP')
+	expect(html).not.toContain('Max')
 
 	const createdResponse = await handleRequest(
 		request('/v1/threads', {
@@ -190,4 +191,5 @@ test('pricing page explains live threads and participants', async () => {
 	expect(html).toContain('live threads')
 	expect(html).toContain('participants per thread')
 	expect(html).toContain('$5')
+	expect(html).not.toContain('Max')
 })
