@@ -1,0 +1,21 @@
+export type AppEnv = {
+	DB: D1Database
+	RATE_LIMIT: KVNamespace
+	BLOBS: R2Bucket
+	ASSETS?: Fetcher
+	COOKIE_SECRET?: string
+	GITHUB_CLIENT_ID?: string
+	GITHUB_CLIENT_SECRET?: string
+	STRIPE_SECRET_KEY?: string
+	STRIPE_WEBHOOK_SECRET?: string
+	STRIPE_PRO_PRICE_ID?: string
+	STRIPE_PAYMENT_LINK_URL?: string
+	APP_BASE_URL: string
+	APP_COMMIT_SHA: string
+}
+
+export function appBaseUrl(env: AppEnv, request: Request) {
+	const configured = env.APP_BASE_URL?.trim()
+	if (configured) return configured.replace(/\/$/, '')
+	return new URL(request.url).origin
+}

@@ -1,0 +1,38 @@
+{
+	"name": "kody-email",
+	"version": "0.0.0",
+	"private": true,
+	"license": "FSL-1.1-ALv2",
+	"type": "module",
+	"imports": {
+		"#src/*": "./src/*"
+	},
+	"scripts": {
+		"dev": "wrangler dev",
+		"deploy": "wrangler deploy",
+		"lint": "oxlint .",
+		"lint:fix": "oxlint . --fix",
+		"format": "oxfmt",
+		"format:check": "oxfmt --check",
+		"typecheck": "tsc --noEmit",
+		"test": "vitest run",
+		"validate": "npm run format:check && npm run lint && npm run typecheck && npm run test",
+		"validate:fix": "npm run format && npm run lint:fix"
+	},
+	"devDependencies": {
+		"@cloudflare/workers-types": "^5.20260801.1",
+		"@types/node": "^24.3.0",
+		"oxfmt": "^0.62.0",
+		"oxlint": "^1.77.0",
+		"typescript": "^5.9.2",
+		"vitest": "^4.1.10",
+		"wrangler": "^4.118.0"
+	},
+	"engines": {
+		"node": ">=22"
+	},
+	"allowScripts": {
+		"esbuild@0.28.1": true,
+		"workerd@1.20260811.1": true
+	}
+}

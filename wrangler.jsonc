@@ -1,0 +1,49 @@
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "kody-email",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-04-16",
+	"compatibility_flags": ["nodejs_compat"],
+	"minify": true,
+	"workers_dev": true,
+	"preview_urls": false,
+	"vars": {
+		"APP_BASE_URL": "https://kody.email",
+		"APP_COMMIT_SHA": "dev",
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "kody-email",
+			"database_id": "b761e1fb-79a5-4618-a907-4898364172ed",
+			"migrations_dir": "migrations",
+		},
+	],
+	"kv_namespaces": [
+		{
+			"binding": "RATE_LIMIT",
+			"id": "b535de60b64b41479ef2e22240fccd24",
+		},
+	],
+	"r2_buckets": [
+		{
+			"binding": "BLOBS",
+			"bucket_name": "kodyemail-blobs",
+		},
+	],
+	"assets": {
+		"directory": "./public",
+		"binding": "ASSETS",
+		"html_handling": "none",
+		"not_found_handling": "none",
+	},
+	"triggers": {
+		"crons": ["17 * * * *"],
+	},
+	"routes": [
+		{
+			"pattern": "kody.email/*",
+			"zone_name": "kody.email",
+		},
+	],
+}

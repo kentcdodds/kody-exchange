@@ -1,0 +1,136 @@
+import { readFileSync } from 'node:fs'
+import { DatabaseSync } from 'node:sqlite'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { type AppEnv } from '#src/env.ts'
+
+const migration = readFileSync(
+	join(dirname(fileURLToPath(import.meta.url)), '../migrations/0001_init.sql'),
+	'utf8',
+)
+
+class MemoryPrepared {
+	#db: DatabaseSync
+	#sql: string
+	#params: Array<unknown> = []
+
+	constructor(db: DatabaseSync, sql: string) {
+		this.#db = db
+		this.#sql = sql
+	}
+
+	bind(...params: Array<unknown>) {
+		this.#params = params
+		return this
+	}
+
+	#bound() {
+		return this.#params as Array<
+			null | number | bigint | string | Uint8Array | Int8Array
+		>
+	}
+
+	async first<T>() {
+		const row = this.#db.prepare(this.#sql).get(...this.#bound()) as
+			| T
+			| undefined
+		return row ?? null
+	}
+
+	async all<T>() {
+		const results = this.#db
+			.prepare(this.#sql)
+			.all(...this.#bound()) as Array<T>
+		return { results, success: true }
+	}
+
+	async run() {
+		const result = this.#db.prepare(this.#sql).run(...this.#bound())
+		return {
+			success: true,
+			meta: { changes: result.changes, last_row_id: result.lastInsertRowid },
+		}
+	}
+}
+
+function createD1(db: DatabaseSync): D1Database {
+	return {
+		prepare(sql: string) {
+			return new MemoryPrepared(db, sql) as unknown as D1PreparedStatement
+		},
+		async exec(sql: string) {
+			db.exec(sql)
+			return { count: 1, duration: 0 }
+		},
+		async batch() {
+			throw new Error('batch not implemented in test D1')
+		},
+		async dump() {
+			throw new Error('dump not implemented in test D1')
+		},
+	} as unknown as D1Database
+}
+
+class MemoryKv {
+	#map = new Map<string, string>()
+
+	async get(key: string) {
+		return this.#map.get(key) ?? null
+	}
+
+	async put(key: string, value: string) {
+		this.#map.set(key, value)
+	}
+
+	async delete(key: string) {
+		this.#map.delete(key)
+	}
+
+	async list() {
+		return { keys: [...this.#map.keys()].map((name) => ({ name })) }
+	}
+}
+
+class MemoryR2 {
+	#map = new Map<string, { body: ArrayBuffer; contentType: string }>()
+
+	async put(
+		key: string,
+		value: ArrayBuffer,
+		options?: { httpMetadata?: { contentType?: string } },
+	) {
+		this.#map.set(key, {
+			body: value,
+			contentType:
+				options?.httpMetadata?.contentType ?? 'application/octet-stream',
+		})
+		return { key }
+	}
+
+	async get(key: string) {
+		const item = this.#map.get(key)
+		if (!item) return null
+		return {
+			body: item.body,
+			httpMetadata: { contentType: item.contentType },
+		}
+	}
+}
+
+export function createTestEnv(overrides: Partial<AppEnv> = {}): AppEnv {
+	const sqlite = new DatabaseSync(':memory:')
+	sqlite.exec(migration)
+	return {
+		DB: createD1(sqlite),
+		RATE_LIMIT: new MemoryKv() as unknown as KVNamespace,
+		BLOBS: new MemoryR2() as unknown as R2Bucket,
+		COOKIE_SECRET: 'test-cookie-secret-at-least-32-bytes',
+		APP_BASE_URL: 'https://kody.email',
+		APP_COMMIT_SHA: 'testsha',
+		...overrides,
+	}
+}
+
+export function request(path: string, init: RequestInit = {}) {
+	return new Request(`https://kody.email${path}`, init)
+}
