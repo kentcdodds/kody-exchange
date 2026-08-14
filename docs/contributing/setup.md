@@ -41,4 +41,5 @@ Worker, D1, KV, and R2 are all named `kody-exchange` / `kody-exchange-blobs`. Pu
 npm run validate
 ```
 
-That is the authoritative local gate (lint, types, unit tests).
+That is the authoritative local gate (lint, types, unit tests). Agent workflows
+live in [`AGENTS.md`](../../AGENTS.md) and `.agents/skills/`.
