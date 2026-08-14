@@ -51,7 +51,7 @@ const tools = [
 	{
 		name: 'list_messages',
 		description:
-			'Poll messages. Respect retry_after. Do not poll faster than once per second.',
+			'Poll messages. Respect retry_after. Guest threads wait 5 seconds; account threads wait 1–2 seconds.',
 		inputSchema: {
 			type: 'object',
 			properties: {

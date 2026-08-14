@@ -1,6 +1,8 @@
 import {
 	guestCreatePerHour,
+	guestPollMinIntervalMs,
 	messageBurstPerMinute,
+	pollKvPersistMs,
 	pollMinIntervalMs,
 } from '#src/limits.ts'
 
@@ -9,6 +11,8 @@ export type RateLimitStore = Pick<KVNamespace, 'get' | 'put'>
 export type RateLimitResult =
 	| { ok: true; remaining: number }
 	| { ok: false; retryAfterSeconds: number }
+
+export type PollCache = Pick<Cache, 'match' | 'put'>
 
 async function consumeWindow(input: {
 	store: RateLimitStore
@@ -70,20 +74,94 @@ export async function limitMessageBurst(input: {
 	})
 }
 
+export function workerPollCache(): PollCache | null {
+	try {
+		return typeof caches === 'undefined' ? null : caches.default
+	} catch {
+		return null
+	}
+}
+
+function pollCacheRequest(key: string) {
+	return new Request(`https://kx-rl.invalid/${encodeURIComponent(key)}`)
+}
+
 export async function limitPoll(input: {
 	store: RateLimitStore
+	cache?: PollCache | null
 	agentId: string
 	threadId: string
+	minIntervalMs?: number
+	persistEveryMs?: number
+	now?: number
+}): Promise<RateLimitResult> {
+	return limitInterval({
+		store: input.store,
+		cache: input.cache,
+		key: `poll:${input.agentId}:${input.threadId}`,
+		minIntervalMs: input.minIntervalMs ?? pollMinIntervalMs,
+		persistEveryMs: input.persistEveryMs ?? pollKvPersistMs,
+		now: input.now,
+	})
+}
+
+export async function limitViewPoll(input: {
+	store: RateLimitStore
+	cache?: PollCache | null
+	ip: string
+	threadId: string
+	minIntervalMs?: number
+	persistEveryMs?: number
+	now?: number
+}): Promise<RateLimitResult> {
+	return limitInterval({
+		store: input.store,
+		cache: input.cache,
+		key: `view-poll:${input.ip}:${input.threadId}`,
+		minIntervalMs: input.minIntervalMs ?? guestPollMinIntervalMs,
+		persistEveryMs: input.persistEveryMs ?? pollKvPersistMs,
+		now: input.now,
+	})
+}
+
+async function limitInterval(input: {
+	store: RateLimitStore
+	cache?: PollCache | null
+	key: string
+	minIntervalMs: number
+	persistEveryMs: number
 	now?: number
 }): Promise<RateLimitResult> {
 	const now = input.now ?? Date.now()
-	const key = `poll:${input.agentId}:${input.threadId}`
-	const raw = await input.store.get(key)
-	const last = raw ? Number.parseInt(raw, 10) : 0
-	if (Number.isFinite(last) && now - last < pollMinIntervalMs) {
-		return { ok: false, retryAfterSeconds: 1 }
+	const retryAfterSeconds = Math.max(1, Math.ceil(input.minIntervalMs / 1000))
+	const cacheRequest = pollCacheRequest(input.key)
+	if (input.cache) {
+		const hit = await input.cache.match(cacheRequest)
+		if (hit) return { ok: false, retryAfterSeconds }
 	}
-	await input.store.put(key, String(now), { expirationTtl: 60 })
+
+	const raw = await input.store.get(input.key)
+	const last = raw ? Number.parseInt(raw, 10) : Number.NaN
+	if (Number.isFinite(last) && now - last < input.minIntervalMs) {
+		return { ok: false, retryAfterSeconds }
+	}
+
+	if (input.cache) {
+		await input.cache.put(
+			cacheRequest,
+			new Response('1', {
+				headers: {
+					'cache-control': `max-age=${retryAfterSeconds}`,
+				},
+			}),
+		)
+	}
+
+	const shouldWriteKv =
+		!input.cache || !Number.isFinite(last) || now - last >= input.persistEveryMs
+	if (shouldWriteKv) {
+		await input.store.put(input.key, String(now), { expirationTtl: 60 })
+	}
 	return { ok: true, remaining: 1 }
 }
 

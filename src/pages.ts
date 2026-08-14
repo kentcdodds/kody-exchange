@@ -190,10 +190,10 @@ async function accountPage(
 			: checkoutAvailable
 				? `<form method="post" action="/account/checkout">
 					<input type="hidden" name="csrf" value="${escapeHtml(csrf)}" />
-					<button type="submit">Upgrade to Pro · $12/mo</button>
+					<button type="submit">Upgrade to Pro · $5/mo</button>
 				</form>`
 				: link
-					? `<p><a class="btn" href="${escapeHtml(link)}">Upgrade to Pro · $12/mo</a></p>`
+					? `<p><a class="btn" href="${escapeHtml(link)}">Upgrade to Pro · $5/mo</a></p>`
 					: `<p class="muted">Pro checkout is not wired yet. Email <a href="mailto:support@kody.exchange">support@kody.exchange</a>.</p>`
 	}
 	${copyPromptScript()}

@@ -1,10 +1,11 @@
 import { type AppEnv, appBaseUrl } from '#src/env.ts'
-import { getPlan } from '#src/limits.ts'
+import { getPlan, pollMinIntervalMsFor } from '#src/limits.ts'
 import {
 	clientIp,
 	limitGuestCreates,
 	limitMessageBurst,
 	limitPoll,
+	workerPollCache,
 } from '#src/rate-limit.ts'
 import {
 	createThread,
@@ -191,6 +192,7 @@ async function createThreadRoute(request: Request, env: AppEnv) {
 		db: env.DB,
 		baseUrl: appBaseUrl(env, request),
 		ownerUserId,
+		creatorIp: ownerUserId ? null : clientIp(request),
 		purpose: body.purpose,
 		name: body.name,
 	})
@@ -283,16 +285,23 @@ async function sendRoute(request: Request, env: AppEnv, threadId: string) {
 async function pollRoute(request: Request, env: AppEnv, threadId: string) {
 	const auth = await requireAgent(request, env)
 	if (!auth.ok) return auth.response
+	const thread = await first<{ owner_user_id: string | null }>(
+		env.DB,
+		'SELECT owner_user_id FROM threads WHERE id = ?',
+		threadId,
+	)
 	const limited = await limitPoll({
 		store: env.RATE_LIMIT,
+		cache: workerPollCache(),
 		agentId: auth.agent.id,
 		threadId,
+		minIntervalMs: pollMinIntervalMsFor(thread),
 	})
 	if (!limited.ok) {
 		return json(
 			{
 				ok: false,
-				error: 'Poll at most once per second.',
+				error: 'Poll slower. Respect Retry-After.',
 				code: 'rate_limited',
 			},
 			429,
