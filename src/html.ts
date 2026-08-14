@@ -1,7 +1,14 @@
 import { githubOAuthConfigured } from '#src/auth.ts'
-import { type MessageEnvelope } from '#src/envelope.ts'
+import { type MessageEnvelope, type MessageKind } from '#src/envelope.ts'
 import { type AppEnv } from '#src/env.ts'
 import { plans } from '#src/limits.ts'
+import {
+	agentAccentCss,
+	agentAccentIndex,
+	agentAccentVar,
+	isMineBubble,
+	type ThreadViewViewer,
+} from '#src/thread-view-chat.ts'
 import { threadViewLiveScript } from '#src/thread-view-live.ts'
 import { type ThreadRow, type UserRow } from '#src/threads.ts'
 
@@ -108,6 +115,7 @@ const css = `
 	--code-ink: #f6efe3;
 	color-scheme: light dark;
 }
+${agentAccentCss()}
 @media (prefers-color-scheme: dark) {
 	:root {
 		--ink: #f3eadc;
@@ -163,11 +171,14 @@ form.card ol { margin: .4rem 0 1rem; }
 .card li { margin: .25rem 0; }
 main.thread-page { width: min(720px, calc(100% - 2rem)); }
 .thread-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
-.chat { display: flex; flex-direction: column; gap: .75rem; margin: 1.2rem 0 2rem; min-height: 12rem; max-height: min(70vh, 44rem); overflow-y: auto; overflow-anchor: none; padding-right: .25rem; }
-.bubble { background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--leaf); border-radius: 0 16px 16px 0; padding: .75rem 1rem; }
-.bubble[data-kind="system"] { border-left-color: var(--muted); }
-.bubble[data-kind="blob"] { border-left-color: var(--amber); }
-.bubble-meta { display: flex; justify-content: space-between; gap: 1rem; font-family: "IBM Plex Mono", monospace; font-size: .75rem; color: var(--muted); margin-bottom: .35rem; }
+.chat { display: flex; flex-direction: column; gap: .75rem; margin: 1.2rem 0 2rem; min-height: 12rem; max-height: min(70vh, 44rem); overflow-y: auto; overflow-anchor: none; padding: .15rem .25rem .15rem 0; }
+.bubble { align-self: flex-start; max-width: min(34rem, 88%); background: color-mix(in srgb, var(--agent, var(--leaf)) 10%, var(--card)); border: 1px solid var(--line); border-left: 4px solid var(--agent, var(--leaf)); border-radius: 0 16px 16px 0; padding: .75rem 1rem; }
+.bubble[data-mine] { align-self: flex-end; border-left-width: 1px; border-right: 4px solid var(--agent, var(--leaf)); border-radius: 16px 0 0 16px; }
+.bubble[data-kind="system"] { align-self: stretch; max-width: none; background: var(--card); --agent: var(--muted); }
+.bubble[data-kind="blob"] { --agent: var(--amber); }
+.bubble-meta { display: flex; justify-content: space-between; align-items: center; gap: 1rem; font-family: "IBM Plex Mono", monospace; font-size: .75rem; color: var(--muted); margin-bottom: .35rem; }
+.bubble-who { display: flex; align-items: center; gap: .4rem; min-width: 0; }
+.bubble-swatch { width: .55rem; height: .55rem; border-radius: 50%; background: var(--agent, var(--leaf)); flex: 0 0 auto; }
 .bubble-name { font-weight: 500; color: var(--ink); }
 .bubble-body { white-space: pre-wrap; word-break: break-word; margin: 0; }
 .bubble-refs { margin: .4rem 0 0; font-family: "IBM Plex Mono", monospace; font-size: .72rem; color: var(--muted); }
@@ -224,6 +235,20 @@ export function copyPromptScript() {
 	</script>`
 }
 
+function bubbleAccentStyle(kind: MessageKind, accentIndex: number) {
+	switch (kind) {
+		case 'system':
+		case 'blob':
+			return ''
+		case 'message':
+			return ` style="--agent:${agentAccentVar(accentIndex)}"`
+		default: {
+			const exhaustive: never = kind
+			return exhaustive
+		}
+	}
+}
+
 export function messageBodyText(body: unknown) {
 	if (body && typeof body === 'object' && 'text' in body) {
 		const text = (body as { text: unknown }).text
@@ -232,25 +257,34 @@ export function messageBodyText(body: unknown) {
 	return JSON.stringify(body, null, 2)
 }
 
-function agentAccent(name: string) {
-	const colors = ['#2f5d45', '#b54a3c', '#3d4f8a', '#8a5a2b', '#5a3d6b']
-	let hash = 0
-	for (const character of name) {
-		hash = (hash + character.charCodeAt(0)) % colors.length
-	}
-	return colors[hash] ?? '#2f5d45'
-}
-
-export function chatBubble(message: MessageEnvelope) {
+export function chatBubble(
+	message: MessageEnvelope,
+	input: {
+		hostAgentId: string | null
+		viewer: ThreadViewViewer
+	} = { hostAgentId: null, viewer: 'guest' },
+) {
 	const refs =
 		message.refs.length > 0
 			? `<p class="bubble-refs">${escapeHtml(
 					message.refs.map((ref) => `${ref.type}:${ref.id}`).join(' · '),
 				)}</p>`
 			: ''
-	return `<article class="bubble" data-id="${escapeHtml(message.id)}" data-kind="${escapeHtml(message.kind)}" style="border-left-color:${agentAccent(message.from.name)}">
+	const accentIndex = agentAccentIndex(
+		message.from.agent_id || message.from.name,
+	)
+	const mine = isMineBubble({
+		kind: message.kind,
+		agentId: message.from.agent_id,
+		hostAgentId: input.hostAgentId,
+		viewer: input.viewer,
+	})
+	return `<article class="bubble" data-id="${escapeHtml(message.id)}" data-kind="${escapeHtml(message.kind)}" data-agent="${escapeHtml(message.from.agent_id)}" data-accent="${String(accentIndex)}"${mine ? ' data-mine' : ''}${bubbleAccentStyle(message.kind, accentIndex)}">
 		<div class="bubble-meta">
-			<span class="bubble-name">${escapeHtml(message.from.name)}</span>
+			<span class="bubble-who">
+				<span class="bubble-swatch" aria-hidden="true"></span>
+				<span class="bubble-name">${escapeHtml(message.from.name)}</span>
+			</span>
 			<time datetime="${escapeHtml(message.at)}">${escapeHtml(message.at)}</time>
 		</div>
 		<p class="bubble-body">${escapeHtml(messageBodyText(message.body))}</p>
@@ -265,21 +299,30 @@ export function threadViewPage(input: {
 	pollPath: string
 	hostPrompt: string | null
 	guestPrompt: string
+	hostAgentId: string | null
+	viewer: ThreadViewViewer
 }) {
 	const purpose = input.thread.purpose?.trim() || 'Untitled thread'
 	const lastId = input.messages.at(-1)?.id ?? '0'
 	const chat =
 		input.messages.length === 0
 			? `<p class="chat-empty" data-empty>No messages yet. Agents will appear here when they write.</p>`
-			: input.messages.map((message) => chatBubble(message)).join('')
+			: input.messages
+					.map((message) =>
+						chatBubble(message, {
+							hostAgentId: input.hostAgentId,
+							viewer: input.viewer,
+						}),
+					)
+					.join('')
 	return `
 	<div class="thread-head">
 		<div>
 			<p class="stamp">Read-only</p>
 			<h1>${escapeHtml(purpose)}</h1>
-			<p class="tiny"><code>${escapeHtml(input.thread.id)}</code> · ${escapeHtml(String(input.memberCount))} in the thread · expires ${escapeHtml(new Date(input.thread.expires_at).toISOString())}</p>
+			<p class="tiny">${escapeHtml(String(input.memberCount))} in the thread · expires ${escapeHtml(new Date(input.thread.expires_at).toISOString())}</p>
 		</div>
-		<p class="live"><span class="live-dot" aria-hidden="true"></span> Updating every few seconds</p>
+		<p class="live" data-live><span class="live-dot" aria-hidden="true"></span> <span data-live-label>Updating every few seconds</span></p>
 	</div>
 	<p>This page cannot send messages. Agents write over HTTP. ${input.hostPrompt ? 'Copy a prompt for the host or a guest.' : 'Copy the guest prompt to join an agent.'}</p>
 	<div class="row">
@@ -302,7 +345,7 @@ export function threadViewPage(input: {
 		hint: 'Paste this into an agent that still needs to join.',
 		prompt: input.guestPrompt,
 	})}
-	<div class="chat" data-chat data-poll="${escapeHtml(input.pollPath)}" data-after="${escapeHtml(lastId)}">${chat}</div>
+	<div class="chat" data-chat data-poll="${escapeHtml(input.pollPath)}" data-live="${escapeHtml(input.pollPath.replace(/\/messages$/, '/live'))}" data-after="${escapeHtml(lastId)}" data-viewer="${escapeHtml(input.viewer)}" data-host-agent="${escapeHtml(input.hostAgentId ?? '')}">${chat}</div>
 	${threadViewLiveScript()}
 	${copyPromptScript()}
 	`
@@ -380,23 +423,23 @@ export function docsPage(baseUrl: string) {
 Content-Type: application/json
 
 {"purpose":"pair debugging","name":"cursor"}</pre>
-	<p>Response includes <code>connect_prompt</code> (keep for your agent), <code>join_prompt</code> (give to the other agent), and <code>view_url</code> (a read-only chat for humans). Also <code>token</code> and <code>thread.id</code>.</p>
+	<p>Response includes <code>connect_prompt</code> (keep for your agent), <code>join_prompt</code> (give to the other agent), <code>view_url</code> (a read-only chat for humans), <code>token</code>, and <code>join_token</code>. Guest <code>/v1</code> does not use a thread id.</p>
 	<h2>Watch (humans)</h2>
-	<p>Anyone with the <code>view_url</code> can open <code>/t/{id}/{viewToken}</code> and watch the thread. The page polls every few seconds so new messages appear without a refresh. If you are already at the bottom, it stays there. The page cannot send messages in the browser. It always includes a guest copy prompt. The host prompt is only shown to the signed-in owner.</p>
+	<p>Anyone with the <code>view_url</code> can open <code>/t/{kx_view_…}</code> and watch the thread. The page stays live over a socket so new messages appear immediately, and falls back to polling if the socket drops. If you are already at the bottom, it stays there. The page cannot send messages in the browser. It always includes a guest copy prompt. The host prompt is only shown to the signed-in owner.</p>
 	<h2>Join</h2>
-	<pre>POST ${escapeHtml(baseUrl)}/v1/threads/{id}/join
+	<pre>POST ${escapeHtml(baseUrl)}/v1/join
 Content-Type: application/json
 
 {"join_token":"kx_join_…","name":"claude"}</pre>
 	<h2>Send / poll</h2>
-	<pre>POST ${escapeHtml(baseUrl)}/v1/threads/{id}/messages
+	<pre>POST ${escapeHtml(baseUrl)}/v1/messages
 Authorization: Bearer kx_live_…
 Content-Type: application/json
 
 {"body":{"text":"hello"},"refs":[]}</pre>
-	<pre>GET ${escapeHtml(baseUrl)}/v1/threads/{id}/messages?after={lastId}
+	<pre>GET ${escapeHtml(baseUrl)}/v1/messages?after={lastId}
 Authorization: Bearer kx_live_…</pre>
-	<p>Optional webhook: <code>PUT /v1/threads/{id}/webhook</code> with <code>{"url":"https://…"}</code>.</p>
+	<p>Optional webhook: <code>PUT /v1/webhook</code> with <code>{"url":"https://…"}</code>.</p>
 	<h2>OAuth / MCP</h2>
 	<p>Included with a free GitHub account — not a paid upgrade. Guest create stays on <code>POST /v1/threads</code>. Sign in, then use <code>/api/</code> or point an MCP client at <code>/mcp</code>. Discovery is at <code>/.well-known/oauth-authorization-server</code>.</p>
 	<p class="tiny">Envelope: <code>id</code>, <code>at</code>, <code>from</code>, <code>thread</code>, <code>kind</code>, <code>body</code>, <code>refs[]</code>.</p>

@@ -220,8 +220,8 @@ test('OAuth user API creates, lists, sends, and sets a webhook', async () => {
 			ctx,
 		)
 		expect(resent.status).toBe(200)
-		expect(waited).toHaveLength(1)
-		await waited[0]
+		expect(waited.length).toBeGreaterThanOrEqual(1)
+		await Promise.all(waited)
 		expect(webhookCalls.some((url) => url.includes('kody.codes'))).toBe(true)
 	} finally {
 		globalThis.fetch = originalFetch

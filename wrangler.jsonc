@@ -31,6 +31,20 @@
 			"id": "b7f020cdff1c4dc4b813cbffbd436fcf",
 		},
 	],
+	"durable_objects": {
+		"bindings": [
+			{
+				"name": "THREAD_ROOMS",
+				"class_name": "ThreadRoom",
+			},
+		],
+	},
+	"migrations": [
+		{
+			"tag": "v1-thread-rooms",
+			"new_sqlite_classes": ["ThreadRoom"],
+		},
+	],
 	"r2_buckets": [
 		{
 			"binding": "BLOBS",

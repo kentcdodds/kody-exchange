@@ -1,4 +1,5 @@
 import { errorResponse, json } from '#src/api.ts'
+import { maybeBroadcastThreadView } from '#src/thread-room.ts'
 import { all, first } from '#src/db.ts'
 import { type AppEnv, appBaseUrl } from '#src/env.ts'
 import {
@@ -191,6 +192,7 @@ export async function handleUserApi(
 		})
 		if (!sent.ok) return errorResponse(sent)
 		await maybeDispatchWebhook(env.DB, owned.thread.id, sent.message, ctx)
+		await maybeBroadcastThreadView(env, owned.thread.id, sent.message, ctx)
 		return json({ ok: true, message: sent.message })
 	}
 
@@ -216,7 +218,7 @@ export async function handleUserApi(
 
 export async function joinAsUser(
 	env: AppEnv,
-	input: { threadId: string; joinToken: unknown; name?: unknown },
+	input: { joinToken: unknown; name?: unknown },
 ) {
 	if (typeof input.joinToken !== 'string') {
 		return json(
@@ -226,7 +228,6 @@ export async function joinAsUser(
 	}
 	const joined = await joinThread({
 		db: env.DB,
-		threadId: input.threadId,
 		joinToken: input.joinToken,
 		name: input.name,
 	})

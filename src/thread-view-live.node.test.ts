@@ -50,12 +50,24 @@ test('nextPollDelayMs prefers retry_after, then Retry-After, then 5s', () => {
 	).toBe(5000)
 })
 
-test('live script starts immediately and pins when already at the bottom', () => {
+test('live script prefers a socket and pins when already at the bottom', () => {
 	const script = threadViewLiveScript()
-	expect(script).toContain('void tick()')
+	expect(script).toContain('connectLive()')
+	expect(script).toContain('new WebSocket')
 	expect(script).toContain('pinToBottom()')
 	expect(script).toContain('isPinnedToBottom()')
 	expect(script).toContain(`const nearBottomPx = ${VIEW_POLL_NEAR_BOTTOM_PX}`)
 	expect(script).toContain('retry-after')
+	expect(script).toContain('isMineBubble')
+	expect(script).toContain('dataset.mine')
+	expect(script).toContain('--agent-')
+	expect(script).toContain("setLiveLabel('Live')")
+	expect(script).toContain('void tick()')
+	expect(script).toContain('pollGeneration')
+	expect(script).toContain('generation !== pollGeneration')
+	expect(
+		script.match(/generation !== pollGeneration/g)?.length,
+	).toBeGreaterThanOrEqual(3)
+	expect(script).not.toContain('if (socketOpen) return')
 	expect(script).not.toContain('window.setTimeout(tick, 5000)')
 })

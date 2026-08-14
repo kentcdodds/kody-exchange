@@ -54,13 +54,17 @@ export async function renderPage(
 	const baseUrl = appBaseUrl(env, request)
 	const common = { user, env, path: url.pathname }
 
-	const viewMessages = url.pathname.match(/^\/t\/([^/]+)\/([^/]+)\/messages$/)
-	if (viewMessages?.[1] && viewMessages[2]) {
-		return pollThreadView(request, env, viewMessages[1], viewMessages[2])
+	const viewLive = url.pathname.match(/^\/t\/([^/]+)\/live$/)
+	if (viewLive?.[1]) {
+		return connectThreadView(request, env, viewLive[1])
 	}
-	const view = url.pathname.match(/^\/t\/([^/]+)\/([^/]+)$/)
-	if (view?.[1] && view[2]) {
-		return renderThreadView(request, env, user, view[1], view[2])
+	const viewMessages = url.pathname.match(/^\/t\/([^/]+)\/messages$/)
+	if (viewMessages?.[1]) {
+		return pollThreadView(request, env, viewMessages[1])
+	}
+	const view = url.pathname.match(/^\/t\/([^/]+)$/)
+	if (view?.[1]) {
+		return renderThreadView(request, env, user, view[1])
 	}
 
 	switch (url.pathname) {
@@ -118,12 +122,10 @@ async function renderThreadView(
 	request: Request,
 	env: AppEnv,
 	user: UserRow | null,
-	threadId: string,
 	viewToken: string,
 ) {
 	const listed = await listMessagesForView({
 		db: env.DB,
-		threadId,
 		viewToken,
 	})
 	if (!listed.ok) {
@@ -144,12 +146,12 @@ async function renderThreadView(
 		listed.thread.owner_user_id &&
 		user.id === listed.thread.owner_user_id,
 	)
-	const host = ownsThread ? await getHostAgent(env.DB, listed.thread.id) : null
+	const host = await getHostAgent(env.DB, listed.thread.id)
 	const viewUrl = `${appBaseUrl(env, request)}${new URL(request.url).pathname}`
 	const prompts = await threadViewPrompts({
 		baseUrl: appBaseUrl(env, request),
 		thread: listed.thread,
-		host,
+		host: ownsThread ? host : null,
 		viewUrl,
 	})
 	return html(
@@ -169,22 +171,65 @@ async function renderThreadView(
 				pollPath: `${new URL(request.url).pathname}/messages`,
 				hostPrompt: prompts.hostPrompt,
 				guestPrompt: prompts.guestPrompt,
+				hostAgentId: host?.id ?? null,
+				viewer: ownsThread ? 'host' : 'guest',
 			}),
 		}),
 	)
 }
 
+async function connectThreadView(
+	request: Request,
+	env: AppEnv,
+	viewToken: string,
+) {
+	if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') {
+		return json(
+			{
+				ok: false,
+				error: 'Expected a WebSocket upgrade.',
+				code: 'upgrade_required',
+			},
+			426,
+		)
+	}
+	const listed = await listMessagesForView({
+		db: env.DB,
+		viewToken,
+		limit: 1,
+	})
+	if (!listed.ok) {
+		return json(
+			{ ok: false, error: listed.error, code: listed.code },
+			listed.status,
+		)
+	}
+	if (!env.THREAD_ROOMS) {
+		return json(
+			{
+				ok: false,
+				error: 'Live view is unavailable.',
+				code: 'live_unavailable',
+			},
+			503,
+		)
+	}
+	const stub = env.THREAD_ROOMS.get(
+		env.THREAD_ROOMS.idFromName(listed.thread.id),
+	)
+	return stub.fetch(request)
+}
+
 async function pollThreadView(
 	request: Request,
 	env: AppEnv,
-	threadId: string,
 	viewToken: string,
 ) {
 	const limited = await limitViewPoll({
 		store: env.RATE_LIMIT,
 		cache: workerPollCache(),
 		ip: clientIp(request),
-		threadId,
+		threadId: viewToken,
 	})
 	if (!limited.ok) {
 		return json(
@@ -199,7 +244,6 @@ async function pollThreadView(
 	}
 	const listed = await listMessagesForView({
 		db: env.DB,
-		threadId,
 		viewToken,
 		after: new URL(request.url).searchParams.get('after'),
 		limit: Number(new URL(request.url).searchParams.get('limit') ?? 50),
