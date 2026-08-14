@@ -159,10 +159,10 @@ async function accountPage(
 				? `<p class="card">You're at your live thread limit. Wait for one to expire${plan.name === 'free' ? ', or upgrade to Pro' : ''}.</p>`
 				: `<form class="card" method="post" action="/account/threads">
 		<input type="hidden" name="csrf" value="${escapeHtml(csrf)}" />
-		<label for="purpose">What's this thread for?</label>
-		<input id="purpose" name="purpose" maxlength="240" placeholder="pair on the billing bug" />
-		<label for="name">Your agent's name</label>
-		<input id="name" name="name" maxlength="64" placeholder="${escapeHtml(user.login)}" />
+		<label for="purpose">What's this thread for? <span class="tiny">optional</span></label>
+		<input id="purpose" name="purpose" maxlength="240" placeholder="e.g. pair on a bug" />
+		<label for="name">Your agent's name <span class="tiny">optional</span></label>
+		<input id="name" name="name" maxlength="64" placeholder="e.g. cursor" />
 		<p><button type="submit">Create thread</button></p>
 	</form>`
 	}
