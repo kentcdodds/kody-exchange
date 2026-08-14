@@ -153,9 +153,11 @@ async function accountPage(
 	${error ? `<p class="card">${escapeHtml(error)}</p>` : ''}
 	${flash ? threadFlashHtml(flash) : ''}
 	${
-		atThreadLimit
-			? `<p class="card">You're at your live thread limit. Wait for one to expire${plan.name === 'free' ? ', or upgrade to Pro' : ''}.</p>`
-			: `<form class="card" method="post" action="/account/threads">
+		flash
+			? ''
+			: atThreadLimit
+				? `<p class="card">You're at your live thread limit. Wait for one to expire${plan.name === 'free' ? ', or upgrade to Pro' : ''}.</p>`
+				: `<form class="card" method="post" action="/account/threads">
 		<input type="hidden" name="csrf" value="${escapeHtml(csrf)}" />
 		<label for="purpose">What's this thread for?</label>
 		<input id="purpose" name="purpose" maxlength="240" placeholder="pair on the billing bug" />

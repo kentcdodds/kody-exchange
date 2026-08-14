@@ -65,6 +65,7 @@ test('creating a thread shows a connect prompt and a join prompt once', async ()
 	expect(html).toContain('kx_join_')
 	expect(html).toContain('1 in the thread')
 	expect(html).toContain('shown once')
+	expect(html).not.toContain("What's this thread for?")
 
 	const again = await handleRequest(
 		request('/account', { headers: { cookie } }),
@@ -73,6 +74,7 @@ test('creating a thread shows a connect prompt and a join prompt once', async ()
 	const later = await again.text()
 	expect(later).toContain('pair on the billing bug')
 	expect(later).toContain('1 in the thread')
+	expect(later).toContain("What's this thread for?")
 	expect(later).not.toContain('Give this to your agent')
 	expect(later).not.toContain('kx_live_')
 	expect(later).not.toContain('kx_join_')
