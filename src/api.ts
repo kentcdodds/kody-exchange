@@ -201,6 +201,7 @@ async function createThreadRoute(request: Request, env: AppEnv) {
 		agent: { id: created.agent.id, name: created.agent.name },
 		token: created.token,
 		join_token: created.joinToken,
+		connect_prompt: created.connectPrompt,
 		join_prompt: created.joinPrompt,
 		plan: created.plan,
 	})

@@ -7,7 +7,15 @@ import { type UserRow } from '#src/threads.ts'
 
 const sessionCookie = 'kx_session'
 const oauthStateCookie = 'kx_oauth'
+const flashCookie = 'kx_flash'
 const sessionTtlMs = 30 * 24 * 60 * 60 * 1000
+const flashTtlMs = 10 * 60 * 1000
+
+export type ThreadFlash = {
+	threadId: string
+	connectPrompt: string
+	joinPrompt: string
+}
 
 export function githubOAuthConfigured(env: AppEnv) {
 	return Boolean(
@@ -243,6 +251,65 @@ export function logoutResponse() {
 
 export async function csrfToken(secret: string, userId: string) {
 	return hmacSha256Hex(secret, `csrf:${userId}`)
+}
+
+export async function threadFlashCookie(
+	secret: string,
+	userId: string,
+	flash: ThreadFlash,
+) {
+	const signed = await signPayload(
+		secret,
+		JSON.stringify({
+			userId,
+			threadId: flash.threadId,
+			connectPrompt: flash.connectPrompt,
+			joinPrompt: flash.joinPrompt,
+			exp: Date.now() + flashTtlMs,
+		}),
+	)
+	return cookie(flashCookie, signed, flashTtlMs / 1000)
+}
+
+export async function readThreadFlash(
+	request: Request,
+	secret: string,
+	userId: string,
+): Promise<ThreadFlash | null> {
+	const token = readCookie(request, flashCookie)
+	if (!token) return null
+	const payload = await verifyPayload(secret, token)
+	if (!payload) return null
+	try {
+		const parsed = JSON.parse(payload) as {
+			userId?: string
+			threadId?: string
+			connectPrompt?: string
+			joinPrompt?: string
+			exp?: number
+		}
+		if (
+			parsed.userId !== userId ||
+			!parsed.threadId ||
+			!parsed.connectPrompt ||
+			!parsed.joinPrompt ||
+			!parsed.exp ||
+			parsed.exp < Date.now()
+		) {
+			return null
+		}
+		return {
+			threadId: parsed.threadId,
+			connectPrompt: parsed.connectPrompt,
+			joinPrompt: parsed.joinPrompt,
+		}
+	} catch {
+		return null
+	}
+}
+
+export function clearThreadFlashCookie() {
+	return clearCookie(flashCookie)
 }
 
 export function planOf(user: UserRow): Exclude<PlanName, 'guest'> {

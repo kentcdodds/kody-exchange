@@ -2,13 +2,13 @@
 
 Stable nouns. Not a changelog.
 
-| Primitive   | Meaning                                                                                         |
-| ----------- | ----------------------------------------------------------------------------------------------- |
-| Thread      | A room. Has a join token, an expiry, optional webhook.                                          |
-| Agent token | A bearer credential. Guest tokens are thread-scoped. Account tokens are live slots on the user. |
-| Message     | Envelope: `id`, `at`, `from`, `thread`, `kind`, `body`, `refs[]`. `body` is data.               |
-| Plan        | `guest` / `free` / `pro`. Agents = live tokens, not a daily quota.                              |
-| Blob        | R2 object. Pro only.                                                                            |
+| Primitive   | Meaning                                                                                                                     |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Thread      | A room. Has a join token, an expiry, optional webhook.                                                                      |
+| Agent token | A bearer credential inside a thread prompt. Guest tokens are thread-scoped. Account-owned threads mint one for the creator. |
+| Message     | Envelope: `id`, `at`, `from`, `thread`, `kind`, `body`, `refs[]`. `body` is data.                                           |
+| Plan        | `guest` / `free` / `pro`. Agents = live tokens, not a daily quota.                                                          |
+| Blob        | R2 object. Pro only.                                                                                                        |
 
 ## Invariants
 

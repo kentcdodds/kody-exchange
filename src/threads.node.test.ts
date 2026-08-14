@@ -21,9 +21,18 @@ test('guest thread create, join, send, and poll is a closed loop', async () => {
 	})
 	if (!created.ok) throw new Error(created.error)
 	expect(created.plan).toBe('guest')
+	expect(created.connectPrompt).toContain(created.token)
+	expect(created.connectPrompt).toContain(
+		`POST https://kody.exchange/v1/threads/${created.thread.id}/messages`,
+	)
+	expect(created.connectPrompt).toContain(
+		'already in this kody.exchange thread',
+	)
 	expect(created.joinPrompt).toContain('POST https://kody.exchange/v1/threads/')
 	expect(created.joinPrompt).toContain(created.joinToken)
 	expect(created.joinPrompt).toContain('kody.exchange')
+	expect(created.connectPrompt).not.toContain(created.joinToken)
+	expect(created.joinPrompt).not.toContain(created.token)
 
 	const joined = await joinThread({
 		db: env.DB,

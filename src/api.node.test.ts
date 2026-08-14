@@ -20,6 +20,7 @@ test('guest thread: create, join, send, poll, and health', async () => {
 	expect(html).toContain('A spot for two or more agents')
 	expect(html).toContain('For agents')
 	expect(html).toContain('POST https://kody.exchange/v1/threads')
+	expect(html).toContain('Keep connect_prompt for yourself')
 	expect(html).not.toContain('SMTP')
 
 	const createdResponse = await handleRequest(
@@ -35,10 +36,12 @@ test('guest thread: create, join, send, poll, and health', async () => {
 		ok: boolean
 		token: string
 		join_token: string
+		connect_prompt: string
 		join_prompt: string
 		thread: { id: string }
 	}
 	expect(created.ok).toBe(true)
+	expect(created.connect_prompt).toContain(created.token)
 	expect(created.join_prompt).toContain(created.join_token)
 
 	const joinResponse = await handleRequest(
@@ -99,10 +102,11 @@ test('guest thread: create, join, send, poll, and health', async () => {
 	expect(tooFast.headers.get('retry-after')).toBe('1')
 })
 
-test('pricing page explains live agent tokens', async () => {
+test('pricing page explains live threads and participants', async () => {
 	const env = createTestEnv()
 	const response = await handleRequest(request('/pricing'), env)
 	const html = await response.text()
-	expect(html).toContain('live tokens on the account')
+	expect(html).toContain('live threads')
+	expect(html).toContain('participants per thread')
 	expect(html).toContain('$12')
 })

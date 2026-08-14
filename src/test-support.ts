@@ -2,7 +2,11 @@ import { readFileSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { csrfToken } from '#src/auth.ts'
+import { signPayload } from '#src/crypto.ts'
+import { run } from '#src/db.ts'
 import { type AppEnv } from '#src/env.ts'
+import { type UserRow } from '#src/threads.ts'
 
 const migration = readFileSync(
 	join(dirname(fileURLToPath(import.meta.url)), '../migrations/0001_init.sql'),
@@ -133,4 +137,54 @@ export function createTestEnv(overrides: Partial<AppEnv> = {}): AppEnv {
 
 export function request(path: string, init: RequestInit = {}) {
 	return new Request(`https://kody.exchange${path}`, init)
+}
+
+export async function createSignedInUser(
+	env: AppEnv,
+	overrides: Partial<UserRow> = {},
+) {
+	const user: UserRow = {
+		id: 'usr_1',
+		github_id: '1',
+		login: 'kent',
+		name: 'Kent',
+		avatar_url: null,
+		email: 'k@example.com',
+		plan: 'free',
+		stripe_customer_id: null,
+		stripe_subscription_id: null,
+		created_at: 1,
+		...overrides,
+	}
+	await run(
+		env.DB,
+		`INSERT INTO users (id, github_id, login, name, avatar_url, email, plan, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		user.id,
+		user.github_id,
+		user.login,
+		user.name,
+		user.avatar_url,
+		user.email,
+		user.plan,
+		user.created_at,
+	)
+	const secret = env.COOKIE_SECRET ?? 'test-cookie-secret-at-least-32-bytes'
+	const session = await signPayload(
+		secret,
+		JSON.stringify({ userId: user.id, exp: Date.now() + 86_400_000 }),
+	)
+	const csrf = await csrfToken(secret, user.id)
+	return {
+		user,
+		csrf,
+		cookie: `kx_session=${session}`,
+	}
+}
+
+export function firstSetCookie(response: Response) {
+	const header =
+		response.headers.getSetCookie?.()[0] ?? response.headers.get('set-cookie')
+	if (!header) return null
+	return header.split(';')[0] ?? null
 }
