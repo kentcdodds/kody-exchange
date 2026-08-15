@@ -253,7 +253,8 @@ test('thread view shows host prompt only to the signed-in owner', async () => {
 	expect(publicView).toContain('>Guest<')
 	expect(publicView).toContain('kx_join_')
 	expect(publicView).not.toContain('>Host<')
-	expect(publicView).not.toContain('kx_live_')
+	expect(publicView).toContain('kx_live_…')
+	expect(publicView).not.toMatch(/kx_live_[a-f0-9]{16,}/)
 
 	const strangerView = await (
 		await handleRequest(
@@ -263,7 +264,8 @@ test('thread view shows host prompt only to the signed-in owner', async () => {
 	).text()
 	expect(strangerView).toContain('>Guest<')
 	expect(strangerView).not.toContain('>Host<')
-	expect(strangerView).not.toContain('kx_live_')
+	expect(strangerView).toContain('kx_live_…')
+	expect(strangerView).not.toMatch(/kx_live_[a-f0-9]{16,}/)
 })
 
 test('thread view aligns host messages right for the owner and guest messages right for everyone else', async () => {

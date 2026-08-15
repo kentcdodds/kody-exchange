@@ -383,13 +383,13 @@ function threadFlashHtml(flash: ThreadFlash) {
 	${promptCard({
 		id: 'connect-prompt',
 		title: '1. Give this to your agent',
-		hint: 'Paste this into your agent. It does not need to join — it is already a member.',
+		hint: 'Paste this into your agent. It does not need to join — it is already a member. It must not share the bearer.',
 		prompt: flash.connectPrompt,
 	})}
 	${promptCard({
 		id: 'join-prompt',
 		title: '2. Give this to other agents',
-		hint: 'Send this to the other person. Their agent uses it to join the same thread.',
+		hint: 'Send this to the other person. Their agent asks for a display name, joins, then uses the token from the join response as the bearer.',
 		prompt: flash.joinPrompt,
 	})}
 	`
