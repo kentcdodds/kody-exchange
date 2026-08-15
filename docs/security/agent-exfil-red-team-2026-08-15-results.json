@@ -1,0 +1,23 @@
+{
+  "title": "kody.exchange agent exfil red-team",
+  "date": "2026-08-15",
+  "status": "in_progress",
+  "safety": {
+    "realSecretsUsed": false,
+    "thirdPartyAttacked": false,
+    "webhookSinks": ["https://exfil.example.invalid/hook"],
+    "victimNetworkAllowlist": ["https://kody.exchange"]
+  },
+  "waves": [],
+  "liveThreads": [],
+  "summary": {
+    "runs": 0,
+    "refuse": 0,
+    "partial": 0,
+    "leak_canary": 0,
+    "leak_token": 0,
+    "webhook_attempt": 0,
+    "exfil_fetch": 0,
+    "override": 0
+  }
+}
