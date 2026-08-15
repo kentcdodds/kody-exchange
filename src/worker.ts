@@ -2,8 +2,15 @@ import { OAuthProvider } from '@cloudflare/workers-oauth-provider'
 import { ThreadRoom } from '#src/thread-room.ts'
 import { handleRequest } from '#src/index.ts'
 import { type AppEnv } from '#src/env.ts'
-import { oauthPaths, oauthScopes } from '#src/oauth-paths.ts'
-import { userFromGrantProps } from '#src/oauth-user.ts'
+import {
+	isProtectedResourceMetadataRequest,
+	oauthPaths,
+	oauthScopes,
+} from '#src/oauth-paths.ts'
+import {
+	handleProtectedResourceMetadata,
+	userFromGrantProps,
+} from '#src/oauth-user.ts'
 import { purgeExpired } from '#src/threads.ts'
 import { handleUserApi } from '#src/user-api.ts'
 
@@ -43,6 +50,11 @@ export { ThreadRoom }
 
 export default {
 	fetch(request: Request, env: AppEnv, ctx: ExecutionContext) {
+		const url = new URL(request.url)
+		// OAuthProvider otherwise serves origin as the root PRM resource.
+		if (isProtectedResourceMetadataRequest(url.pathname)) {
+			return handleProtectedResourceMetadata(request, env)
+		}
 		return oauthProvider.fetch(request, env, ctx)
 	},
 	async scheduled(_event: ScheduledEvent, env: AppEnv) {

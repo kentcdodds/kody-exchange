@@ -11,5 +11,13 @@ export const oauthPaths = {
 export const oauthScopes = ['profile', 'threads'] as const
 
 export const mcpResourcePath = '/mcp'
+export const apiResourcePath = '/api'
 export const protectedResourceMetadataPath =
 	'/.well-known/oauth-protected-resource'
+
+export function isProtectedResourceMetadataRequest(pathname: string) {
+	return (
+		pathname === protectedResourceMetadataPath ||
+		pathname === `${protectedResourceMetadataPath}${mcpResourcePath}`
+	)
+}

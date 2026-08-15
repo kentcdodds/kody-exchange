@@ -3,6 +3,7 @@ import { first } from '#src/db.ts'
 import { type AppEnv, appBaseUrl } from '#src/env.ts'
 import { freeAccountUpsell } from '#src/free-account.ts'
 import {
+	apiResourcePath,
 	mcpResourcePath,
 	oauthScopes,
 	protectedResourceMetadataPath,
@@ -69,7 +70,7 @@ export function handleProtectedResourceMetadata(request: Request, env: AppEnv) {
 }
 
 export function unauthorizedOAuthResponse(origin: string) {
-	const resourceMetadata = `${origin}${protectedResourceMetadataPath}`
+	const resourceMetadata = `${origin}${protectedResourceMetadataPath}${mcpResourcePath}`
 	const scope = ` scope="${oauthScopes.join(' ')}"`
 	return json(
 		{
@@ -90,16 +91,22 @@ export function defaultMcpResource(origin: string) {
 	return `${origin}${mcpResourcePath}`
 }
 
+function stripTrailingSlash(value: string) {
+	return value.length > 1 && value.endsWith('/') ? value.slice(0, -1) : value
+}
+
 export function audienceMatches(
 	audience: string | Array<string> | undefined,
 	origin: string,
 ) {
-	const expected = defaultMcpResource(origin)
 	if (audience === undefined) return true
-	if (typeof audience === 'string') {
-		return audience === expected || audience === origin
-	}
-	return audience.includes(expected) || audience.includes(origin)
+	const allowed = new Set([
+		stripTrailingSlash(origin),
+		stripTrailingSlash(`${origin}${mcpResourcePath}`),
+		stripTrailingSlash(`${origin}${apiResourcePath}`),
+	])
+	const values = Array.isArray(audience) ? audience : [audience]
+	return values.some((value) => allowed.has(stripTrailingSlash(value)))
 }
 
 export async function userFromGrantProps(

@@ -17,7 +17,10 @@ import {
 	mcpBrowserLanding,
 } from '#src/mcp.ts'
 import { handleAuthorizeRequest } from '#src/oauth-authorize.ts'
-import { oauthPaths } from '#src/oauth-paths.ts'
+import {
+	isProtectedResourceMetadataRequest,
+	oauthPaths,
+} from '#src/oauth-paths.ts'
 import {
 	handleProtectedResourceMetadata,
 	resolveOAuthUser,
@@ -91,10 +94,7 @@ export async function handleRequest(
 		return logoutResponse()
 	}
 
-	if (url.pathname === oauthPaths.protectedResource) {
-		return handleProtectedResourceMetadata(request, env)
-	}
-	if (url.pathname === `${oauthPaths.protectedResource}${oauthPaths.mcp}`) {
+	if (isProtectedResourceMetadataRequest(url.pathname)) {
 		return handleProtectedResourceMetadata(request, env)
 	}
 	if (url.pathname === oauthPaths.authorize) {

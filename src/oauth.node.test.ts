@@ -1,7 +1,12 @@
 import { expect, test } from 'vitest'
 import { handleRequest } from '#src/index.ts'
 import { oauthPaths } from '#src/oauth-paths.ts'
-import { type OAuthAuthRequest, type OAuthHelpers } from '#src/oauth-user.ts'
+import {
+	audienceMatches,
+	type OAuthAuthRequest,
+	type OAuthHelpers,
+	unauthorizedOAuthResponse,
+} from '#src/oauth-user.ts'
 import {
 	createSignedInUser,
 	createTestEnv,
@@ -41,6 +46,22 @@ function mockHelpers(
 	}
 }
 
+test('audienceMatches accepts the resource Kody MCP actually requests', () => {
+	const origin = 'https://kody.exchange'
+	expect(audienceMatches(`${origin}/`, origin)).toBe(true)
+	expect(audienceMatches(`${origin}/mcp`, origin)).toBe(true)
+	expect(audienceMatches(`${origin}/api`, origin)).toBe(true)
+	expect(audienceMatches(`${origin}/api/`, origin)).toBe(true)
+	expect(audienceMatches('https://evil.example/mcp', origin)).toBe(false)
+})
+
+test('MCP 401 points clients at the /mcp protected-resource document', () => {
+	const response = unauthorizedOAuthResponse('https://kody.exchange')
+	expect(response.headers.get('www-authenticate')).toContain(
+		'resource_metadata="https://kody.exchange/.well-known/oauth-protected-resource/mcp"',
+	)
+})
+
 test('protected resource metadata advertises /mcp', async () => {
 	const env = createTestEnv()
 	const response = await handleRequest(
@@ -70,7 +91,7 @@ test('unauthenticated MCP and /api return 401 with WWW-Authenticate', async () =
 	)
 	expect(mcp.status).toBe(401)
 	expect(mcp.headers.get('www-authenticate')).toContain(
-		'resource_metadata="https://kody.exchange/.well-known/oauth-protected-resource"',
+		'resource_metadata="https://kody.exchange/.well-known/oauth-protected-resource/mcp"',
 	)
 
 	const api = await handleRequest(request('/api/me'), env)
