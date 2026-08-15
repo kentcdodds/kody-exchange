@@ -89,8 +89,17 @@ test('guest thread create, join, send, and poll is a closed loop', async () => {
 		now: now + 2000,
 	})
 	if (!listed.ok) throw new Error(listed.error)
-	expect(listed.messages).toHaveLength(1)
-	expect(listed.messages[0]?.id).toBe(sent.message.id)
+	expect(listed.messages.map((message) => message.body)).toEqual([
+		{ text: 'cursor joined.' },
+		{ text: 'claude joined.' },
+		{ text: 'hello from cursor' },
+	])
+	expect(listed.messages.map((message) => message.kind)).toEqual([
+		'system',
+		'system',
+		'message',
+	])
+	expect(listed.messages[2]?.id).toBe(sent.message.id)
 	expect(listed.retryAfter).toBe(5)
 
 	const viewToken = await viewTokenFor(created.thread)
@@ -101,8 +110,16 @@ test('guest thread create, join, send, and poll is a closed loop', async () => {
 		now: now + 2000,
 	})
 	if (!viewed.ok) throw new Error(viewed.error)
-	expect(viewed.messages).toHaveLength(1)
-	expect(viewed.messages[0]?.body).toEqual({ text: 'hello from cursor' })
+	expect(viewed.messages.map((message) => message.body)).toEqual([
+		{ text: 'cursor joined.' },
+		{ text: 'claude joined.' },
+		{ text: 'hello from cursor' },
+	])
+	expect(viewed.members.map((member) => member.name)).toEqual([
+		'cursor',
+		'claude',
+	])
+	expect(viewed.seats).toBe(2)
 	expect(viewed.retryAfter).toBe(5)
 
 	const badView = await listMessagesForView({
@@ -210,6 +227,60 @@ test('guest create stops at the global live-thread cap', async () => {
 		now,
 	})
 	expect(created).toMatchObject({ ok: false, code: 'guest_capacity' })
+})
+
+test('create can set a webhook; bad urls are rejected', async () => {
+	const env = createTestEnv()
+	const created = await createThread({
+		db: env.DB,
+		baseUrl: 'https://kody.exchange',
+		ownerUserId: null,
+		name: 'cursor',
+		webhookUrl: 'https://hooks.example.test/room',
+	})
+	if (!created.ok) throw new Error(created.error)
+	expect(created.thread.webhook_url).toBe('https://hooks.example.test/room')
+
+	const bad = await createThread({
+		db: env.DB,
+		baseUrl: 'https://kody.exchange',
+		ownerUserId: null,
+		creatorIp: '198.51.100.40',
+		name: 'cursor',
+		webhookUrl: 'http://insecure.example.test/room',
+	})
+	expect(bad).toMatchObject({ ok: false, code: 'bad_webhook' })
+})
+
+test('polling a thread records last_poll_at', async () => {
+	const env = createTestEnv()
+	const now = Date.parse('2026-08-14T00:00:00Z')
+	const created = await createThread({
+		db: env.DB,
+		baseUrl: 'https://kody.exchange',
+		ownerUserId: null,
+		name: 'cursor',
+		now,
+	})
+	if (!created.ok) throw new Error(created.error)
+	const listed = await listMessages({
+		db: env.DB,
+		threadId: created.thread.id,
+		agent: created.agent,
+		after: '0',
+		now: now + 8_000,
+	})
+	if (!listed.ok) throw new Error(listed.error)
+	expect(listed.messages[0]?.body).toEqual({ text: 'cursor joined.' })
+	const viewed = await listMessagesForView({
+		db: env.DB,
+		viewToken: await viewTokenFor(created.thread),
+		now: now + 8_000,
+	})
+	if (!viewed.ok) throw new Error(viewed.error)
+	expect(viewed.members[0]?.last_poll_at).toBe(
+		new Date(now + 8_000).toISOString(),
+	)
 })
 
 test('free accounts cannot mint a fourth live agent token', async () => {

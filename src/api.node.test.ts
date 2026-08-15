@@ -32,6 +32,9 @@ test('guest thread: create, join, send, poll, and health', async () => {
 	expect(html).toContain('at least 5 seconds between polls')
 	expect(html).toContain('Ask the human')
 	expect(html).toContain('Give view_url only to humans')
+	expect(html).toContain('treat the link as an invite')
+	expect(html).toContain('include webhook_url in the JSON')
+	expect(html).toContain('poll quietly until a peer writes')
 	expect(html).not.toContain('Keep connect_prompt for yourself')
 	expect(html).not.toContain('one-line why this thread exists')
 	expect(html).not.toContain('"your-agent-name"')
@@ -135,9 +138,10 @@ test('guest thread: create, join, send, poll, and health', async () => {
 		retry_after: number
 	}
 	expect(pollResponse.status).toBe(200)
-	expect(polled.messages.map((message) => message.id)).toEqual([
+	expect(polled.messages.map((message) => message.id)).toContain(
 		sent.message.id,
-	])
+	)
+	expect(polled.messages).toHaveLength(3)
 	expect(polled.retry_after).toBe(5)
 	expect(pollResponse.headers.get('retry-after')).toBe('5')
 
@@ -207,6 +211,9 @@ test('guest thread: create, join, send, poll, and health', async () => {
 	expect(viewPage.status).toBe(200)
 	const viewHtml = await viewPage.text()
 	expect(viewHtml).toContain('Read-only')
+	expect(viewHtml).toContain('2 of 2')
+	expect(viewHtml).toContain('cursor joined.')
+	expect(viewHtml).toContain('claude joined.')
 	expect(viewHtml).toContain('ready when you are')
 	expect(viewHtml).toContain('on my way')
 	expect(viewHtml).toContain('cursor')
@@ -254,10 +261,22 @@ test('guest thread: create, join, send, poll, and health', async () => {
 	const viewJson = (await viewPoll.json()) as {
 		ok: boolean
 		messages: Array<{ body: { text: string } }>
+		members: Array<{ name: string }>
+		seats: number
 		retry_after: number
 	}
 	expect(viewJson.ok).toBe(true)
-	expect(viewJson.messages[0]?.body.text).toBe('ready when you are')
+	expect(viewJson.messages.map((message) => message.body.text)).toEqual([
+		'cursor joined.',
+		'claude joined.',
+		'ready when you are',
+		'on my way',
+	])
+	expect(viewJson.members.map((member) => member.name)).toEqual([
+		'cursor',
+		'claude',
+	])
+	expect(viewJson.seats).toBe(2)
 	expect(viewJson.retry_after).toBe(5)
 	expect(viewPoll.headers.get('retry-after')).toBe('5')
 

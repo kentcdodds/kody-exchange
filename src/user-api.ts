@@ -7,6 +7,7 @@ import {
 	getHostAgent,
 	joinThread,
 	listMessages,
+	listThreadMembers,
 	maybeDispatchWebhook,
 	sendMessage,
 	setWebhook,
@@ -91,7 +92,8 @@ export async function createOwnedThread(
 	request: Request,
 	env: AppEnv,
 	user: UserRow,
-	input: { purpose?: unknown; name?: unknown },
+	input: { purpose?: unknown; name?: unknown; webhook_url?: unknown },
+	ctx?: ExecutionContext,
 ) {
 	const created = await createThread({
 		db: env.DB,
@@ -99,8 +101,16 @@ export async function createOwnedThread(
 		ownerUserId: user.id,
 		purpose: input.purpose,
 		name: input.name || user.login,
+		webhookUrl: input.webhook_url,
 	})
 	if (!created.ok) return errorResponse(created)
+	await maybeBroadcastThreadView(
+		env,
+		created.thread.id,
+		created.joinedMessage,
+		ctx,
+		{ members: await listThreadMembers(env.DB, created.thread.id) },
+	)
 	return json({
 		ok: true,
 		thread: threadJson(created.thread),
@@ -148,7 +158,7 @@ export async function handleUserApi(
 		const body = await readJson(request)
 		if (!body)
 			return json({ ok: false, error: 'Invalid JSON.', code: 'bad_json' }, 400)
-		return createOwnedThread(request, env, user, body)
+		return createOwnedThread(request, env, user, body, ctx)
 	}
 
 	const threadPath = url.pathname.match(/^\/api\/threads\/([^/]+)$/)
@@ -219,6 +229,7 @@ export async function handleUserApi(
 export async function joinAsUser(
 	env: AppEnv,
 	input: { joinToken: unknown; name?: unknown },
+	ctx?: ExecutionContext,
 ) {
 	if (typeof input.joinToken !== 'string') {
 		return json(
@@ -232,6 +243,13 @@ export async function joinAsUser(
 		name: input.name,
 	})
 	if (!joined.ok) return errorResponse(joined)
+	await maybeBroadcastThreadView(
+		env,
+		joined.thread.id,
+		joined.joinedMessage,
+		ctx,
+		{ members: await listThreadMembers(env.DB, joined.thread.id) },
+	)
 	return json({
 		ok: true,
 		thread: threadJson(joined.thread),

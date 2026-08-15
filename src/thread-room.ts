@@ -1,5 +1,6 @@
 import { type AppEnv } from '#src/env.ts'
 import { type MessageEnvelope } from '#src/envelope.ts'
+import { type ThreadMemberView } from '#src/threads.ts'
 
 export class ThreadRoom {
 	constructor(
@@ -45,13 +46,18 @@ export async function broadcastThreadView(
 	env: AppEnv,
 	threadId: string,
 	message: MessageEnvelope,
+	extra: { members?: Array<ThreadMemberView> } = {},
 ) {
 	if (!env.THREAD_ROOMS) return
 	const stub = env.THREAD_ROOMS.get(env.THREAD_ROOMS.idFromName(threadId))
 	await stub.fetch('https://thread-room/broadcast', {
 		method: 'POST',
 		headers: { 'content-type': 'application/json' },
-		body: JSON.stringify({ ok: true, messages: [message] }),
+		body: JSON.stringify({
+			ok: true,
+			messages: [message],
+			...(extra.members ? { members: extra.members } : {}),
+		}),
 	})
 }
 
@@ -60,10 +66,13 @@ export async function maybeBroadcastThreadView(
 	threadId: string,
 	message: MessageEnvelope,
 	ctx?: ExecutionContext,
+	extra: { members?: Array<ThreadMemberView> } = {},
 ) {
-	const pending = broadcastThreadView(env, threadId, message).catch((error) => {
-		console.warn('thread_room_broadcast_failed', threadId, error)
-	})
+	const pending = broadcastThreadView(env, threadId, message, extra).catch(
+		(error) => {
+			console.warn('thread_room_broadcast_failed', threadId, error)
+		},
+	)
 	if (ctx) ctx.waitUntil(pending)
 	await pending
 }

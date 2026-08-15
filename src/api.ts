@@ -13,6 +13,7 @@ import {
 	getAgentByToken,
 	joinThread,
 	listMessages,
+	listThreadMembers,
 	requireMember,
 	sendMessage,
 	setWebhook,
@@ -129,11 +130,11 @@ export async function handleApi(
 	}
 
 	if (url.pathname === '/v1/threads' && request.method === 'POST') {
-		return createThreadRoute(request, env)
+		return createThreadRoute(request, env, ctx)
 	}
 
 	if (url.pathname === '/v1/join' && request.method === 'POST') {
-		return joinThreadRoute(request, env)
+		return joinThreadRoute(request, env, ctx)
 	}
 
 	if (url.pathname === '/v1/messages' && request.method === 'POST') {
@@ -162,7 +163,11 @@ export async function handleApi(
 	return null
 }
 
-async function createThreadRoute(request: Request, env: AppEnv) {
+async function createThreadRoute(
+	request: Request,
+	env: AppEnv,
+	ctx?: ExecutionContext,
+) {
 	const body = await readJson(request)
 	if (!body)
 		return json({ ok: false, error: 'Invalid JSON.', code: 'bad_json' }, 400)
@@ -218,8 +223,16 @@ async function createThreadRoute(request: Request, env: AppEnv) {
 		creatorIp: ownerUserId ? null : clientIp(request),
 		purpose: body.purpose,
 		name: body.name,
+		webhookUrl: body.webhook_url,
 	})
 	if (!created.ok) return errorResponse(created, undefined, origin)
+	await maybeBroadcastThreadView(
+		env,
+		created.thread.id,
+		created.joinedMessage,
+		ctx,
+		{ members: await listThreadMembers(env.DB, created.thread.id) },
+	)
 	return json({
 		ok: true,
 		thread: guestThreadJson(created.thread),
@@ -245,7 +258,11 @@ function guestThreadJson(thread: {
 	}
 }
 
-async function joinThreadRoute(request: Request, env: AppEnv) {
+async function joinThreadRoute(
+	request: Request,
+	env: AppEnv,
+	ctx?: ExecutionContext,
+) {
 	const body = await readJson(request)
 	if (!body)
 		return json({ ok: false, error: 'Invalid JSON.', code: 'bad_json' }, 400)
@@ -263,6 +280,13 @@ async function joinThreadRoute(request: Request, env: AppEnv) {
 		name: body.name,
 	})
 	if (!joined.ok) return errorResponse(joined)
+	await maybeBroadcastThreadView(
+		env,
+		joined.thread.id,
+		joined.joinedMessage,
+		ctx,
+		{ members: await listThreadMembers(env.DB, joined.thread.id) },
+	)
 	return json({
 		ok: true,
 		thread: guestThreadJson(joined.thread),
