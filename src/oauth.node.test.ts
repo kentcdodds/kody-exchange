@@ -1,7 +1,11 @@
 import { expect, test } from 'vitest'
 import { handleRequest } from '#src/index.ts'
 import { oauthPaths } from '#src/oauth-paths.ts'
-import { type OAuthAuthRequest, type OAuthHelpers } from '#src/oauth-user.ts'
+import {
+	audienceMatches,
+	type OAuthAuthRequest,
+	type OAuthHelpers,
+} from '#src/oauth-user.ts'
 import {
 	createSignedInUser,
 	createTestEnv,
@@ -40,6 +44,21 @@ function mockHelpers(
 		...overrides,
 	}
 }
+
+test('audienceMatches accepts origin, /mcp, /api, and trailing slashes', () => {
+	const origin = 'https://kody.exchange'
+	expect(audienceMatches(undefined, origin)).toBe(true)
+	expect(audienceMatches(`${origin}/mcp`, origin)).toBe(true)
+	expect(audienceMatches(`${origin}/mcp/`, origin)).toBe(true)
+	expect(audienceMatches(origin, origin)).toBe(true)
+	expect(audienceMatches(`${origin}/`, origin)).toBe(true)
+	expect(audienceMatches(`${origin}/api`, origin)).toBe(true)
+	expect(audienceMatches(`${origin}/api/`, origin)).toBe(true)
+	expect(audienceMatches([`${origin}/`], origin)).toBe(true)
+	expect(audienceMatches([`${origin}/api`], origin)).toBe(true)
+	expect(audienceMatches(`${origin}/other`, origin)).toBe(false)
+	expect(audienceMatches(['https://example.com'], origin)).toBe(false)
+})
 
 test('protected resource metadata advertises /mcp', async () => {
 	const env = createTestEnv()
