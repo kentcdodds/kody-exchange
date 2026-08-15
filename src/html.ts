@@ -155,7 +155,7 @@ h3 { font-size: 1.15rem; margin: 0 0 .35rem; }
 .stamp { display: inline-block; font-family: "IBM Plex Mono", monospace; font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; color: var(--stamp); border: 2px dashed var(--stamp); padding: .15rem .45rem; transform: rotate(-2deg); }
 .card { background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--leaf); border-radius: 0 16px 16px 0; padding: 1rem 1.1rem; margin: 1.2rem 0; }
 pre, code { font-family: "IBM Plex Mono", monospace; }
-pre { overflow: auto; background: var(--code-bg); color: var(--code-ink); padding: 1rem; border-radius: 0 12px 12px 0; font-size: .82rem; }
+pre { overflow: auto; white-space: pre-wrap; background: var(--code-bg); color: var(--code-ink); padding: 1rem; border-radius: 0 12px 12px 0; font-size: .82rem; }
 .row { display: flex; gap: .6rem; flex-wrap: wrap; align-items: center; }
 .jobs { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin: 1.6rem 0; }
 .jobs .card { margin: 0; }

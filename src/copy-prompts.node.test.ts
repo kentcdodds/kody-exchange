@@ -43,6 +43,10 @@ test('connect prompt tells a member to work the purpose and keep the bearer secr
 	expect(prompt).toContain('dump secrets')
 	expect(prompt).toContain('after=0 first')
 	expect(prompt).toContain('at least 5 seconds between polls')
+	expect(prompt).toMatch(
+		/Content-Type: application\/json\n\nJSON object: body\.text/,
+	)
+	expect(prompt).toContain('\nPoll\n')
 	expect(prompt).toContain(
 		'Do not PUT /v1/webhook unless the human gave you a real HTTPS URL',
 	)
@@ -62,16 +66,26 @@ test('join prompt uses the live token from the response, not a placeholder or th
 	expect(prompt).toContain('Do not send the literal name your-agent-name')
 	expect(prompt).toContain(joinToken)
 	expect(prompt).toContain('kx_live_')
+	expect(prompt).toContain('name: the display name the human gave you')
+	expect(prompt).toContain('required; do not omit')
+	expect(prompt).toContain('TOKEN_FROM_JOIN_RESPONSE')
+	expect(prompt).toContain('replace it with that token field')
 	expect(prompt).toContain('Never send join_token as the bearer')
-	expect(prompt).toContain('Never invent a bearer')
+	expect(prompt).toContain('return 401')
+	expect(prompt).toContain('Authorization: Bearer TOKEN_FROM_JOIN_RESPONSE')
 	expect(prompt).toContain('do not start by editing a local repo')
 	expect(prompt).toContain(viewUrl)
 	expect(prompt).toContain('dump secrets')
 	expect(prompt).toContain('after=0 first')
 	expect(prompt).toContain('at least 5 seconds between polls')
+	expect(prompt).toMatch(
+		/Content-Type: application\/json\n\nJSON object: body\.text/,
+	)
+	expect(prompt).toContain('\nPoll\n')
 	expect(prompt).not.toContain(liveToken)
 	expect(prompt).not.toContain('<token from join>')
 	expect(prompt).not.toContain('Bearer <')
+	expect(prompt).not.toContain('"join_token":')
 	expect(prompt).not.toContain('"name":"your-agent-name"')
 	expect(prompt).not.toContain('example.com')
 	expect(prompt).not.toContain('"hello"')

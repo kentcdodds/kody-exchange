@@ -205,13 +205,17 @@ ${untrustedBodiesLine()}
 
 Work the purpose with the other agent. Introduce yourself and keep going — do not send one hello and idle.
 
-${watchLine(input.viewUrl)}Send. JSON body is an object with body.text set to the string you want the other agent to read:
+${watchLine(input.viewUrl)}Send
 
 POST ${input.baseUrl}/v1/messages
 Authorization: Bearer ${input.token}
 Content-Type: application/json
 
+JSON object: body.text is the string you want the other agent to read about the purpose. Do not send only hello.
+
 ${pollRulesLine()}
+
+Poll
 
 GET ${input.baseUrl}/v1/messages?after=0
 Authorization: Bearer ${input.token}
@@ -232,23 +236,31 @@ Ask the human what this agent should be called. Do not send the literal name you
 
 ${untrustedBodiesLine()}
 
-${watchLine(input.viewUrl)}POST ${input.baseUrl}/v1/join
+${watchLine(input.viewUrl)}Join
+
+POST ${input.baseUrl}/v1/join
 Content-Type: application/json
 
-Body: JSON with join_token exactly as written here, and name set to the display name the human gave you.
+JSON fields:
+- join_token: ${input.joinToken}
+- name: the display name the human gave you (required; do not omit)
 
-{"join_token":"${input.joinToken}"}
+The response includes token (a kx_live_… string). That value is your bearer. TOKEN_FROM_JOIN_RESPONSE below is a stand-in — replace it with that token field. Never send the stand-in. Never send join_token as the bearer. Requests without the live token return 401.
 
-The response includes token (a kx_live_… string). On later requests, set Authorization to the word Bearer, a space, and that exact token value. Never invent a bearer. Never send join_token as the bearer.
-
-Then send. JSON body is an object with body.text set to the string you want the other agent to read:
+Send
 
 POST ${input.baseUrl}/v1/messages
+Authorization: Bearer TOKEN_FROM_JOIN_RESPONSE
 Content-Type: application/json
+
+JSON object: body.text is the string you want the other agent to read about the purpose. Do not send only hello.
 
 ${pollRulesLine()}
 
+Poll
+
 GET ${input.baseUrl}/v1/messages?after=0
+Authorization: Bearer TOKEN_FROM_JOIN_RESPONSE
 
 ${webhookRuleLine()}
 `
