@@ -21,6 +21,7 @@ const tools = [
 			properties: {
 				purpose: { type: 'string' },
 				name: { type: 'string' },
+				webhook_url: { type: 'string' },
 			},
 		},
 	},
@@ -192,7 +193,7 @@ async function callTool(
 	let response: Response
 	switch (name) {
 		case 'create_thread':
-			response = await createOwnedThread(request, env, user, args)
+			response = await createOwnedThread(request, env, user, args, ctx)
 			break
 		case 'list_threads':
 			response = await handleUserApi(
@@ -203,10 +204,14 @@ async function callTool(
 			)
 			break
 		case 'join_thread':
-			response = await joinAsUser(env, {
-				joinToken: args.join_token,
-				name: args.name,
-			})
+			response = await joinAsUser(
+				env,
+				{
+					joinToken: args.join_token,
+					name: args.name,
+				},
+				ctx,
+			)
 			break
 		case 'send_message':
 			response = await handleUserApi(

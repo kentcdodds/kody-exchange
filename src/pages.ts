@@ -31,12 +31,13 @@ import {
 import { grantMaxToLogin } from '#src/grants.ts'
 import { getPlan, isOperatorLogin } from '#src/limits.ts'
 import { clientIp, limitViewPoll, workerPollCache } from '#src/rate-limit.ts'
+import { maybeBroadcastThreadView } from '#src/thread-room.ts'
 import {
-	countMembers,
 	countOwnedThreads,
 	createThread,
 	getHostAgent,
 	listMessagesForView,
+	listThreadMembers,
 	threadViewPrompts,
 	threadViewUrlFor,
 	type ThreadRow,
@@ -140,7 +141,6 @@ async function renderThreadView(
 			404,
 		)
 	}
-	const memberCount = await countMembers(env.DB, listed.thread.id)
 	const ownsThread = Boolean(
 		user &&
 		listed.thread.owner_user_id &&
@@ -167,7 +167,8 @@ async function renderThreadView(
 			body: threadViewPage({
 				thread: listed.thread,
 				messages: listed.messages,
-				memberCount,
+				members: listed.members,
+				seats: listed.seats,
 				pollPath: `${new URL(request.url).pathname}/messages`,
 				hostPrompt: prompts.hostPrompt,
 				guestPrompt: prompts.guestPrompt,
@@ -255,7 +256,13 @@ async function pollThreadView(
 		)
 	}
 	return json(
-		{ ok: true, messages: listed.messages, retry_after: listed.retryAfter },
+		{
+			ok: true,
+			messages: listed.messages,
+			members: listed.members,
+			seats: listed.seats,
+			retry_after: listed.retryAfter,
+		},
 		200,
 		{ 'retry-after': String(listed.retryAfter) },
 	)
@@ -348,7 +355,7 @@ async function accountPage(
 			: (
 					await Promise.all(
 						threads.map((thread) =>
-							threadListItem(thread, appBaseUrl(env, request)),
+							threadListItem(thread, appBaseUrl(env, request), plan.liveAgents),
 						),
 					)
 				).join('')
@@ -395,10 +402,14 @@ function threadFlashHtml(flash: ThreadFlash) {
 	`
 }
 
-async function threadListItem(thread: ThreadListRow, baseUrl: string) {
+async function threadListItem(
+	thread: ThreadListRow,
+	baseUrl: string,
+	seats: number,
+) {
 	const purpose = thread.purpose?.trim() || 'Untitled thread'
 	const members = Number(thread.member_count)
-	const memberLabel = `${members} in the thread`
+	const memberLabel = `${members} of ${seats}`
 	const href = await threadViewUrlFor(baseUrl, thread)
 	return `<article class="card">
 		<h3><a href="${escapeHtml(href)}">${escapeHtml(purpose)}</a></h3>
@@ -478,6 +489,13 @@ export async function handleAccountAction(
 			next.searchParams.set('error', created.code)
 			return Response.redirect(next.toString(), 303)
 		}
+		await maybeBroadcastThreadView(
+			env,
+			created.thread.id,
+			created.joinedMessage,
+			undefined,
+			{ members: await listThreadMembers(env.DB, created.thread.id) },
+		)
 		const flash = await threadFlashCookie(secret, user.id, {
 			threadId: created.thread.id,
 			connectPrompt: created.connectPrompt,

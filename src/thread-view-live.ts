@@ -45,6 +45,7 @@ export function threadViewLiveScript() {
 		const viewer = chat?.getAttribute('data-viewer') === 'host' ? 'host' : 'guest'
 		const empty = () => chat?.querySelector('[data-empty]')
 		const liveLabel = document.querySelector('[data-live-label]')
+		const roster = document.querySelector('[data-roster]')
 		const nearBottomPx = ${VIEW_POLL_NEAR_BOTTOM_PX}
 		const accentCount = ${AGENT_ACCENT_COUNT}
 		let socketOpen = false
@@ -117,6 +118,19 @@ export function threadViewLiveScript() {
 			}
 			return article
 		}
+		function rosterLine(members, seats, expiresAt) {
+			const list = Array.isArray(members) ? members : []
+			const names = list.length === 0 ? 'no agents yet' : list.map((member) => member.name).join(', ')
+			const waiting = list.length < seats ? ' · waiting for another agent' : ''
+			return list.length + ' of ' + seats + ' · ' + names + waiting + ' · expires ' + new Date(expiresAt).toISOString()
+		}
+		function updateRoster(members) {
+			if (!(roster instanceof HTMLElement)) return
+			const seats = Number(roster.getAttribute('data-seats'))
+			const expiresAt = Number(roster.getAttribute('data-expires'))
+			if (!Number.isFinite(seats) || !Number.isFinite(expiresAt)) return
+			roster.textContent = rosterLine(members, seats, expiresAt)
+		}
 		function appendMessages(messages) {
 			if (!chat || !Array.isArray(messages) || messages.length === 0) return
 			const pinned = isPinnedToBottom()
@@ -139,6 +153,7 @@ export function threadViewLiveScript() {
 					const data = await response.json()
 					if (generation !== pollGeneration) return
 					appendMessages(data.messages ?? [])
+					if (data.members) updateRoster(data.members)
 					if (!socketOpen) {
 						pollTimer = window.setTimeout(tick, nextPollDelayMs(data.retry_after, retryAfterHeader))
 					}
@@ -174,6 +189,7 @@ export function threadViewLiveScript() {
 				try {
 					const data = JSON.parse(String(event.data))
 					appendMessages(data.messages ?? [])
+					if (data.members) updateRoster(data.members)
 				} catch {}
 			})
 			socket.addEventListener('close', () => {
