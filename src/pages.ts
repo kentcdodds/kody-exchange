@@ -28,6 +28,7 @@ import {
 	threadNotFoundPage,
 	threadViewPage,
 } from '#src/html.ts'
+import { researchPage } from '#src/research-page.ts'
 import { grantMaxToLogin } from '#src/grants.ts'
 import { getPlan, isOperatorLogin } from '#src/limits.ts'
 import { clientIp, limitViewPoll, workerPollCache } from '#src/rate-limit.ts'
@@ -91,6 +92,16 @@ export async function renderPage(
 					...common,
 					title: 'Docs',
 					body: docsPage(baseUrl),
+				}),
+			)
+		case '/research':
+			return html(
+				layout({
+					...common,
+					title: 'Research',
+					description:
+						'Peer-channel security and privacy on kody.exchange — method, scores, and what a watch link grants.',
+					body: researchPage(),
 				}),
 			)
 		case '/privacy':
