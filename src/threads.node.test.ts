@@ -19,13 +19,14 @@ import { run } from '#src/db.ts'
 
 test('guest thread create, join, send, and poll is a closed loop', async () => {
 	const env = createTestEnv()
+	const now = Date.parse('2026-08-14T00:00:00Z')
 	const created = await createThread({
 		db: env.DB,
 		baseUrl: 'https://kody.exchange',
 		ownerUserId: null,
 		purpose: 'pair on a bug',
 		name: 'cursor',
-		now: Date.parse('2026-08-14T00:00:00Z'),
+		now,
 	})
 	if (!created.ok) throw new Error(created.error)
 	expect(created.plan).toBe('guest')
@@ -56,7 +57,7 @@ test('guest thread create, join, send, and poll is a closed loop', async () => {
 		db: env.DB,
 		joinToken: created.joinToken,
 		name: 'claude',
-		now: Date.parse('2026-08-14T00:00:01Z'),
+		now: now + 1000,
 	})
 	if (!joined.ok) throw new Error(joined.error)
 	expect(joined.agent.name).toBe('claude')
@@ -65,6 +66,7 @@ test('guest thread create, join, send, and poll is a closed loop', async () => {
 		db: env.DB,
 		joinToken: created.joinToken,
 		name: 'extra',
+		now: now + 2000,
 	})
 	expect(third).toMatchObject({ ok: false, code: 'participant_limit' })
 
@@ -73,7 +75,7 @@ test('guest thread create, join, send, and poll is a closed loop', async () => {
 		threadId: created.thread.id,
 		agent: created.agent,
 		body: { text: 'hello from cursor' },
-		now: Date.parse('2026-08-14T00:00:02Z'),
+		now: now + 2000,
 	})
 	if (!sent.ok) throw new Error(sent.error)
 	expect(sent.message.body).toEqual({ text: 'hello from cursor' })
@@ -84,6 +86,7 @@ test('guest thread create, join, send, and poll is a closed loop', async () => {
 		threadId: created.thread.id,
 		agent: joined.agent,
 		after: '0',
+		now: now + 2000,
 	})
 	if (!listed.ok) throw new Error(listed.error)
 	expect(listed.messages).toHaveLength(1)
@@ -95,6 +98,7 @@ test('guest thread create, join, send, and poll is a closed loop', async () => {
 	const viewed = await listMessagesForView({
 		db: env.DB,
 		viewToken,
+		now: now + 2000,
 	})
 	if (!viewed.ok) throw new Error(viewed.error)
 	expect(viewed.messages).toHaveLength(1)
@@ -115,6 +119,7 @@ test('guest thread create, join, send, and poll is a closed loop', async () => {
 		db: env.DB,
 		joinToken: await joinTokenFor(created.thread),
 		name: 'from-view',
+		now: now + 2000,
 	})
 	expect(viewJoin).toMatchObject({ ok: false, code: 'participant_limit' })
 })
