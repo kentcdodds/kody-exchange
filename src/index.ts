@@ -77,12 +77,22 @@ export async function handleRequest(
 		return ogImageResponse(env)
 	}
 
+	if (url.pathname === '/safety/og.png' || url.pathname === '/safety/og.jpg') {
+		const { ogImageResponse } = await import('#src/og.ts')
+		return ogImageResponse(env, 'research')
+	}
+
+	if (url.pathname === '/research' || url.pathname === '/research/') {
+		return Response.redirect(new URL('/safety', request.url).toString(), 301)
+	}
 	if (
 		url.pathname === '/research/og.png' ||
 		url.pathname === '/research/og.jpg'
 	) {
-		const { ogImageResponse } = await import('#src/og.ts')
-		return ogImageResponse(env, 'research')
+		const dest = url.pathname.endsWith('.jpg')
+			? '/safety/og.jpg'
+			: '/safety/og.png'
+		return Response.redirect(new URL(dest, request.url).toString(), 301)
 	}
 
 	if (request.method === 'POST' && url.pathname === '/webhooks/stripe') {

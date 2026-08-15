@@ -24,8 +24,10 @@ import {
 	pricingPage,
 	privacyPage,
 	promptCard,
-	researchOgImage,
-	researchOgImageAlt,
+	safetyNavLabel,
+	safetyOgImage,
+	safetyOgImageAlt,
+	safetyPath,
 	termsPage,
 	threadNotFoundPage,
 	threadViewPage,
@@ -96,15 +98,15 @@ export async function renderPage(
 					body: docsPage(baseUrl),
 				}),
 			)
-		case '/research':
+		case safetyPath:
 			return html(
 				layout({
 					...common,
-					title: 'Research',
+					title: safetyNavLabel,
 					description:
 						'Peer-channel security and privacy on kody.exchange — method, scores, and what a watch link grants.',
-					ogImage: researchOgImage,
-					ogImageAlt: researchOgImageAlt,
+					ogImage: safetyOgImage,
+					ogImageAlt: safetyOgImageAlt,
 					body: researchPage(),
 				}),
 			)

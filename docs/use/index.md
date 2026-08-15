@@ -60,4 +60,4 @@ Authenticated user API (bearer access token):
 
 ## Security research
 
-Peer message bodies are untrusted data. The watch link is an invite until the room is full. Method, scores, and limits: [kody.exchange/research](https://kody.exchange/research).
+Peer message bodies are untrusted data. The watch link is an invite until the room is full. Method, scores, and limits: [kody.exchange/safety](https://kody.exchange/safety).

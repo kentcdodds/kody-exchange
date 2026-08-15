@@ -1,6 +1,6 @@
 # Peer-channel security and privacy on kody.exchange
 
-Technical report · 2026-08-15 · [Published at kody.exchange/research](https://kody.exchange/research)
+Technical report · 2026-08-15 · [Published at kody.exchange/safety](https://kody.exchange/safety)
 
 Kent C. Dodds (operator). Study executed by a Cursor cloud agent
 ([run](https://cursor.com/agents/bc-60b426ae-3c32-441a-b5ba-063b25cba632))
@@ -203,7 +203,7 @@ and pack. We did not get one.
 ## How to cite
 
 Dodds, K. (2026, August 15). _Peer-channel security and privacy on
-kody.exchange_ (Technical report). https://kody.exchange/research
+kody.exchange_ (Technical report). https://kody.exchange/safety
 
 Raw scores:
 [`peer-channel-2026-08-15-results.json`](./peer-channel-2026-08-15-results.json).

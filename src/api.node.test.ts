@@ -1,6 +1,11 @@
 import { expect, test } from 'vitest'
 import { first } from '#src/db.ts'
-import { researchOgImage, researchOgImageAlt } from '#src/html.ts'
+import {
+	safetyNavLabel,
+	safetyOgImage,
+	safetyOgImageAlt,
+	safetyPath,
+} from '#src/html.ts'
 import { handleRequest } from '#src/index.ts'
 import { createTestEnv, request } from '#src/test-support.ts'
 import { liveTokenFor } from '#src/threads.ts'
@@ -25,7 +30,8 @@ test('guest thread: create, join, send, poll, and health', async () => {
 	expect(html).toContain('Stop being the messenger')
 	expect(html).toContain('Hash it out together')
 	expect(html).toContain('Auditable, not a black box')
-	expect(html).toContain('href="/research"')
+	expect(html).toContain(`href="${safetyPath}"`)
+	expect(html).toContain(safetyNavLabel)
 	expect(html).toContain('For agents')
 	expect(html).toContain('Made by Kent C. Dodds')
 	expect(html).toContain('POST https://kody.exchange/v1/threads')
@@ -418,33 +424,40 @@ test('pricing page explains live threads and participants', async () => {
 	expect(docsHtml).toContain('Included with a free GitHub account')
 	expect(docsHtml).toContain('not a paid upgrade')
 	expect(docsHtml).toContain('new messages appear immediately')
-	expect(docsHtml).toContain('href="/research"')
+	expect(docsHtml).toContain(`href="${safetyPath}"`)
 	expect(docsHtml).not.toContain('Max')
 
 	const privacy = await handleRequest(request('/privacy'), env)
 	const privacyHtml = await privacy.text()
 	expect(privacyHtml).toContain('me@kentcdodds.com')
 	expect(privacyHtml).toContain('Made by Kent C. Dodds')
-	expect(privacyHtml).toContain('href="/research"')
+	expect(privacyHtml).toContain(`href="${safetyPath}"`)
 	expect(privacyHtml).not.toContain('Operator:')
 
-	const research = await handleRequest(request('/research'), env)
-	const researchHtml = await research.text()
-	expect(research.status).toBe(200)
-	expect(researchHtml).toContain('Peer-channel security and privacy')
-	expect(researchHtml).toContain('261 protocol-faithful turns')
-	expect(researchHtml).toContain('not proven')
-	expect(researchHtml).toContain('invite')
-	expect(researchHtml).toContain('kx_join_')
-	expect(researchHtml).toContain('How to cite')
-	expect(researchHtml).toContain('>Research<')
-	expect(researchHtml).toContain(
-		`content="https://kody.exchange${researchOgImage}"`,
+	const safety = await handleRequest(request(safetyPath), env)
+	const safetyHtml = await safety.text()
+	expect(safety.status).toBe(200)
+	expect(safetyHtml).toContain('Peer-channel security and privacy')
+	expect(safetyHtml).toContain('261 protocol-faithful turns')
+	expect(safetyHtml).toContain('not proven')
+	expect(safetyHtml).toContain('invite')
+	expect(safetyHtml).toContain('kx_join_')
+	expect(safetyHtml).toContain('How to cite')
+	expect(safetyHtml).toContain(`>${safetyNavLabel}<`)
+	expect(safetyHtml).toContain(
+		`content="https://kody.exchange${safetyOgImage}"`,
 	)
-	expect(researchHtml).toContain(`content="${researchOgImageAlt}"`)
-	expect(researchHtml).not.toContain('content="https://kody.exchange/og.png"')
-	expect(researchHtml).not.toContain('Max')
-	expect(researchHtml).not.toMatch(/kx_view_[0-9a-f]{16,}/)
-	expect(researchHtml).not.toMatch(/kx_join_[0-9a-f]{16,}/)
-	expect(researchHtml).not.toMatch(/kx_live_[0-9a-f]{16,}/)
+	expect(safetyHtml).toContain(`content="${safetyOgImageAlt}"`)
+	expect(safetyHtml).not.toContain('content="https://kody.exchange/og.png"')
+	expect(safetyHtml).not.toContain('href="/research"')
+	expect(safetyHtml).not.toContain('Max')
+	expect(safetyHtml).not.toMatch(/kx_view_[0-9a-f]{16,}/)
+	expect(safetyHtml).not.toMatch(/kx_join_[0-9a-f]{16,}/)
+	expect(safetyHtml).not.toMatch(/kx_live_[0-9a-f]{16,}/)
+
+	const legacyResearch = await handleRequest(request('/research'), env)
+	expect(legacyResearch.status).toBe(301)
+	expect(legacyResearch.headers.get('location')).toBe(
+		'https://kody.exchange/safety',
+	)
 })

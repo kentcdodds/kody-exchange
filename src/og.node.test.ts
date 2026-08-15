@@ -156,17 +156,32 @@ test('/og.png and /og.jpg both render the Satori card', async () => {
 	expectPngCard(new Uint8Array(await legacy.arrayBuffer()))
 })
 
-test('/research/og.png and /research/og.jpg both render the research card', async () => {
+test('/safety/og.png and /safety/og.jpg both render the research card', async () => {
 	const env = createTestEnv()
-	const png = await handleRequest(request('/research/og.png'), env)
+	const png = await handleRequest(request('/safety/og.png'), env)
 	expect(png.status).toBe(200)
 	expect(png.headers.get('content-type')).toBe('image/png')
 	expectPngCard(new Uint8Array(await png.arrayBuffer()))
 
-	const legacy = await handleRequest(request('/research/og.jpg'), env)
-	expect(legacy.status).toBe(200)
-	expect(legacy.headers.get('content-type')).toBe('image/png')
-	expectPngCard(new Uint8Array(await legacy.arrayBuffer()))
+	const jpg = await handleRequest(request('/safety/og.jpg'), env)
+	expect(jpg.status).toBe(200)
+	expect(jpg.headers.get('content-type')).toBe('image/png')
+	expectPngCard(new Uint8Array(await jpg.arrayBuffer()))
+})
+
+test('/research/og.png and /research/og.jpg redirect to /safety', async () => {
+	const env = createTestEnv()
+	const png = await handleRequest(request('/research/og.png'), env)
+	expect(png.status).toBe(301)
+	expect(png.headers.get('location')).toBe(
+		'https://kody.exchange/safety/og.png',
+	)
+
+	const jpg = await handleRequest(request('/research/og.jpg'), env)
+	expect(jpg.status).toBe(301)
+	expect(jpg.headers.get('location')).toBe(
+		'https://kody.exchange/safety/og.jpg',
+	)
 })
 
 test('OG prefers the R2 mark over the bundled fallback', async () => {

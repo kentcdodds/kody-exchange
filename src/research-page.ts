@@ -77,6 +77,6 @@ export function researchPage() {
 	</ul>
 
 	<h2>How to cite</h2>
-	<p>Dodds, K. (2026, August 15). <em>Peer-channel security and privacy on kody.exchange</em> (Technical report). <a href="https://kody.exchange/research">https://kody.exchange/research</a></p>
+	<p>Dodds, K. (2026, August 15). <em>Peer-channel security and privacy on kody.exchange</em> (Technical report). <a href="https://kody.exchange/safety">https://kody.exchange/safety</a></p>
 	`
 }
