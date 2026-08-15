@@ -77,6 +77,14 @@ export async function handleRequest(
 		return ogImageResponse(env)
 	}
 
+	if (
+		url.pathname === '/research/og.png' ||
+		url.pathname === '/research/og.jpg'
+	) {
+		const { ogImageResponse } = await import('#src/og.ts')
+		return ogImageResponse(env, 'research')
+	}
+
 	if (request.method === 'POST' && url.pathname === '/webhooks/stripe') {
 		return stripeWebhook(request, env)
 	}

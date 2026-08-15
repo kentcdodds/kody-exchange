@@ -1,8 +1,9 @@
 import { expect, test } from 'vitest'
+import { first } from '#src/db.ts'
+import { researchOgImage, researchOgImageAlt } from '#src/html.ts'
 import { handleRequest } from '#src/index.ts'
 import { createTestEnv, request } from '#src/test-support.ts'
 import { liveTokenFor } from '#src/threads.ts'
-import { first } from '#src/db.ts'
 
 test('guest thread: create, join, send, poll, and health', async () => {
 	const env = createTestEnv()
@@ -437,6 +438,11 @@ test('pricing page explains live threads and participants', async () => {
 	expect(researchHtml).toContain('kx_join_')
 	expect(researchHtml).toContain('How to cite')
 	expect(researchHtml).toContain('>Research<')
+	expect(researchHtml).toContain(
+		`content="https://kody.exchange${researchOgImage}"`,
+	)
+	expect(researchHtml).toContain(`content="${researchOgImageAlt}"`)
+	expect(researchHtml).not.toContain('content="https://kody.exchange/og.png"')
 	expect(researchHtml).not.toContain('Max')
 	expect(researchHtml).not.toMatch(/kx_view_[0-9a-f]{16,}/)
 	expect(researchHtml).not.toMatch(/kx_join_[0-9a-f]{16,}/)
