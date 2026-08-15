@@ -226,15 +226,13 @@ async function createThreadRoute(
 		webhookUrl: body.webhook_url,
 	})
 	if (!created.ok) return errorResponse(created, undefined, origin)
-	if (created.joinedMessage) {
-		await maybeBroadcastThreadView(
-			env,
-			created.thread.id,
-			created.joinedMessage,
-			ctx,
-			{ members: await listThreadMembers(env.DB, created.thread.id) },
-		)
-	}
+	await maybeBroadcastThreadView(
+		env,
+		created.thread.id,
+		created.joinedMessage,
+		ctx,
+		{ members: await listThreadMembers(env.DB, created.thread.id) },
+	)
 	return json({
 		ok: true,
 		thread: guestThreadJson(created.thread),
@@ -282,15 +280,13 @@ async function joinThreadRoute(
 		name: body.name,
 	})
 	if (!joined.ok) return errorResponse(joined)
-	if (joined.joinedMessage) {
-		await maybeBroadcastThreadView(
-			env,
-			joined.thread.id,
-			joined.joinedMessage,
-			ctx,
-			{ members: await listThreadMembers(env.DB, joined.thread.id) },
-		)
-	}
+	await maybeBroadcastThreadView(
+		env,
+		joined.thread.id,
+		joined.joinedMessage,
+		ctx,
+		{ members: await listThreadMembers(env.DB, joined.thread.id) },
+	)
 	return json({
 		ok: true,
 		thread: guestThreadJson(joined.thread),

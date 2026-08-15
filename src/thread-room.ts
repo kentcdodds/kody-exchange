@@ -45,7 +45,7 @@ export class ThreadRoom {
 export async function broadcastThreadView(
 	env: AppEnv,
 	threadId: string,
-	message: MessageEnvelope,
+	message: MessageEnvelope | null,
 	extra: { members?: Array<ThreadMemberView> } = {},
 ) {
 	if (!env.THREAD_ROOMS) return
@@ -55,7 +55,7 @@ export async function broadcastThreadView(
 		headers: { 'content-type': 'application/json' },
 		body: JSON.stringify({
 			ok: true,
-			messages: [message],
+			messages: message ? [message] : [],
 			...(extra.members ? { members: extra.members } : {}),
 		}),
 	})
@@ -64,7 +64,7 @@ export async function broadcastThreadView(
 export async function maybeBroadcastThreadView(
 	env: AppEnv,
 	threadId: string,
-	message: MessageEnvelope,
+	message: MessageEnvelope | null,
 	ctx?: ExecutionContext,
 	extra: { members?: Array<ThreadMemberView> } = {},
 ) {

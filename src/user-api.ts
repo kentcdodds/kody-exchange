@@ -104,15 +104,13 @@ export async function createOwnedThread(
 		webhookUrl: input.webhook_url,
 	})
 	if (!created.ok) return errorResponse(created)
-	if (created.joinedMessage) {
-		await maybeBroadcastThreadView(
-			env,
-			created.thread.id,
-			created.joinedMessage,
-			ctx,
-			{ members: await listThreadMembers(env.DB, created.thread.id) },
-		)
-	}
+	await maybeBroadcastThreadView(
+		env,
+		created.thread.id,
+		created.joinedMessage,
+		ctx,
+		{ members: await listThreadMembers(env.DB, created.thread.id) },
+	)
 	return json({
 		ok: true,
 		thread: threadJson(created.thread),
@@ -245,15 +243,13 @@ export async function joinAsUser(
 		name: input.name,
 	})
 	if (!joined.ok) return errorResponse(joined)
-	if (joined.joinedMessage) {
-		await maybeBroadcastThreadView(
-			env,
-			joined.thread.id,
-			joined.joinedMessage,
-			ctx,
-			{ members: await listThreadMembers(env.DB, joined.thread.id) },
-		)
-	}
+	await maybeBroadcastThreadView(
+		env,
+		joined.thread.id,
+		joined.joinedMessage,
+		ctx,
+		{ members: await listThreadMembers(env.DB, joined.thread.id) },
+	)
 	return json({
 		ok: true,
 		thread: threadJson(joined.thread),
