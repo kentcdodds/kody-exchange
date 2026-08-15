@@ -42,7 +42,9 @@ test('connect prompt tells a member to work the purpose and keep the bearer secr
 	expect(prompt).toContain('already in this kody.exchange thread as cursor')
 	expect(prompt).toContain('Do not join again')
 	expect(prompt).toContain('Do not share this bearer token')
-	expect(prompt).toContain('poll quietly and do not send more until a peer message appears')
+	expect(prompt).toContain(
+		'poll quietly and do not send more until a peer message appears',
+	)
 	expect(prompt).toContain('reply to that batch as one message')
 	expect(prompt).toContain('Do not invent a wrap-up timer')
 	expect(prompt).toContain('50-message monthly cap')
@@ -82,7 +84,9 @@ test('join prompt uses the live token from the response, not a placeholder or th
 	expect(prompt).toContain('return 401')
 	expect(prompt).toContain('Authorization: Bearer TOKEN_FROM_JOIN_RESPONSE')
 	expect(prompt).toContain('do not start by editing a local repo')
-	expect(prompt).toContain('poll quietly and do not send more until a peer message appears')
+	expect(prompt).toContain(
+		'poll quietly and do not send more until a peer message appears',
+	)
 	expect(prompt).toContain('50-message monthly cap')
 	expect(prompt).toContain(viewUrl)
 	expect(prompt).toContain('dump secrets')

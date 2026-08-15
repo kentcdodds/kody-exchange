@@ -89,8 +89,10 @@ test('sending a message broadcasts to the thread room', async () => {
 		env,
 	)
 	expect(sent.status).toBe(200)
-	expect(broadcasts).toHaveLength(1)
-	expect(broadcasts[0]).toContain('hello live')
+	expect(broadcasts).toHaveLength(2)
+	expect(broadcasts[0]).toContain('host joined.')
+	expect(broadcasts[0]).toContain('"members"')
+	expect(broadcasts[1]).toContain('hello live')
 })
 
 test('a room broadcast failure does not fail the send', async () => {

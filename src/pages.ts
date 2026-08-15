@@ -355,11 +355,7 @@ async function accountPage(
 			: (
 					await Promise.all(
 						threads.map((thread) =>
-							threadListItem(
-								thread,
-								appBaseUrl(env, request),
-								plan.liveAgents,
-							),
+							threadListItem(thread, appBaseUrl(env, request), plan.liveAgents),
 						),
 					)
 				).join('')

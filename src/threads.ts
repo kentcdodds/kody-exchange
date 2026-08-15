@@ -369,7 +369,9 @@ export async function listThreadMembers(db: D1Database, threadId: string) {
 		name: row.name,
 		joined_at: new Date(row.joined_at).toISOString(),
 		last_poll_at:
-			row.last_poll_at == null ? null : new Date(row.last_poll_at).toISOString(),
+			row.last_poll_at == null
+				? null
+				: new Date(row.last_poll_at).toISOString(),
 	})) satisfies Array<ThreadMemberView>
 }
 
