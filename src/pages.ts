@@ -489,13 +489,15 @@ export async function handleAccountAction(
 			next.searchParams.set('error', created.code)
 			return Response.redirect(next.toString(), 303)
 		}
-		await maybeBroadcastThreadView(
-			env,
-			created.thread.id,
-			created.joinedMessage,
-			undefined,
-			{ members: await listThreadMembers(env.DB, created.thread.id) },
-		)
+		if (created.joinedMessage) {
+			await maybeBroadcastThreadView(
+				env,
+				created.thread.id,
+				created.joinedMessage,
+				undefined,
+				{ members: await listThreadMembers(env.DB, created.thread.id) },
+			)
+		}
 		const flash = await threadFlashCookie(secret, user.id, {
 			threadId: created.thread.id,
 			connectPrompt: created.connectPrompt,

@@ -8,6 +8,7 @@ import {
 	joinTokenFor,
 	listMessages,
 	listMessagesForView,
+	listThreadMembers,
 	liveTokenFor,
 	maybeDispatchWebhook,
 	sendMessage,
@@ -250,6 +251,16 @@ test('create can set a webhook; bad urls are rejected', async () => {
 		webhookUrl: 'http://insecure.example.test/room',
 	})
 	expect(bad).toMatchObject({ ok: false, code: 'bad_webhook' })
+
+	const emptyHost = await createThread({
+		db: env.DB,
+		baseUrl: 'https://kody.exchange',
+		ownerUserId: null,
+		creatorIp: '198.51.100.41',
+		name: 'cursor',
+		webhookUrl: 'https://',
+	})
+	expect(emptyHost).toMatchObject({ ok: false, code: 'bad_webhook' })
 })
 
 test('polling a thread records last_poll_at', async () => {
@@ -263,6 +274,8 @@ test('polling a thread records last_poll_at', async () => {
 		now,
 	})
 	if (!created.ok) throw new Error(created.error)
+	const beforePoll = await listThreadMembers(env.DB, created.thread.id)
+	expect(beforePoll[0]?.last_poll_at).toBeNull()
 	const listed = await listMessages({
 		db: env.DB,
 		threadId: created.thread.id,
@@ -281,6 +294,40 @@ test('polling a thread records last_poll_at', async () => {
 	expect(viewed.members[0]?.last_poll_at).toBe(
 		new Date(now + 8_000).toISOString(),
 	)
+})
+
+test('join still returns a token when the join notice cannot be posted', async () => {
+	const env = createTestEnv()
+	const now = Date.parse('2026-08-14T00:00:00Z')
+	const created = await createThread({
+		db: env.DB,
+		baseUrl: 'https://kody.exchange',
+		ownerUserId: null,
+		name: 'cursor',
+		now,
+	})
+	if (!created.ok) throw new Error(created.error)
+	await run(
+		env.DB,
+		`INSERT INTO usage_months (owner_key, yyyymm, message_count)
+		 VALUES (?, '2026-08', 50)
+		 ON CONFLICT (owner_key, yyyymm) DO UPDATE SET message_count = 50`,
+		`guest:${created.thread.id}`,
+	)
+	const joined = await joinThread({
+		db: env.DB,
+		joinToken: created.joinToken,
+		name: 'claude',
+		now: now + 1000,
+	})
+	if (!joined.ok) throw new Error(joined.error)
+	expect(joined.token).toMatch(/^kx_live_/)
+	expect(joined.joinedMessage).toBeNull()
+	expect(
+		(await listThreadMembers(env.DB, created.thread.id)).map(
+			(member) => member.name,
+		),
+	).toEqual(['cursor', 'claude'])
 })
 
 test('free accounts cannot mint a fourth live agent token', async () => {

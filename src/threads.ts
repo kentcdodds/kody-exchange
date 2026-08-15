@@ -391,13 +391,21 @@ async function touchLastPoll(
 }
 
 export function parseWebhookUrl(value: unknown) {
-	if (typeof value !== 'string' || !value.startsWith('https://')) {
+	if (typeof value !== 'string') {
 		return fail(400, 'bad_webhook', 'webhook url must be https.')
 	}
 	if (value.length > 512) {
 		return fail(400, 'bad_webhook', 'webhook url is too long.')
 	}
-	return { ok: true as const, url: value }
+	try {
+		const parsed = new URL(value)
+		if (parsed.protocol !== 'https:' || parsed.hostname.length === 0) {
+			return fail(400, 'bad_webhook', 'webhook url must be https.')
+		}
+		return { ok: true as const, url: parsed.href }
+	} catch {
+		return fail(400, 'bad_webhook', 'webhook url must be https.')
+	}
 }
 
 async function announceJoined(input: {
@@ -406,7 +414,7 @@ async function announceJoined(input: {
 	agent: AgentRow
 	now: number
 }) {
-	return sendMessage({
+	const announced = await sendMessage({
 		db: input.db,
 		threadId: input.threadId,
 		agent: input.agent,
@@ -414,6 +422,7 @@ async function announceJoined(input: {
 		body: { text: `${input.agent.name} joined.` },
 		now: input.now,
 	})
+	return announced.ok ? announced.message : null
 }
 
 async function planForOwner(
@@ -445,7 +454,7 @@ export async function createThread(input: {
 			joinPrompt: string
 			viewUrl: string
 			plan: PlanName
-			joinedMessage: MessageEnvelope
+			joinedMessage: MessageEnvelope | null
 	  }>
 > {
 	const now = input.now ?? Date.now()
@@ -526,10 +535,9 @@ export async function createThread(input: {
 	)
 	await run(
 		input.db,
-		'INSERT INTO thread_members (thread_id, agent_id, joined_at, last_poll_at) VALUES (?, ?, ?, ?)',
+		'INSERT INTO thread_members (thread_id, agent_id, joined_at) VALUES (?, ?, ?)',
 		threadId,
 		agentId,
-		now,
 		now,
 	)
 
@@ -547,13 +555,12 @@ export async function createThread(input: {
 		return fail(500, 'create_failed', 'Could not create the thread.')
 	}
 
-	const announced = await announceJoined({
+	const joinedMessage = await announceJoined({
 		db: input.db,
 		threadId,
 		agent,
 		now,
 	})
-	if (!announced.ok) return announced
 
 	const viewUrl = await threadViewUrlFor(input.baseUrl, thread)
 	return {
@@ -577,7 +584,7 @@ export async function createThread(input: {
 			viewUrl,
 		}),
 		plan: planName,
-		joinedMessage: announced.message,
+		joinedMessage,
 	}
 }
 
@@ -593,7 +600,7 @@ export async function joinThread(input: {
 			agent: AgentRow
 			token: string
 			plan: PlanName
-			joinedMessage: MessageEnvelope
+			joinedMessage: MessageEnvelope | null
 	  }>
 > {
 	const now = input.now ?? Date.now()
@@ -627,10 +634,9 @@ export async function joinThread(input: {
 	)
 	await run(
 		input.db,
-		'INSERT INTO thread_members (thread_id, agent_id, joined_at, last_poll_at) VALUES (?, ?, ?, ?)',
+		'INSERT INTO thread_members (thread_id, agent_id, joined_at) VALUES (?, ?, ?)',
 		thread.id,
 		agentId,
-		now,
 		now,
 	)
 	const agent = await first<AgentRow>(
@@ -639,20 +645,18 @@ export async function joinThread(input: {
 		agentId,
 	)
 	if (!agent) return fail(500, 'join_failed', 'Could not join the thread.')
-	const announced = await announceJoined({
-		db: input.db,
-		threadId: thread.id,
-		agent,
-		now,
-	})
-	if (!announced.ok) return announced
 	return {
 		ok: true,
 		thread,
 		agent,
 		token,
 		plan: planName,
-		joinedMessage: announced.message,
+		joinedMessage: await announceJoined({
+			db: input.db,
+			threadId: thread.id,
+			agent,
+			now,
+		}),
 	}
 }
 
