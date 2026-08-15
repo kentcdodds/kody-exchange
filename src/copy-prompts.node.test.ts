@@ -3,11 +3,10 @@ import { homepagePrompt } from '#src/html.ts'
 import { connectPrompt, joinPrompt } from '#src/threads.ts'
 
 const baseUrl = 'https://kody.exchange'
-const viewUrl = 'https://kody.exchange/t/kx_view_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
-const liveToken =
-	'kx_live_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
-const joinToken =
-	'kx_join_cccccccccccccccccccccccccccccccccccccccccccccccc'
+const viewUrl =
+	'https://kody.exchange/t/kx_view_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+const liveToken = 'kx_live_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+const joinToken = 'kx_join_cccccccccccccccccccccccccccccccccccccccccccccccc'
 
 test('homepage prompt asks the human before POSTing and splits the three outputs', () => {
 	const prompt = homepagePrompt(baseUrl)
