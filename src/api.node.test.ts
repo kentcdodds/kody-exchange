@@ -380,7 +380,10 @@ test('pricing page explains live threads and participants', async () => {
 	expect(html).toContain('unlocks the OAuth API and MCP')
 	expect(html).toContain('HTTP /v1 only')
 	expect(html).toContain('OAuth API + MCP')
-	expect(html).toContain('Made by Kent C. Dodds')
+	expect(html).toContain('Cancel anytime.')
+	expect(html.match(/Made by Kent C. Dodds/g)).toEqual([
+		'Made by Kent C. Dodds',
+	])
 	expect(html).not.toContain('Operator:')
 	expect(html).not.toContain('me@kentcdodds.com')
 
