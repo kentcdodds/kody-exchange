@@ -5,6 +5,7 @@ import { expect, test } from 'vitest'
 import { handleRequest } from '#src/index.ts'
 import {
 	createOgMarkup,
+	createResearchOgMarkup,
 	findOgIconElement,
 	loadIconDataUri,
 	OG_HEIGHT,
@@ -13,7 +14,14 @@ import {
 	OG_TAGLINE,
 	OG_WIDTH,
 	OG_WORDMARK,
+	RESEARCH_OG_ICON_SIZE,
+	RESEARCH_OG_STAMP,
+	RESEARCH_OG_STATS,
+	RESEARCH_OG_TITLE,
+	RESEARCH_OG_TITLE_LINE_1,
+	RESEARCH_OG_TITLE_LINE_2,
 	renderExchangeOgImage,
+	renderResearchOgImage,
 } from '#src/og.ts'
 import { createTestEnv, request } from '#src/test-support.ts'
 
@@ -93,6 +101,48 @@ test('renderExchangeOgImage returns a 1200×630 PNG', async () => {
 	expectPngCard(png)
 })
 
+test('research OG markup is a report card, not the homepage mark', () => {
+	const markup = createResearchOgMarkup('data:image/png;base64,abc')
+	const icon = findOgIconElement(markup)
+	expect(icon).not.toBeNull()
+	expect(RESEARCH_OG_ICON_SIZE).toBeLessThan(OG_HEIGHT)
+	expect(icon?.props.width).toBe(RESEARCH_OG_ICON_SIZE)
+	expect(icon?.props.height).toBe(RESEARCH_OG_ICON_SIZE)
+	expect(markup.props.style?.alignItems).not.toBe('flex-end')
+
+	const tree = JSON.stringify(markup)
+	expect(tree).toContain(RESEARCH_OG_STAMP)
+	expect(tree).toContain(RESEARCH_OG_TITLE_LINE_1)
+	expect(tree).toContain(RESEARCH_OG_TITLE_LINE_2)
+	expect(RESEARCH_OG_TITLE).toBe(
+		`${RESEARCH_OG_TITLE_LINE_1} ${RESEARCH_OG_TITLE_LINE_2}`,
+	)
+	expect(tree).toContain(OG_WORDMARK)
+	expect(tree).not.toContain(OG_TAGLINE)
+	for (const stat of RESEARCH_OG_STATS) {
+		expect(tree).toContain(stat.value)
+		expect(tree).toContain(stat.label)
+	}
+	expect(tree).toContain('#d4921a')
+	expect(tree).toContain('#b54a3c')
+	expect(tree).toContain('#fffaf1')
+})
+
+test('renderResearchOgImage returns a 1200×630 PNG', async () => {
+	const env = createTestEnv()
+	await env.BLOBS.put(
+		'public/icon.png',
+		publicIcon.buffer.slice(
+			publicIcon.byteOffset,
+			publicIcon.byteOffset + publicIcon.byteLength,
+		),
+		{ httpMetadata: { contentType: 'image/png' } },
+	)
+	const png = await renderResearchOgImage(env)
+	expect(png.byteLength).toBeGreaterThan(10_000)
+	expectPngCard(png)
+})
+
 test('/og.png and /og.jpg both render the Satori card', async () => {
 	const env = createTestEnv()
 	const png = await handleRequest(request('/og.png'), env)
@@ -101,6 +151,19 @@ test('/og.png and /og.jpg both render the Satori card', async () => {
 	expectPngCard(new Uint8Array(await png.arrayBuffer()))
 
 	const legacy = await handleRequest(request('/og.jpg'), env)
+	expect(legacy.status).toBe(200)
+	expect(legacy.headers.get('content-type')).toBe('image/png')
+	expectPngCard(new Uint8Array(await legacy.arrayBuffer()))
+})
+
+test('/research/og.png and /research/og.jpg both render the research card', async () => {
+	const env = createTestEnv()
+	const png = await handleRequest(request('/research/og.png'), env)
+	expect(png.status).toBe(200)
+	expect(png.headers.get('content-type')).toBe('image/png')
+	expectPngCard(new Uint8Array(await png.arrayBuffer()))
+
+	const legacy = await handleRequest(request('/research/og.jpg'), env)
 	expect(legacy.status).toBe(200)
 	expect(legacy.headers.get('content-type')).toBe('image/png')
 	expectPngCard(new Uint8Array(await legacy.arrayBuffer()))

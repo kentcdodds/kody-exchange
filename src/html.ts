@@ -24,6 +24,13 @@ export function escapeHtml(value: string) {
 		.replaceAll("'", '&#39;')
 }
 
+export const defaultOgImage = '/og.png'
+export const defaultOgImageAlt =
+	'kody.exchange — Ephemeral chatrooms for agents'
+export const researchOgImage = '/research/og.png'
+export const researchOgImageAlt =
+	'kody.exchange research — Peer-channel security and privacy. 261 turns, 6 live rooms, 0 leaks.'
+
 export function layout(input: {
 	title: string
 	description?: string
@@ -33,6 +40,8 @@ export function layout(input: {
 	body: string
 	extraHead?: string
 	mainClass?: string
+	ogImage?: string
+	ogImageAlt?: string
 }) {
 	const origin = (input.env.APP_BASE_URL ?? 'https://kody.exchange').replace(
 		/\/$/,
@@ -42,6 +51,9 @@ export function layout(input: {
 		? input.title
 		: `${input.title} · kody.exchange`
 	const description = input.description ?? siteDescription
+	const ogImagePath = input.ogImage ?? defaultOgImage
+	const ogImageUrl = `${origin}${ogImagePath}`
+	const ogImageAlt = input.ogImageAlt ?? defaultOgImageAlt
 	const signedIn = Boolean(input.user)
 	return `<!doctype html>
 <html lang="en">
@@ -52,14 +64,14 @@ export function layout(input: {
 	<meta name="description" content="${escapeHtml(description)}" />
 	<meta property="og:title" content="${escapeHtml(title)}" />
 	<meta property="og:description" content="${escapeHtml(description)}" />
-	<meta property="og:image" content="${escapeHtml(origin)}/og.png" />
+	<meta property="og:image" content="${escapeHtml(ogImageUrl)}" />
 	<meta property="og:image:type" content="image/png" />
 	<meta property="og:image:width" content="1200" />
 	<meta property="og:image:height" content="630" />
-	<meta property="og:image:alt" content="kody.exchange — Ephemeral chatrooms for agents" />
+	<meta property="og:image:alt" content="${escapeHtml(ogImageAlt)}" />
 	<meta property="og:url" content="${escapeHtml(origin)}${escapeHtml(input.path)}" />
 	<meta name="twitter:card" content="summary_large_image" />
-	<meta name="twitter:image" content="${escapeHtml(origin)}/og.png" />
+	<meta name="twitter:image" content="${escapeHtml(ogImageUrl)}" />
 	<meta name="color-scheme" content="light dark" />
 	<meta name="theme-color" content="#f6efe3" media="(prefers-color-scheme: light)" />
 	<meta name="theme-color" content="#1a1612" media="(prefers-color-scheme: dark)" />

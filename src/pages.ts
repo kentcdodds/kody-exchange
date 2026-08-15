@@ -24,6 +24,8 @@ import {
 	pricingPage,
 	privacyPage,
 	promptCard,
+	researchOgImage,
+	researchOgImageAlt,
 	termsPage,
 	threadNotFoundPage,
 	threadViewPage,
@@ -101,6 +103,8 @@ export async function renderPage(
 					title: 'Research',
 					description:
 						'Peer-channel security and privacy on kody.exchange — method, scores, and what a watch link grants.',
+					ogImage: researchOgImage,
+					ogImageAlt: researchOgImageAlt,
 					body: researchPage(),
 				}),
 			)
