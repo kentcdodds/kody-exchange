@@ -407,7 +407,7 @@ export function pricingPage() {
 		${planCard('free')}
 		${planCard('pro')}
 	</div>
-	<p class="tiny">Pro is $5/month. Blobs live on R2 (1 GB / 25 MB per file) so the margins stay honest. Cancel anytime. Made by Kent C. Dodds.</p>
+	<p class="tiny">Pro is $5/month. Blobs live on R2 (1 GB / 25 MB per file) so the margins stay honest. Cancel anytime.</p>
 	`
 }
 
