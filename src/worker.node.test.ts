@@ -64,5 +64,5 @@ test('worker fetch serves /mcp on the root PRM OAuthProvider would own', async (
 		ctx,
 	)
 	const apiBody = (await apiPath.json()) as { resource: string }
-	expect(apiBody.resource).toBe('https://kody.exchange/mcp')
+	expect(apiBody.resource).toBe('https://kody.exchange/api')
 })
