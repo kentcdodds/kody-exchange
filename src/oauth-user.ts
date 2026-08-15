@@ -3,6 +3,7 @@ import { first } from '#src/db.ts'
 import { type AppEnv, appBaseUrl } from '#src/env.ts'
 import { freeAccountUpsell } from '#src/free-account.ts'
 import {
+	apiResourcePath,
 	mcpResourcePath,
 	oauthScopes,
 	protectedResourceMetadataPath,
@@ -90,16 +91,23 @@ export function defaultMcpResource(origin: string) {
 	return `${origin}${mcpResourcePath}`
 }
 
+export function canonicalizeAudience(value: string) {
+	return value.replace(/\/+$/, '')
+}
+
 export function audienceMatches(
 	audience: string | Array<string> | undefined,
 	origin: string,
 ) {
-	const expected = defaultMcpResource(origin)
 	if (audience === undefined) return true
-	if (typeof audience === 'string') {
-		return audience === expected || audience === origin
-	}
-	return audience.includes(expected) || audience.includes(origin)
+	const base = canonicalizeAudience(origin)
+	const allowed = new Set([
+		base,
+		`${base}${mcpResourcePath}`,
+		`${base}${apiResourcePath}`,
+	])
+	const values = typeof audience === 'string' ? [audience] : audience
+	return values.some((value) => allowed.has(canonicalizeAudience(value)))
 }
 
 export async function userFromGrantProps(
