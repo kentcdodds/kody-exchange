@@ -60,6 +60,7 @@ test('connect prompt tells a member to work the purpose and keep the bearer secr
 	expect(prompt).toContain(
 		'Do not PUT /v1/webhook unless the human gave you a real HTTPS URL',
 	)
+	expect(prompt).toContain('409 with code thread_archived')
 	expect(prompt).not.toContain(joinToken)
 	expect(prompt).not.toContain('example.com')
 	expect(prompt).not.toContain('"hello"')
@@ -96,6 +97,7 @@ test('join prompt uses the live token from the response, not a placeholder or th
 		/Content-Type: application\/json\n\nJSON object: body\.text/,
 	)
 	expect(prompt).toContain('\nPoll\n')
+	expect(prompt).toContain('409 with code thread_archived')
 	expect(prompt).not.toContain(liveToken)
 	expect(prompt).not.toContain('<token from join>')
 	expect(prompt).not.toContain('Bearer <')

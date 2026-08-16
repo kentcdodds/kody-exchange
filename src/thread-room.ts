@@ -15,6 +15,16 @@ export class ThreadRoom {
 			return new Response(null, { status: 101, webSocket: pair[0] })
 		}
 		if (request.method === 'POST') {
+			if (new URL(request.url).pathname === '/close') {
+				for (const socket of this.ctx.getWebSockets()) {
+					try {
+						socket.close(1000, 'archived')
+					} catch {
+						// Drop dead sockets; hibernation cleanup will finish them.
+					}
+				}
+				return new Response(null, { status: 204 })
+			}
 			const payload = await request.text()
 			for (const socket of this.ctx.getWebSockets()) {
 				try {
@@ -59,6 +69,24 @@ export async function broadcastThreadView(
 			...(extra.members ? { members: extra.members } : {}),
 		}),
 	})
+}
+
+export async function closeThreadView(env: AppEnv, threadId: string) {
+	if (!env.THREAD_ROOMS) return
+	const stub = env.THREAD_ROOMS.get(env.THREAD_ROOMS.idFromName(threadId))
+	await stub.fetch('https://thread-room/close', { method: 'POST' })
+}
+
+export async function maybeCloseThreadView(
+	env: AppEnv,
+	threadId: string,
+	ctx?: ExecutionContext,
+) {
+	const pending = closeThreadView(env, threadId).catch((error) => {
+		console.warn('thread_room_close_failed', threadId, error)
+	})
+	if (ctx) ctx.waitUntil(pending)
+	await pending
 }
 
 export async function maybeBroadcastThreadView(

@@ -13,7 +13,7 @@ import {
 	paymentLinkUrl,
 	stripeSecretConfigured,
 } from '#src/billing.ts'
-import { all } from '#src/db.ts'
+import { all, first } from '#src/db.ts'
 import { type AppEnv, appBaseUrl } from '#src/env.ts'
 import {
 	copyPromptScript,
@@ -43,13 +43,19 @@ import { researchPage } from '#src/research-page.ts'
 import { grantMaxToLogin } from '#src/grants.ts'
 import { getPlan, isOperatorLogin } from '#src/limits.ts'
 import { clientIp, limitViewPoll, workerPollCache } from '#src/rate-limit.ts'
-import { maybeBroadcastThreadView } from '#src/thread-room.ts'
 import {
+	maybeBroadcastThreadView,
+	maybeCloseThreadView,
+} from '#src/thread-room.ts'
+import {
+	archiveThread,
 	countOwnedThreads,
 	createThread,
 	getHostAgent,
+	isThreadArchived,
 	listMessagesForView,
 	listThreadMembers,
+	threadArchivedViewError,
 	threadViewPrompts,
 	threadViewUrlFor,
 	type ThreadRow,
@@ -255,6 +261,13 @@ async function connectThreadView(
 			listed.status,
 		)
 	}
+	if (isThreadArchived(listed.thread)) {
+		const archived = threadArchivedViewError()
+		return json(
+			{ ok: false, error: archived.error, code: archived.code },
+			archived.status,
+		)
+	}
 	if (!env.THREAD_ROOMS) {
 		return json(
 			{
@@ -305,6 +318,13 @@ async function pollThreadView(
 			listed.status,
 		)
 	}
+	if (isThreadArchived(listed.thread)) {
+		const archived = threadArchivedViewError()
+		return json(
+			{ ok: false, error: archived.error, code: archived.code },
+			archived.status,
+		)
+	}
 	return json(
 		{
 			ok: true,
@@ -349,20 +369,34 @@ async function accountPage(
 	const plan = getPlan(planOf(user))
 	const secret = env.COOKIE_SECRET?.trim() ?? 'dev'
 	const csrf = await csrfToken(secret, user.id)
+	const now = Date.now()
 	const threads = await all<ThreadListRow>(
 		env.DB,
 		`SELECT t.*, (
 			 SELECT COUNT(*) FROM thread_members m WHERE m.thread_id = t.id
 		 ) AS member_count
 		 FROM threads t
-		 WHERE t.owner_user_id = ? AND t.expires_at > ?
+		 WHERE t.owner_user_id = ? AND t.expires_at > ? AND t.archived_at IS NULL
 		 ORDER BY t.created_at DESC`,
 		user.id,
-		Date.now(),
+		now,
+	)
+	const archivedThreads = await all<ThreadListRow>(
+		env.DB,
+		`SELECT t.*, (
+			 SELECT COUNT(*) FROM thread_members m WHERE m.thread_id = t.id
+		 ) AS member_count
+		 FROM threads t
+		 WHERE t.owner_user_id = ? AND t.expires_at > ? AND t.archived_at IS NOT NULL
+		 ORDER BY t.archived_at DESC`,
+		user.id,
+		now,
 	)
 	const liveThreads = await countOwnedThreads(env.DB, user.id)
 	const atThreadLimit = liveThreads >= plan.threads
 	const upgraded = new URL(request.url).searchParams.get('upgraded') === '1'
+	const archivedFlash =
+		new URL(request.url).searchParams.get('archived') === '1'
 	const error = accountError(new URL(request.url).searchParams.get('error'))
 	const checkoutAvailable = Boolean(
 		stripeSecretConfigured(env) && env.STRIPE_PRO_PRICE_ID,
@@ -375,13 +409,14 @@ async function accountPage(
 	<p>A thread is a room. You create it here, then we give you two prompts to copy. You do not invent tokens.</p>
 	<p class="tiny">OAuth API and MCP are included with a signed-in account. Point integrations at <code>${escapeHtml(appBaseUrl(env, request))}/mcp</code> and approve the prompt. Guest threads still work over plain <code>/v1</code> with no account.</p>
 	${upgraded ? `<p class="card">Pro is active. Thank you.</p>` : ''}
+	${archivedFlash ? `<p class="card">Thread archived. It is read-only now.</p>` : ''}
 	${error ? `<p class="card">${escapeHtml(error)}</p>` : ''}
 	${flash ? threadFlashHtml(flash) : ''}
 	${
 		flash
 			? ''
 			: atThreadLimit
-				? `<p class="card">You're at your live thread limit. Wait for one to expire${plan.name === 'free' ? ', or upgrade to Pro' : ''}.</p>`
+				? `<p class="card">You're at your live thread limit. Close one, or wait for one to expire${plan.name === 'free' ? ', or upgrade to Pro' : ''}.</p>`
 				: `<form class="card" method="post" action="/account/threads">
 		<input type="hidden" name="csrf" value="${escapeHtml(csrf)}" />
 		<p>After you create the thread:</p>
@@ -405,10 +440,31 @@ async function accountPage(
 			: (
 					await Promise.all(
 						threads.map((thread) =>
-							threadListItem(thread, appBaseUrl(env, request), plan.liveAgents),
+							threadListItem({
+								thread,
+								baseUrl: appBaseUrl(env, request),
+								seats: plan.liveAgents,
+								csrf,
+							}),
 						),
 					)
 				).join('')
+	}
+	${
+		archivedThreads.length === 0
+			? ''
+			: `<h2>Archived</h2>
+	${(
+		await Promise.all(
+			archivedThreads.map((thread) =>
+				threadListItem({
+					thread,
+					baseUrl: appBaseUrl(env, request),
+					seats: plan.liveAgents,
+				}),
+			),
+		)
+	).join('')}`
 	}
 	${accountBillingHtml({ user, csrf, checkoutAvailable, link })}
 	${
@@ -452,19 +508,28 @@ function threadFlashHtml(flash: ThreadFlash) {
 	`
 }
 
-async function threadListItem(
-	thread: ThreadListRow,
-	baseUrl: string,
-	seats: number,
-) {
-	const purpose = thread.purpose?.trim() || 'Untitled thread'
-	const members = Number(thread.member_count)
-	const memberLabel = `${members} of ${seats}`
-	const href = await threadViewUrlFor(baseUrl, thread)
+async function threadListItem(input: {
+	thread: ThreadListRow
+	baseUrl: string
+	seats: number
+	csrf?: string
+}) {
+	const purpose = input.thread.purpose?.trim() || 'Untitled thread'
+	const members = Number(input.thread.member_count)
+	const memberLabel = `${members} of ${input.seats}`
+	const href = await threadViewUrlFor(input.baseUrl, input.thread)
+	const archived = isThreadArchived(input.thread)
+	const close = input.csrf
+		? `<form method="post" action="/account/threads/${escapeHtml(input.thread.id)}/archive">
+		<input type="hidden" name="csrf" value="${escapeHtml(input.csrf)}" />
+		<p><button type="submit">Close thread</button></p>
+	</form>`
+		: ''
 	return `<article class="card">
 		<h3><a href="${escapeHtml(href)}">${escapeHtml(purpose)}</a></h3>
-		<p class="tiny"><code>${escapeHtml(thread.id)}</code> · ${escapeHtml(memberLabel)} · expires ${escapeHtml(new Date(thread.expires_at).toISOString())}</p>
+		<p class="tiny"><code>${escapeHtml(input.thread.id)}</code> · ${escapeHtml(memberLabel)} · ${archived ? 'archived' : `expires ${escapeHtml(new Date(input.thread.expires_at).toISOString())}`}</p>
 		<p><a href="${escapeHtml(href)}">Open read-only chat</a></p>
+		${close}
 	</article>`
 }
 
@@ -505,6 +570,11 @@ function accountError(code: string | null) {
 			return "You're at your live thread limit."
 		case 'create_failed':
 			return 'Could not create that thread. Try again.'
+		case 'not_found':
+		case 'thread_not_found':
+			return 'That thread was not found.'
+		case 'archive_failed':
+			return 'Could not archive that thread. Try again.'
 		case 'bad_login':
 			return 'That GitHub login is not valid.'
 		default:
@@ -526,6 +596,35 @@ export async function handleAccountAction(
 		return new Response('Bad CSRF token', { status: 403 })
 	}
 
+	const archivePath = url.pathname.match(
+		/^\/account\/threads\/([^/]+)\/archive$/,
+	)
+	if (archivePath?.[1]) {
+		const owned = await first<ThreadRow>(
+			env.DB,
+			'SELECT * FROM threads WHERE id = ? AND owner_user_id = ?',
+			archivePath[1],
+			user.id,
+		)
+		if (!owned) {
+			const next = new URL('/account', appBaseUrl(env, request))
+			next.searchParams.set('error', 'not_found')
+			return Response.redirect(next.toString(), 303)
+		}
+		const archived = await archiveThread({
+			db: env.DB,
+			threadId: owned.id,
+		})
+		if (!archived.ok) {
+			const next = new URL('/account', appBaseUrl(env, request))
+			next.searchParams.set('error', archived.code)
+			return Response.redirect(next.toString(), 303)
+		}
+		await maybeCloseThreadView(env, archived.thread.id)
+		const next = new URL('/account', appBaseUrl(env, request))
+		next.searchParams.set('archived', '1')
+		return Response.redirect(next.toString(), 303)
+	}
 	if (url.pathname === '/account/threads') {
 		const created = await createThread({
 			db: env.DB,

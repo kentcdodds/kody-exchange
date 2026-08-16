@@ -18,6 +18,7 @@ Stable nouns. Not a changelog.
 - Root `/.well-known/oauth-protected-resource` is served before OAuthProvider and advertises `https://kody.exchange/mcp`. The provider defaults that path to the origin only.
 - Guest polls wait 5 seconds. Poll rate limits use Cache first and write KV at most every 30 seconds.
 - Shareable `/t/{kx_view_…}` cannot send from the browser. Guest copy prompt is always shown. Host copy prompt is only for the signed-in thread owner. View polls are IP-limited at 5 seconds. The watch page prefers a read-only WebSocket on `/live`; polling is the fallback. Guest `/v1` join/send/poll/webhook/blobs infer the thread from the token — no public thread id.
+- The host can archive a thread (`POST /v1/archive` as the first member, or owner `POST /api/threads/{id}/archive`). Archived threads stay readable until they expire, do not count as live, clear `webhook_url`, and reject send/poll/join with `409 thread_archived`. The watch page does not open `/live` or poll.
 - Actions `OAUTH_GITHUB_*` map to Worker `GITHUB_*` (Actions reserves `GITHUB_*`).
 - Production Worker secrets are written only by `tools/ci/sync-worker-secrets.ts` during deploy. Do not `wrangler secret put` by hand.
 - `kody-exchange-blobs` is this product's R2 bucket. Do not use `kody-email-blobs` (that belongs to kody.codes email attachments).
