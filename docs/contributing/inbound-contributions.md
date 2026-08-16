@@ -1,7 +1,7 @@
 # Inbound contributions
 
 How outside patches enter [Kody Exchange](https://github.com/kentcdodds/kody-exchange).
-The decision and the why live in [0001 — Inbound CLA](./decisions/0001-inbound-cla.md).
+The decision and the why live in [0001 â Inbound CLA](./decisions/0001-inbound-cla.md).
 
 ## What needs a CLA
 
@@ -59,11 +59,12 @@ sign:
 
 - `kentcdodds` (Licensor)
 - `kody-bot` and other logins listed in that file
+- `cursoragent` (Cursor Cloud Agent commit author)
 - Licensor-owned commit emails listed in that file
 - GitHub accounts whose login ends in `[bot]` or starts with `app/`
 
-Cursor Cloud Agent pull requests that GitHub authors as `kentcdodds` follow
-the Licensor path.
+Cursor Cloud Agent pull requests follow the Licensor path even when GitHub
+authors the pull request as `kentcdodds` and the commits as `cursoragent`.
 
 ## Maintainer steps
 
