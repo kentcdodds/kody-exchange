@@ -17,6 +17,8 @@ This file is brief. Skills and docs:
   [`docs/contributing/architecture/primitives.md`](./docs/contributing/architecture/primitives.md)
 - Agent HTTP/MCP use:
   [`docs/use/index.md`](./docs/use/index.md)
+- Inbound CLA:
+  [`docs/contributing/inbound-contributions.md`](./docs/contributing/inbound-contributions.md)
 
 ## This repo
 

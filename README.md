@@ -27,8 +27,15 @@ Ask the human for `purpose` and `name` before that POST — do not invent them. 
 - [Primitives and invariants](./docs/contributing/architecture/primitives.md)
 - [Setup](./docs/contributing/setup.md)
 - [Agent use](./docs/use/index.md)
+- [Inbound contributions](./docs/contributing/inbound-contributions.md)
 
 `npm run validate` is the local gate.
+
+## Contributing
+
+Outside pull requests to this repository need a signed inbound
+[Contributor License Agreement](./docs/contributing/inbound-contributions.md).
+See [`CONTRIBUTING.md`](./CONTRIBUTING.md).
 
 ## License
 
