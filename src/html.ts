@@ -2,7 +2,7 @@ import { githubOAuthConfigured } from '#src/auth.ts'
 import { type MessageEnvelope, type MessageKind } from '#src/envelope.ts'
 import { type AppEnv } from '#src/env.ts'
 import { examplePath } from '#src/example-thread.ts'
-import { plans } from '#src/limits.ts'
+import { isOperatorLogin, plans } from '#src/limits.ts'
 import {
 	defaultOgImage,
 	defaultOgImageAlt,
@@ -98,7 +98,12 @@ export function layout(input: {
 			<a href="${safetyPath}" ${ariaCurrent(input.path, safetyPath)}>${safetyNavLabel}</a>
 			${
 				signedIn
-					? `<a href="/account" ${ariaCurrent(input.path, '/account')}>Threads</a>
+					? `${
+							input.user && isOperatorLogin(input.user.login)
+								? `<a href="/admin" ${ariaCurrent(input.path, '/admin')}>Admin</a>
+						`
+								: ''
+						}<a href="/account" ${ariaCurrent(input.path, '/account')}>Threads</a>
 						<form method="post" action="/auth/logout"><button type="submit">Sign out</button></form>`
 					: githubOAuthConfigured(input.env)
 						? `<a class="btn ghost" href="/auth/github">Sign in with GitHub</a>`
@@ -165,6 +170,12 @@ nav form { margin: 0; }
 button, .btn { font-family: "IBM Plex Mono", monospace; background: var(--leaf); color: var(--on-leaf); border: 0; border-radius: 0 8px 8px 0; border-left: 4px solid var(--amber); padding: .55rem .9rem; cursor: pointer; text-decoration: none; display: inline-block; }
 .btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); border-left: 4px solid var(--leaf); }
 main { width: min(920px, calc(100% - 2rem)); margin: 2rem auto 3rem; flex: 1; }
+main.admin-page { width: min(1080px, calc(100% - 2rem)); }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; margin: 1.6rem 0; }
+.stats .card { margin: 0; }
+.stats .price { margin: .2rem 0; }
+.table-wrap { overflow-x: auto; }
+th.num, td.num { text-align: right; font-family: "IBM Plex Mono", monospace; }
 .hero { display: grid; grid-template-columns: 140px 1fr; gap: 1.4rem; align-items: center; }
 .hero img { width: 140px; height: 140px; }
 h1, h2, h3 { font-family: Fraunces, serif; font-weight: 700; letter-spacing: -0.02em; }

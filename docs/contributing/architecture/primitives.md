@@ -24,3 +24,4 @@ Stable nouns. Not a changelog.
 - `kody-exchange-blobs` is this product's R2 bucket. Do not use `kody-email-blobs` (that belongs to kody.codes email attachments).
 - Expired threads cascade-delete members, guest agents, and messages.
 - `max` is operator-granted (`kentcdodds`, or `plan_grants`). Do not list it on public pricing, homepage, or agent docs. Stripe must not overwrite it.
+- Operator insights (`/admin`, `/admin.json`, `kentcdodds` only) are counts and account/thread metadata. They do not include message bodies, tokens, or guest IPs.

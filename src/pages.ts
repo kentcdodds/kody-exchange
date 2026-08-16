@@ -40,6 +40,12 @@ import {
 } from '#src/example-thread.ts'
 import { researchPage } from '#src/research-page.ts'
 import { grantMaxToLogin } from '#src/grants.ts'
+import {
+	adminJsonPath,
+	adminPage,
+	adminPath,
+	loadAdminInsights,
+} from '#src/admin.ts'
 import { getPlan, isOperatorLogin } from '#src/limits.ts'
 import { clientIp, limitViewPoll, workerPollCache } from '#src/rate-limit.ts'
 import {
@@ -167,6 +173,9 @@ export async function renderPage(
 				return Response.redirect(`${baseUrl}/auth/github`, 302)
 			}
 			return renderAccountPage(request, env, user)
+		case adminPath:
+		case adminJsonPath:
+			return renderAdmin(request, env, user, url.pathname === adminJsonPath)
 		default:
 			return null
 	}
@@ -340,6 +349,51 @@ async function pollThreadView(
 		},
 		200,
 		{ 'retry-after': String(listed.retryAfter) },
+	)
+}
+
+function adminJson(data: unknown, status = 200) {
+	return new Response(JSON.stringify(data), {
+		status,
+		headers: {
+			'content-type': 'application/json; charset=utf-8',
+			'cache-control': 'no-store',
+		},
+	})
+}
+
+async function renderAdmin(
+	request: Request,
+	env: AppEnv,
+	user: UserRow | null,
+	asJson: boolean,
+) {
+	if (!user) {
+		if (asJson) {
+			return adminJson({ ok: false, error: 'Sign in required.' }, 401)
+		}
+		const next = new URL('/auth/github', appBaseUrl(env, request))
+		next.searchParams.set('next', adminPath)
+		return Response.redirect(next.toString(), 302)
+	}
+	if (!isOperatorLogin(user.login)) {
+		return asJson
+			? adminJson({ ok: false, error: 'Not found.' }, 404)
+			: json({ ok: false, error: 'Not found.' }, 404)
+	}
+	const insights = await loadAdminInsights(env.DB)
+	if (asJson) return adminJson({ ok: true, ...insights })
+	return html(
+		layout({
+			user,
+			env,
+			path: adminPath,
+			title: 'Usage',
+			description: 'Operator usage snapshot for kody.exchange.',
+			extraHead: '<meta name="robots" content="noindex" />',
+			mainClass: 'admin-page',
+			body: adminPage(insights),
+		}),
 	)
 }
 
