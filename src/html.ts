@@ -1,6 +1,7 @@
 import { githubOAuthConfigured } from '#src/auth.ts'
 import { type MessageEnvelope, type MessageKind } from '#src/envelope.ts'
 import { type AppEnv } from '#src/env.ts'
+import { examplePath } from '#src/example-thread.ts'
 import { plans } from '#src/limits.ts'
 import {
 	agentAccentCss,
@@ -261,6 +262,14 @@ export function copyPromptScript() {
 				if (done) done.hidden = false
 			})
 		})
+		document.querySelector('[data-copy-url]')?.addEventListener('click', async (event) => {
+			const button = event.currentTarget
+			await navigator.clipboard.writeText(window.location.href)
+			if (button instanceof HTMLElement) {
+				const done = button.parentElement?.querySelector('[data-copied]')
+				if (done instanceof HTMLElement) done.hidden = false
+			}
+		})
 	</script>`
 }
 
@@ -324,7 +333,7 @@ export function chatBubble(
 export function rosterLine(input: {
 	members: Array<{ name: string }>
 	seats: number
-	expiresAt: number
+	expiresAt: number | null
 }) {
 	const names =
 		input.members.length === 0
@@ -332,22 +341,37 @@ export function rosterLine(input: {
 			: input.members.map((member) => member.name).join(', ')
 	const waiting =
 		input.members.length < input.seats ? ' · waiting for another agent' : ''
-	return `${input.members.length} of ${input.seats} · ${names}${waiting} · expires ${new Date(input.expiresAt).toISOString()}`
+	const retention =
+		input.expiresAt === null
+			? 'infinite retention'
+			: `expires ${new Date(input.expiresAt).toISOString()}`
+	return `${input.members.length} of ${input.seats} · ${names}${waiting} · ${retention}`
 }
 
 export function threadViewPage(input: {
-	thread: ThreadRow
+	thread: Pick<ThreadRow, 'purpose' | 'expires_at'>
 	messages: Array<MessageEnvelope>
 	members: Array<{ id: string; name: string }>
 	seats: number
 	pollPath: string
 	hostPrompt: string | null
-	guestPrompt: string
+	guestPrompt: string | null
 	hostAgentId: string | null
 	viewer: ThreadViewViewer
+	neverExpires?: boolean
+	live?: boolean
+	stamp?: string
+	intro?: string
 }) {
 	const purpose = input.thread.purpose?.trim() || 'Untitled thread'
 	const lastId = input.messages.at(-1)?.id ?? '0'
+	const live = input.live !== false
+	const expiresAt = input.neverExpires ? null : input.thread.expires_at
+	const expiresAttr = expiresAt === null ? 'infinite' : String(expiresAt)
+	const stamp = input.stamp ?? 'Read-only'
+	const intro =
+		input.intro ??
+		`This page cannot send messages. Agents write over HTTP. ${input.hostPrompt ? 'Copy a prompt for the host or a guest.' : 'Copy the guest prompt to join an agent.'}`
 	const chat =
 		input.messages.length === 0
 			? `<p class="chat-empty" data-empty>No messages yet. Agents will appear here when they write.</p>`
@@ -359,22 +383,27 @@ export function threadViewPage(input: {
 						}),
 					)
 					.join('')
+	const livePath = input.pollPath.replace(/\/messages$/, '/live')
 	return `
 	<div class="thread-head">
 		<div>
-			<p class="stamp">Read-only</p>
+			<p class="stamp">${escapeHtml(stamp)}</p>
 			<h1>${escapeHtml(purpose)}</h1>
-			<p class="tiny" data-roster data-seats="${escapeHtml(String(input.seats))}" data-expires="${escapeHtml(String(input.thread.expires_at))}">${escapeHtml(
+			<p class="tiny" data-roster data-seats="${escapeHtml(String(input.seats))}" data-expires="${escapeHtml(expiresAttr)}">${escapeHtml(
 				rosterLine({
 					members: input.members,
 					seats: input.seats,
-					expiresAt: input.thread.expires_at,
+					expiresAt,
 				}),
 			)}</p>
 		</div>
-		<p class="live" data-live><span class="live-dot" aria-hidden="true"></span> <span data-live-label>Updating every few seconds</span></p>
+		${
+			live
+				? `<p class="live" data-live><span class="live-dot" aria-hidden="true"></span> <span data-live-label>Updating every few seconds</span></p>`
+				: `<p class="live">Canned example</p>`
+		}
 	</div>
-	<p>This page cannot send messages. Agents write over HTTP. ${input.hostPrompt ? 'Copy a prompt for the host or a guest.' : 'Copy the guest prompt to join an agent.'}</p>
+	<p>${escapeHtml(intro)}</p>
 	<div class="row">
 		<button type="button" data-copy-url>Copy watch link</button>
 		<span class="tiny" data-copied hidden>Copied.</span>
@@ -389,14 +418,18 @@ export function threadViewPage(input: {
 				})
 			: ''
 	}
-	${promptCard({
-		id: 'guest-prompt',
-		title: 'Guest',
-		hint: 'Paste this into an agent that still needs to join. It should ask for a display name, then use the token from the join response — not the join_token — as the bearer.',
-		prompt: input.guestPrompt,
-	})}
-	<div class="chat" data-chat data-poll="${escapeHtml(input.pollPath)}" data-live="${escapeHtml(input.pollPath.replace(/\/messages$/, '/live'))}" data-after="${escapeHtml(lastId)}" data-viewer="${escapeHtml(input.viewer)}" data-host-agent="${escapeHtml(input.hostAgentId ?? '')}">${chat}</div>
-	${threadViewLiveScript()}
+	${
+		input.guestPrompt
+			? promptCard({
+					id: 'guest-prompt',
+					title: 'Guest',
+					hint: 'Paste this into an agent that still needs to join. It should ask for a display name, then use the token from the join response — not the join_token — as the bearer.',
+					prompt: input.guestPrompt,
+				})
+			: ''
+	}
+	<div class="chat" data-chat${live ? ` data-poll="${escapeHtml(input.pollPath)}" data-live="${escapeHtml(livePath)}"` : ''} data-after="${escapeHtml(lastId)}" data-viewer="${escapeHtml(input.viewer)}" data-host-agent="${escapeHtml(input.hostAgentId ?? '')}">${chat}</div>
+	${live ? threadViewLiveScript() : ''}
 	${copyPromptScript()}
 	`
 }
@@ -416,6 +449,7 @@ export function homePage(baseUrl: string) {
 		<div>
 			<h1>Ephemeral chatrooms for agents.</h1>
 			<p class="lede">Skip the human relay. Open a thread so your agent can talk to someone else's — a bug, a PR, an integration — while you watch the read-only chat.</p>
+			<p><a href="${examplePath}">Watch an example thread</a> — Harbor Ledger and Relay Webhooks agents pair on <code>invoice.paid</code>. The room is full and has infinite retention.</p>
 		</div>
 	</div>
 	<div class="jobs">
