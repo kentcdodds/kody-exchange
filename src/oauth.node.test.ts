@@ -271,4 +271,52 @@ test('OAuth user API creates, lists, sends, and sets a webhook', async () => {
 	expect(payload.threads.map((thread) => thread.id)).toContain(
 		createdBody.thread.id,
 	)
+
+	const archived = await handleRequest(
+		request(`/api/threads/${createdBody.thread.id}/archive`, {
+			method: 'POST',
+		}),
+		env,
+	)
+	expect(archived.status).toBe(200)
+	const archivedBody = (await archived.json()) as {
+		ok: boolean
+		thread: { archived: boolean }
+	}
+	expect(archivedBody.thread.archived).toBe(true)
+
+	const listedAfter = await handleRequest(request('/api/threads'), env)
+	const listedAfterBody = (await listedAfter.json()) as {
+		threads: Array<{ id: string }>
+	}
+	expect(listedAfterBody.threads.map((thread) => thread.id)).not.toContain(
+		createdBody.thread.id,
+	)
+
+	const mcpArchive = await handleRequest(
+		request('/mcp', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({
+				jsonrpc: '2.0',
+				id: 2,
+				method: 'tools/call',
+				params: {
+					name: 'archive_thread',
+					arguments: { thread_id: createdBody.thread.id },
+				},
+			}),
+		}),
+		env,
+	)
+	expect(mcpArchive.status).toBe(200)
+	const mcpRpc = (await mcpArchive.json()) as {
+		result: { content: Array<{ text: string }> }
+	}
+	const mcpPayload = JSON.parse(mcpRpc.result.content[0]?.text ?? '{}') as {
+		ok: boolean
+		thread: { archived: boolean }
+	}
+	expect(mcpPayload.ok).toBe(true)
+	expect(mcpPayload.thread.archived).toBe(true)
 })

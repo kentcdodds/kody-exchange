@@ -1,10 +1,15 @@
 import { errorResponse, json } from '#src/api.ts'
-import { maybeBroadcastThreadView } from '#src/thread-room.ts'
+import {
+	maybeBroadcastThreadView,
+	maybeCloseThreadView,
+} from '#src/thread-room.ts'
 import { all, first } from '#src/db.ts'
 import { type AppEnv, appBaseUrl } from '#src/env.ts'
 import {
+	archiveThread,
 	createThread,
 	getHostAgent,
+	isThreadArchived,
 	joinThread,
 	listMessages,
 	listThreadMembers,
@@ -32,12 +37,14 @@ function threadJson(thread: {
 	purpose: string | null
 	created_at: number
 	expires_at: number
+	archived_at?: number | null
 }) {
 	return {
 		id: thread.id,
 		purpose: thread.purpose,
 		created_at: new Date(thread.created_at).toISOString(),
 		expires_at: new Date(thread.expires_at).toISOString(),
+		archived: isThreadArchived(thread),
 	}
 }
 
@@ -81,7 +88,7 @@ async function listOwnedThreads(env: AppEnv, user: UserRow) {
 			 SELECT COUNT(*) FROM thread_members m WHERE m.thread_id = t.id
 		 ) AS member_count
 		 FROM threads t
-		 WHERE t.owner_user_id = ? AND t.expires_at > ?
+		 WHERE t.owner_user_id = ? AND t.expires_at > ? AND t.archived_at IS NULL
 		 ORDER BY t.created_at DESC`,
 		user.id,
 		Date.now(),
@@ -221,6 +228,19 @@ export async function handleUserApi(
 		})
 		if (!result.ok) return errorResponse(result)
 		return json({ ok: true, url: result.url })
+	}
+
+	const archive = url.pathname.match(/^\/api\/threads\/([^/]+)\/archive$/)
+	if (archive?.[1] && request.method === 'POST') {
+		const owned = await requireOwnedThread(env, user, archive[1])
+		if (!owned.ok) return owned.response
+		const archived = await archiveThread({
+			db: env.DB,
+			threadId: owned.thread.id,
+		})
+		if (!archived.ok) return errorResponse(archived)
+		await maybeCloseThreadView(env, archived.thread.id, ctx)
+		return json({ ok: true, thread: threadJson(archived.thread) })
 	}
 
 	return json({ ok: false, error: 'Not found.', code: 'not_found' }, 404)

@@ -426,6 +426,7 @@ test('pricing page explains live threads and participants', async () => {
 	expect(docsHtml).toContain('Included with a free GitHub account')
 	expect(docsHtml).toContain('not a paid upgrade')
 	expect(docsHtml).toContain('new messages appear immediately')
+	expect(docsHtml).toContain('POST /v1/archive')
 	expect(docsHtml).toContain(`href="${safetyPath}"`)
 	expect(docsHtml).not.toContain('Max')
 
@@ -462,4 +463,113 @@ test('pricing page explains live threads and participants', async () => {
 	expect(legacyResearch.headers.get('location')).toBe(
 		'https://kody.exchange/safety',
 	)
+})
+
+test('host archive freezes send, poll, and the watch page live subscription', async () => {
+	const env = createTestEnv()
+	const createdResponse = await handleRequest(
+		request('/v1/threads', {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				'cf-connecting-ip': '203.0.113.60',
+			},
+			body: JSON.stringify({ purpose: 'close the room', name: 'host' }),
+		}),
+		env,
+	)
+	const created = (await createdResponse.json()) as {
+		ok: boolean
+		token: string
+		join_token: string
+		view_url: string
+		agent: { id: string }
+	}
+	expect(created.ok).toBe(true)
+	const joined = await handleRequest(
+		request('/v1/join', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ join_token: created.join_token, name: 'guest' }),
+		}),
+		env,
+	)
+	const joinedBody = (await joined.json()) as { token: string }
+	const guestArchive = await handleRequest(
+		request('/v1/archive', {
+			method: 'POST',
+			headers: { authorization: `Bearer ${joinedBody.token}` },
+		}),
+		env,
+	)
+	expect(guestArchive.status).toBe(403)
+	const archived = await handleRequest(
+		request('/v1/archive', {
+			method: 'POST',
+			headers: { authorization: `Bearer ${created.token}` },
+		}),
+		env,
+	)
+	expect(archived.status).toBe(200)
+	const archivedBody = (await archived.json()) as {
+		ok: boolean
+		thread: { archived: boolean }
+	}
+	expect(archivedBody.thread.archived).toBe(true)
+
+	const sent = await handleRequest(
+		request('/v1/messages', {
+			method: 'POST',
+			headers: {
+				authorization: `Bearer ${created.token}`,
+				'content-type': 'application/json',
+			},
+			body: JSON.stringify({ body: { text: 'too late' } }),
+		}),
+		env,
+	)
+	expect(sent.status).toBe(409)
+	const sentBody = (await sent.json()) as { code: string; error: string }
+	expect(sentBody.code).toBe('thread_archived')
+	expect(sentBody.error).toContain('read-only')
+
+	const polled = await handleRequest(
+		request('/v1/messages?after=0', {
+			headers: { authorization: `Bearer ${joinedBody.token}` },
+		}),
+		env,
+	)
+	expect(polled.status).toBe(409)
+	expect(((await polled.json()) as { code: string }).code).toBe(
+		'thread_archived',
+	)
+
+	const viewPath = new URL(created.view_url).pathname
+	const viewPage = await handleRequest(request(viewPath), env)
+	expect(viewPage.status).toBe(200)
+	const viewHtml = await viewPage.text()
+	expect(viewHtml).toContain('Archived')
+	expect(viewHtml).toContain('does not subscribe for updates')
+	expect(viewHtml).not.toContain('data-poll=')
+	expect(viewHtml).not.toContain('data-live=')
+	expect(viewHtml).not.toContain('connectLive()')
+	expect(viewHtml).not.toContain('new WebSocket')
+	expect(viewHtml).not.toContain('<p class="live"')
+	expect(viewHtml).not.toContain('>Guest<')
+	expect(viewHtml).not.toContain(created.join_token)
+
+	const viewPoll = await handleRequest(
+		request(`${viewPath}/messages?after=0`),
+		env,
+	)
+	expect(viewPoll.status).toBe(409)
+	expect(((await viewPoll.json()) as { code: string }).code).toBe(
+		'thread_archived',
+	)
+
+	const live = await handleRequest(
+		request(`${viewPath}/live`, { headers: { upgrade: 'websocket' } }),
+		env,
+	)
+	expect(live.status).toBe(409)
 })

@@ -81,6 +81,18 @@ const tools = [
 			required: ['thread_id', 'url'],
 		},
 	},
+	{
+		name: 'archive_thread',
+		description:
+			'Archive a thread you own. It becomes read-only: send, poll, and the watch-page live subscription stop.',
+		inputSchema: {
+			type: 'object',
+			properties: {
+				thread_id: { type: 'string' },
+			},
+			required: ['thread_id'],
+		},
+	},
 ] as const
 
 function rpcResult(id: JsonRpc['id'], result: unknown) {
@@ -249,6 +261,16 @@ async function callTool(
 					method: 'PUT',
 					headers: { 'content-type': 'application/json' },
 					body: JSON.stringify({ url: args.url }),
+				}),
+				env,
+				user,
+				ctx,
+			)
+			break
+		case 'archive_thread':
+			response = await handleUserApi(
+				new Request(new URL(`/api/threads/${threadId}/archive`, request.url), {
+					method: 'POST',
 				}),
 				env,
 				user,

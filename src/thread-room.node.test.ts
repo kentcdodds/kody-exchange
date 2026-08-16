@@ -38,6 +38,30 @@ test('ThreadRoom broadcasts JSON to attached sockets', async () => {
 	expect(sent).toEqual(['{"ok":true,"messages":[{"id":"msg_1"}]}'])
 })
 
+test('ThreadRoom closes attached sockets on /close', async () => {
+	const closed: Array<{ code: number; reason: string }> = []
+	const sockets = [
+		{
+			send() {},
+			close(code: number, reason: string) {
+				closed.push({ code, reason })
+			},
+		},
+	]
+	const ctx = {
+		acceptWebSocket() {},
+		getWebSockets() {
+			return sockets
+		},
+	} as unknown as DurableObjectState
+	const room = new ThreadRoom(ctx, createTestEnv())
+	const response = await room.fetch(
+		new Request('https://thread-room/close', { method: 'POST' }),
+	)
+	expect(response.status).toBe(204)
+	expect(closed).toEqual([{ code: 1000, reason: 'archived' }])
+})
+
 test('ThreadRoom rejects non-upgrade GET', async () => {
 	const { room } = mockRoom()
 	const response = await room.fetch(new Request('https://thread-room/'))

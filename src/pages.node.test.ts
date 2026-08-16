@@ -359,3 +359,91 @@ test('thread view aligns host messages right for the owner and guest messages ri
 		/data-agent="[^"]+"(?![^>]*data-mine)[^>]*>[\s\S]*host says hello/,
 	)
 })
+
+test('signed-in host can close a thread from the account page', async () => {
+	const env = createTestEnv()
+	const { cookie, csrf } = await createSignedInUser(env)
+	const created = await handleRequest(
+		request('/account/threads', {
+			method: 'POST',
+			headers: {
+				cookie,
+				'content-type': 'application/x-www-form-urlencoded',
+			},
+			body: new URLSearchParams({
+				csrf,
+				purpose: 'close from account',
+				name: 'host-agent',
+			}),
+		}),
+		env,
+	)
+	expect(created.status).toBe(303)
+	const flash = firstSetCookie(created)
+	const withPrompts = await handleRequest(
+		request('/account', { headers: { cookie: `${cookie}; ${flash}` } }),
+		env,
+	)
+	const accountHtml = await withPrompts.text()
+	expect(accountHtml).toContain('Close thread')
+	const threadId = /th_[a-z0-9]+/.exec(accountHtml)?.[0]
+	expect(threadId).toBeTruthy()
+
+	const closed = await handleRequest(
+		request(`/account/threads/${threadId}/archive`, {
+			method: 'POST',
+			headers: {
+				cookie,
+				'content-type': 'application/x-www-form-urlencoded',
+			},
+			body: new URLSearchParams({ csrf }),
+		}),
+		env,
+	)
+	expect(closed.status).toBe(303)
+	expect(closed.headers.get('location')).toBe(
+		'https://kody.exchange/account?archived=1',
+	)
+
+	const later = await handleRequest(
+		request('/account?archived=1', { headers: { cookie } }),
+		env,
+	)
+	const laterHtml = await later.text()
+	expect(laterHtml).toContain('Thread archived. It is read-only now.')
+	expect(laterHtml).toContain('Archived')
+	expect(laterHtml).toContain('close from account')
+	expect(laterHtml).toContain("What's this thread for?")
+	expect(laterHtml).not.toContain('Close thread')
+
+	const missing = await handleRequest(
+		request('/account/threads/th_missing/archive', {
+			method: 'POST',
+			headers: {
+				cookie,
+				'content-type': 'application/x-www-form-urlencoded',
+			},
+			body: new URLSearchParams({ csrf }),
+		}),
+		env,
+	)
+	expect(missing.status).toBe(303)
+	expect(missing.headers.get('location')).toContain('error=not_found')
+	const missingPage = await handleRequest(
+		request('/account?error=not_found', { headers: { cookie } }),
+		env,
+	)
+	expect(await missingPage.text()).toContain('That thread was not found.')
+	const failedPage = await handleRequest(
+		request('/account?error=archive_failed', { headers: { cookie } }),
+		env,
+	)
+	expect(await failedPage.text()).toContain(
+		'Could not archive that thread. Try again.',
+	)
+	const expiredPage = await handleRequest(
+		request('/account?error=thread_not_found', { headers: { cookie } }),
+		env,
+	)
+	expect(await expiredPage.text()).toContain('That thread was not found.')
+})

@@ -8,6 +8,8 @@ import {
 	workerPollCache,
 } from '#src/rate-limit.ts'
 import {
+	archiveThreadAsHost,
+	assertThreadLive,
 	createThread,
 	maybeDispatchWebhook,
 	getAgentByToken,
@@ -21,6 +23,7 @@ import {
 	type AgentRow,
 	type DomainError,
 } from '#src/threads.ts'
+import { maybeCloseThreadView } from '#src/thread-room.ts'
 import { createId } from '#src/ids.ts'
 import { first, run } from '#src/db.ts'
 import { freeAccountUpsell, isGuestUpsellCode } from '#src/free-account.ts'
@@ -146,6 +149,10 @@ export async function handleApi(
 
 	if (url.pathname === '/v1/webhook' && request.method === 'PUT') {
 		return webhookRoute(request, env)
+	}
+
+	if (url.pathname === '/v1/archive' && request.method === 'POST') {
+		return archiveRoute(request, env, ctx)
 	}
 
 	if (url.pathname === '/v1/blobs' && request.method === 'POST') {
@@ -400,6 +407,31 @@ async function webhookRoute(request: Request, env: AppEnv) {
 	return json({ ok: true, url: result.url })
 }
 
+async function archiveRoute(
+	request: Request,
+	env: AppEnv,
+	ctx?: ExecutionContext,
+) {
+	const auth = await requireAgent(request, env)
+	if (!auth.ok) return auth.response
+	const scoped = threadIdForAgent(auth.agent)
+	if (!scoped.ok) return scoped.response
+	const archived = await archiveThreadAsHost({
+		db: env.DB,
+		threadId: scoped.threadId,
+		agent: auth.agent,
+	})
+	if (!archived.ok) return errorResponse(archived)
+	await maybeCloseThreadView(env, archived.thread.id, ctx)
+	return json({
+		ok: true,
+		thread: {
+			...guestThreadJson(archived.thread),
+			archived: true,
+		},
+	})
+}
+
 async function uploadBlob(request: Request, env: AppEnv) {
 	const auth = await requireAgent(request, env)
 	if (!auth.ok) return auth.response
@@ -411,6 +443,8 @@ async function uploadBlob(request: Request, env: AppEnv) {
 		agent: auth.agent,
 	})
 	if (!membership.ok) return errorResponse(membership)
+	const live = assertThreadLive(membership.thread)
+	if (!live.ok) return errorResponse(live)
 	const plan = getPlan(membership.plan)
 	if (!plan.blobs) {
 		return json(

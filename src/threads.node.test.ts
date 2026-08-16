@@ -1,6 +1,8 @@
 import { expect, test } from 'vitest'
 import { createTestEnv } from '#src/test-support.ts'
 import {
+	archiveThread,
+	archiveThreadAsHost,
 	createAccountAgent,
 	createThread,
 	getAgentByToken,
@@ -360,6 +362,142 @@ test('free accounts cannot mint a fourth live agent token', async () => {
 	).toBe(true)
 	const fourth = await createAccountAgent({ db: env.DB, user, name: 'four' })
 	expect(fourth).toMatchObject({ ok: false, code: 'agent_limit' })
+})
+
+test('host can archive a thread; send, poll, join, and webhook then fail', async () => {
+	const env = createTestEnv()
+	const now = Date.parse('2026-08-16T00:00:00Z')
+	const created = await createThread({
+		db: env.DB,
+		baseUrl: 'https://kody.exchange',
+		ownerUserId: null,
+		creatorIp: '203.0.113.50',
+		name: 'cursor',
+		webhookUrl: 'https://hooks.example.test/room',
+		now,
+	})
+	if (!created.ok) throw new Error(created.error)
+	const joined = await joinThread({
+		db: env.DB,
+		joinToken: created.joinToken,
+		name: 'claude',
+		now: now + 1000,
+	})
+	if (!joined.ok) throw new Error(joined.error)
+
+	const guestArchive = await archiveThreadAsHost({
+		db: env.DB,
+		threadId: created.thread.id,
+		agent: joined.agent,
+		now: now + 2000,
+	})
+	expect(guestArchive).toMatchObject({ ok: false, code: 'not_host' })
+
+	const archived = await archiveThreadAsHost({
+		db: env.DB,
+		threadId: created.thread.id,
+		agent: created.agent,
+		now: now + 2000,
+	})
+	if (!archived.ok) throw new Error(archived.error)
+	expect(archived.thread.archived_at).toBe(now + 2000)
+	expect(archived.thread.webhook_url).toBeNull()
+
+	const sent = await sendMessage({
+		db: env.DB,
+		threadId: created.thread.id,
+		agent: created.agent,
+		body: { text: 'too late' },
+		now: now + 3000,
+	})
+	expect(sent).toMatchObject({
+		ok: false,
+		status: 409,
+		code: 'thread_archived',
+	})
+	if (sent.ok) throw new Error('expected send to fail')
+	expect(sent.error).toContain('read-only')
+
+	const polled = await listMessages({
+		db: env.DB,
+		threadId: created.thread.id,
+		agent: joined.agent,
+		after: '0',
+		now: now + 3000,
+	})
+	expect(polled).toMatchObject({
+		ok: false,
+		status: 409,
+		code: 'thread_archived',
+	})
+
+	const lateJoin = await joinThread({
+		db: env.DB,
+		joinToken: created.joinToken,
+		name: 'late',
+		now: now + 3000,
+	})
+	expect(lateJoin).toMatchObject({ ok: false, code: 'thread_archived' })
+
+	const webhook = await setWebhook({
+		db: env.DB,
+		threadId: created.thread.id,
+		agent: created.agent,
+		url: 'https://hooks.example.test/other',
+		now: now + 3000,
+	})
+	expect(webhook).toMatchObject({ ok: false, code: 'thread_archived' })
+
+	const viewed = await listMessagesForView({
+		db: env.DB,
+		viewToken: await viewTokenFor(created.thread),
+		now: now + 3000,
+	})
+	if (!viewed.ok) throw new Error(viewed.error)
+	expect(viewed.thread.archived_at).toBe(now + 2000)
+	expect(viewed.messages.map((message) => message.body)).toEqual([
+		{ text: 'cursor joined.' },
+		{ text: 'claude joined.' },
+	])
+
+	const again = await createThread({
+		db: env.DB,
+		baseUrl: 'https://kody.exchange',
+		ownerUserId: null,
+		creatorIp: '203.0.113.50',
+		name: 'next',
+		now: now + 4000,
+	})
+	expect(again.ok).toBe(true)
+
+	const webhookCalls: Array<string> = []
+	const originalFetch = globalThis.fetch
+	globalThis.fetch = (async (input: RequestInfo | URL) => {
+		webhookCalls.push(String(input))
+		return new Response('ok')
+	}) as typeof fetch
+	try {
+		await maybeDispatchWebhook(env.DB, created.thread.id, {
+			id: 'msg_x',
+			at: new Date(now).toISOString(),
+			from: { agent_id: created.agent.id, name: 'cursor' },
+			thread: created.thread.id,
+			kind: 'message',
+			body: { text: 'should not fire' },
+			refs: [],
+		})
+		expect(webhookCalls).toEqual([])
+	} finally {
+		globalThis.fetch = originalFetch
+	}
+
+	const idempotent = await archiveThread({
+		db: env.DB,
+		threadId: created.thread.id,
+		now: now + 5000,
+	})
+	if (!idempotent.ok) throw new Error(idempotent.error)
+	expect(idempotent.thread.archived_at).toBe(now + 2000)
 })
 
 test('webhook dispatch stays alive through waitUntil', async () => {

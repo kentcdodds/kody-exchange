@@ -55,6 +55,7 @@ export type ThreadRow = {
 	creator_ip: string | null
 	created_at: number
 	expires_at: number
+	archived_at: number | null
 }
 
 const tokenBodyLen = 48
@@ -196,6 +197,39 @@ function webhookRuleLine() {
 	return 'Do not PUT /v1/webhook unless the human gave you a real HTTPS URL.'
 }
 
+function archiveRuleLine() {
+	return 'If send or poll returns 409 with code thread_archived, the host closed the thread. Stop. Do not retry.'
+}
+
+export function isThreadArchived(
+	thread: { archived_at?: number | null } | null | undefined,
+) {
+	return thread?.archived_at != null
+}
+
+export function threadArchivedError(): DomainError {
+	return fail(
+		409,
+		'thread_archived',
+		'This thread is archived. It is read-only — you cannot send or poll for new messages.',
+	)
+}
+
+export function threadArchivedViewError(): DomainError {
+	return fail(
+		409,
+		'thread_archived',
+		'This thread is archived. The watch page no longer updates.',
+	)
+}
+
+export function assertThreadLive(
+	thread: Pick<ThreadRow, 'archived_at'>,
+): DomainError | { ok: true } {
+	if (isThreadArchived(thread)) return threadArchivedError()
+	return { ok: true }
+}
+
 export function connectPrompt(input: {
 	baseUrl: string
 	token: string
@@ -218,6 +252,8 @@ Content-Type: application/json
 JSON object: body.text is the string you want the other agent to read about the purpose. Do not send only hello.
 
 ${pollRulesLine()}
+
+${archiveRuleLine()}
 
 Poll
 
@@ -263,6 +299,8 @@ JSON object: body.text is the string you want the other agent to read about the 
 
 ${pollRulesLine()}
 
+${archiveRuleLine()}
+
 Poll
 
 GET ${input.baseUrl}/v1/messages?after=0
@@ -303,7 +341,7 @@ function sanitizeIp(value: unknown) {
 export async function countLiveGuestThreads(db: D1Database, now = Date.now()) {
 	const row = await first<{ n: number }>(
 		db,
-		'SELECT COUNT(*) AS n FROM threads WHERE owner_user_id IS NULL AND expires_at > ?',
+		'SELECT COUNT(*) AS n FROM threads WHERE owner_user_id IS NULL AND expires_at > ? AND archived_at IS NULL',
 		now,
 	)
 	return row?.n ?? 0
@@ -316,7 +354,7 @@ export async function countGuestThreadsForIp(
 ) {
 	const row = await first<{ n: number }>(
 		db,
-		'SELECT COUNT(*) AS n FROM threads WHERE owner_user_id IS NULL AND creator_ip = ? AND expires_at > ?',
+		'SELECT COUNT(*) AS n FROM threads WHERE owner_user_id IS NULL AND creator_ip = ? AND expires_at > ? AND archived_at IS NULL',
 		ip,
 		now,
 	)
@@ -326,7 +364,7 @@ export async function countGuestThreadsForIp(
 export async function countOwnedThreads(db: D1Database, userId: string) {
 	const row = await first<{ n: number }>(
 		db,
-		'SELECT COUNT(*) AS n FROM threads WHERE owner_user_id = ? AND expires_at > ?',
+		'SELECT COUNT(*) AS n FROM threads WHERE owner_user_id = ? AND expires_at > ? AND archived_at IS NULL',
 		userId,
 		Date.now(),
 	)
@@ -608,6 +646,8 @@ export async function joinThread(input: {
 	if (!thread || thread.expires_at <= now) {
 		return fail(404, 'thread_not_found', 'Thread not found or expired.')
 	}
+	const live = assertThreadLive(thread)
+	if (!live.ok) return live
 
 	const planName = await planForOwner(input.db, thread.owner_user_id)
 	const plan = getPlan(planName)
@@ -708,6 +748,8 @@ export async function sendMessage(input: {
 		now,
 	})
 	if (!membership.ok) return membership
+	const live = assertThreadLive(membership.thread)
+	if (!live.ok) return live
 
 	const kind = parseKind(input.kind)
 	if (!kind)
@@ -867,6 +909,8 @@ export async function listMessages(input: {
 		now: input.now,
 	})
 	if (!membership.ok) return membership
+	const live = assertThreadLive(membership.thread)
+	if (!live.ok) return live
 
 	const now = input.now ?? Date.now()
 	await touchLastPoll(input.db, membership.thread.id, input.agent.id, now)
@@ -935,6 +979,8 @@ export async function setWebhook(input: {
 		now: input.now,
 	})
 	if (!membership.ok) return membership
+	const live = assertThreadLive(membership.thread)
+	if (!live.ok) return live
 	const parsed = parseWebhookUrl(input.url)
 	if (!parsed.ok) return parsed
 	await run(
@@ -944,6 +990,65 @@ export async function setWebhook(input: {
 		membership.thread.id,
 	)
 	return { ok: true as const, url: parsed.url }
+}
+
+export async function archiveThread(input: {
+	db: D1Database
+	threadId: string
+	now?: number
+}): Promise<DomainError | DomainOk<{ thread: ThreadRow }>> {
+	const now = input.now ?? Date.now()
+	const thread = await first<ThreadRow>(
+		input.db,
+		'SELECT * FROM threads WHERE id = ?',
+		input.threadId,
+	)
+	if (!thread || thread.expires_at <= now) {
+		return fail(404, 'thread_not_found', 'Thread not found or expired.')
+	}
+	if (isThreadArchived(thread)) return { ok: true, thread }
+	await run(
+		input.db,
+		'UPDATE threads SET archived_at = ?, webhook_url = NULL WHERE id = ? AND archived_at IS NULL',
+		now,
+		thread.id,
+	)
+	const updated = await first<ThreadRow>(
+		input.db,
+		'SELECT * FROM threads WHERE id = ?',
+		thread.id,
+	)
+	if (!updated) {
+		return fail(500, 'archive_failed', 'Could not archive the thread.')
+	}
+	return { ok: true, thread: updated }
+}
+
+export async function archiveThreadAsHost(input: {
+	db: D1Database
+	threadId: string
+	agent: AgentRow
+	now?: number
+}): Promise<DomainError | DomainOk<{ thread: ThreadRow }>> {
+	const membership = await requireMember({
+		db: input.db,
+		threadId: input.threadId,
+		agent: input.agent,
+		now: input.now,
+	})
+	if (!membership.ok) return membership
+	if (isThreadArchived(membership.thread)) {
+		return { ok: true, thread: membership.thread }
+	}
+	const host = await getHostAgent(input.db, membership.thread.id)
+	if (!host || host.id !== input.agent.id) {
+		return fail(403, 'not_host', 'Only the host can archive this thread.')
+	}
+	return archiveThread({
+		db: input.db,
+		threadId: membership.thread.id,
+		now: input.now,
+	})
 }
 
 export async function createAccountAgent(input: {
@@ -1043,12 +1148,11 @@ export async function maybeDispatchWebhook(
 	message: MessageEnvelope,
 	ctx?: ExecutionContext,
 ) {
-	const thread = await first<{ webhook_url: string | null }>(
-		db,
-		'SELECT webhook_url FROM threads WHERE id = ?',
-		threadId,
-	)
-	if (!thread?.webhook_url) return
+	const thread = await first<{
+		webhook_url: string | null
+		archived_at: number | null
+	}>(db, 'SELECT webhook_url, archived_at FROM threads WHERE id = ?', threadId)
+	if (!thread?.webhook_url || isThreadArchived(thread)) return
 	const pending = dispatchWebhook(thread.webhook_url, message)
 	if (ctx) ctx.waitUntil(pending)
 	else void pending

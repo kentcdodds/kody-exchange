@@ -49,6 +49,8 @@ export function threadViewLiveScript() {
 		const nearBottomPx = ${VIEW_POLL_NEAR_BOTTOM_PX}
 		const accentCount = ${AGENT_ACCENT_COUNT}
 		let socketOpen = false
+		let stopped = false
+		let liveSocket = null
 		let pollTimer = 0
 		let pollGeneration = 0
 		function setLiveLabel(text) {
@@ -144,13 +146,27 @@ export function threadViewLiveScript() {
 			}
 			if (pinned) pinToBottom()
 		}
+		function stopLive(label) {
+			stopped = true
+			socketOpen = false
+			window.clearTimeout(pollTimer)
+			pollGeneration += 1
+			try { liveSocket?.close() } catch {}
+			liveSocket = null
+			setLiveLabel(label)
+		}
 		async function tick() {
+			if (stopped || !pollPath) return
 			const generation = ++pollGeneration
 			window.clearTimeout(pollTimer)
 			try {
 				const response = await fetch(pollPath + '?after=' + encodeURIComponent(after))
 				const retryAfterHeader = response.headers.get('retry-after')
 				if (generation !== pollGeneration) return
+				if (response.status === 409) {
+					stopLive('Archived')
+					return
+				}
 				if (response.ok) {
 					const data = await response.json()
 					if (generation !== pollGeneration) return
@@ -168,39 +184,45 @@ export function threadViewLiveScript() {
 			if (!socketOpen) pollTimer = window.setTimeout(tick, nextPollDelayMs())
 		}
 		function connectLive() {
+			if (stopped || (!pollPath && !livePath)) return
 			if (!livePath) {
 				void tick()
 				return
 			}
 			const url = new URL(livePath, window.location.href)
 			url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
-			let socket
 			try {
-				socket = new WebSocket(url)
+				liveSocket = new WebSocket(url)
 			} catch {
 				void tick()
 				return
 			}
-			socket.addEventListener('open', () => {
+			liveSocket.addEventListener('open', () => {
+				if (stopped) {
+					try { liveSocket?.close() } catch {}
+					return
+				}
 				socketOpen = true
 				window.clearTimeout(pollTimer)
 				setLiveLabel('Live')
 				void tick()
 			})
-			socket.addEventListener('message', (event) => {
+			liveSocket.addEventListener('message', (event) => {
+				if (stopped) return
 				try {
 					const data = JSON.parse(String(event.data))
 					appendMessages(data.messages ?? [])
 					if (data.members) updateRoster(data.members)
 				} catch {}
 			})
-			socket.addEventListener('close', () => {
+			liveSocket.addEventListener('close', () => {
 				socketOpen = false
+				if (stopped) return
 				setLiveLabel('Updating every few seconds')
 				void tick()
 			})
-			socket.addEventListener('error', () => {
-				socket.close()
+			liveSocket.addEventListener('error', () => {
+				liveSocket?.close()
 			})
 		}
 		pinToBottom()
