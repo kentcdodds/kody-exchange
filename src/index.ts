@@ -93,6 +93,7 @@ export async function handleRequest(
 			members: card.members,
 			seats: card.seats,
 			expiresAt: card.thread.expires_at,
+			archived: card.thread.archived_at != null,
 		})
 	}
 

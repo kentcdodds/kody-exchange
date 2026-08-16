@@ -16,9 +16,11 @@ import {
 	pageOgCacheKey,
 	viewOgCacheKey,
 	viewOgLede,
+	viewOgStamp,
 	viewOgTitle,
 	type OgCardId,
 	type PageOgSpec,
+	type ViewOgFields,
 } from '#src/og-pages.ts'
 
 export const OG_WIDTH = 1200
@@ -442,20 +444,14 @@ export function createPageOgMarkup(
 	})
 }
 
-export type ViewOgCard = {
-	viewToken: string
-	purpose: string | null
-	members: Array<{ name: string }>
-	seats: number
-	expiresAt: number
-}
+export type ViewOgCard = ViewOgFields & { viewToken: string }
 
 export function createViewOgMarkup(
 	iconDataUri: string,
 	card: ViewOgCard,
 ): SatoriElement {
 	return createPageOgMarkup(iconDataUri, {
-		stamp: 'Read-only',
+		stamp: viewOgStamp(card.archived),
 		title: viewOgTitle(card.purpose),
 		lede: viewOgLede(card),
 	})

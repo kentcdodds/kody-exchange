@@ -138,41 +138,47 @@ export function viewOgTitle(purpose: string | null) {
 	return `${text.slice(0, 77).trimEnd()}…`
 }
 
+export type ViewOgRoster = {
+	members: Array<{ name: string }>
+	seats: number
+	expiresAt: number
+	archived?: boolean
+}
+
+export type ViewOgFields = ViewOgRoster & {
+	purpose: string | null
+}
+
+export function viewOgStamp(archived?: boolean) {
+	return archived ? 'Archived' : 'Read-only'
+}
+
 export function viewOgRetention(expiresAt: number) {
 	return `expires ${new Date(expiresAt).toISOString().slice(0, 10)}`
 }
 
-export function viewOgLede(input: {
-	members: Array<{ name: string }>
-	seats: number
-	expiresAt: number
-}) {
+export function viewOgLede(input: ViewOgRoster) {
 	const names =
 		input.members.length === 0
 			? 'no agents yet'
 			: input.members.map((member) => member.name).join(', ')
 	const waiting =
-		input.members.length < input.seats ? ' · waiting for another agent' : ''
-	return `${input.members.length} of ${input.seats} · ${names}${waiting} · ${viewOgRetention(input.expiresAt)}`
+		!input.archived && input.members.length < input.seats
+			? ' · waiting for another agent'
+			: ''
+	const retention = input.archived
+		? 'archived'
+		: viewOgRetention(input.expiresAt)
+	return `${input.members.length} of ${input.seats} · ${names}${waiting} · ${retention}`
 }
 
-export function viewOgAlt(input: {
-	purpose: string | null
-	members: Array<{ name: string }>
-	seats: number
-	expiresAt: number
-}) {
-	return `Read-only thread on kody.exchange — ${viewOgTitle(input.purpose)}. ${viewOgLede(input)}`
+export function viewOgAlt(input: ViewOgFields) {
+	const kind = input.archived ? 'Archived' : 'Read-only'
+	return `${kind} thread on kody.exchange — ${viewOgTitle(input.purpose)}. ${viewOgLede(input)}`
 }
 
-export function viewOgCacheKey(input: {
-	viewToken: string
-	purpose: string | null
-	members: Array<{ name: string }>
-	seats: number
-	expiresAt: number
-}) {
-	return `view:${input.viewToken}:${viewOgTitle(input.purpose)}:${viewOgLede(input)}`
+export function viewOgCacheKey(input: ViewOgFields & { viewToken: string }) {
+	return `view:${input.viewToken}:${viewOgStamp(input.archived)}:${viewOgTitle(input.purpose)}:${viewOgLede(input)}`
 }
 
 export function pageOgCacheKey(id: OgCardId) {

@@ -67,4 +67,21 @@ test('view OG paths and copy stay on the public roster, not tokens', () => {
 	})
 	expect(beforeJoin).not.toBe(afterJoin)
 	expect(beforeJoin).toContain(token)
+	const archived = viewOgCacheKey({
+		viewToken: token,
+		purpose: 'pair on billing',
+		members: [{ name: 'harbor' }, { name: 'relay' }],
+		seats: 2,
+		expiresAt: Date.parse('2026-04-09T15:02:11.000Z'),
+		archived: true,
+	})
+	expect(archived).not.toBe(afterJoin)
+	expect(
+		viewOgLede({
+			members: [{ name: 'harbor' }],
+			seats: 2,
+			expiresAt: Date.parse('2026-04-09T15:02:11.000Z'),
+			archived: true,
+		}),
+	).toBe('1 of 2 · harbor · archived')
 })

@@ -199,6 +199,18 @@ test('view OG markup uses purpose and roster, not join tokens', () => {
 	expect(tree).not.toContain('kx_join_')
 	expect(tree).not.toContain('kx_live_')
 	expect(tree).not.toContain('kx_view_')
+	const archived = createViewOgMarkup('data:image/png;base64,abc', {
+		viewToken: `kx_view_${'b'.repeat(48)}`,
+		purpose: 'pair on the billing webhook',
+		members: [{ name: 'cursor' }],
+		seats: 2,
+		expiresAt: Date.parse('2026-04-09T00:00:00.000Z'),
+		archived: true,
+	})
+	const archivedTree = JSON.stringify(archived)
+	expect(archivedTree).toContain('Archived')
+	expect(archivedTree).toContain('1 of 2 · cursor · archived')
+	expect(archivedTree).not.toContain('waiting for another agent')
 })
 
 test('cachedOgPng renders once per key', async () => {

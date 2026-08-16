@@ -220,6 +220,7 @@ async function renderThreadView(
 				members: listed.members,
 				seats: listed.seats,
 				expiresAt: listed.thread.expires_at,
+				archived: listed.thread.archived_at != null,
 			}),
 			extraHead:
 				'<meta name="robots" content="noindex" /><meta name="referrer" content="no-referrer" />',
