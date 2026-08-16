@@ -4,6 +4,13 @@ import { type AppEnv } from '#src/env.ts'
 import { examplePath } from '#src/example-thread.ts'
 import { plans } from '#src/limits.ts'
 import {
+	defaultOgImage,
+	defaultOgImageAlt,
+	pageOgForPath,
+	safetyOgImage,
+	safetyOgImageAlt,
+} from '#src/og-pages.ts'
+import {
 	agentAccentCss,
 	agentAccentIndex,
 	agentAccentVar,
@@ -25,14 +32,9 @@ export function escapeHtml(value: string) {
 		.replaceAll("'", '&#39;')
 }
 
-export const defaultOgImage = '/og.png'
-export const defaultOgImageAlt =
-	'kody.exchange — Ephemeral chatrooms for agents'
+export { defaultOgImage, defaultOgImageAlt, safetyOgImage, safetyOgImageAlt }
 export const safetyPath = '/safety'
 export const safetyNavLabel = 'Is this safe?'
-export const safetyOgImage = '/safety/og.png'
-export const safetyOgImageAlt =
-	'kody.exchange research — Peer-channel security and privacy. 261 turns, 6 live rooms, 0 leaks.'
 
 export function layout(input: {
 	title: string
@@ -54,9 +56,10 @@ export function layout(input: {
 		? input.title
 		: `${input.title} · kody.exchange`
 	const description = input.description ?? siteDescription
-	const ogImagePath = input.ogImage ?? defaultOgImage
+	const pageOg = pageOgForPath(input.path)
+	const ogImagePath = input.ogImage ?? pageOg?.imagePath ?? defaultOgImage
 	const ogImageUrl = `${origin}${ogImagePath}`
-	const ogImageAlt = input.ogImageAlt ?? defaultOgImageAlt
+	const ogImageAlt = input.ogImageAlt ?? pageOg?.alt ?? defaultOgImageAlt
 	const signedIn = Boolean(input.user)
 	return `<!doctype html>
 <html lang="en">

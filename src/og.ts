@@ -9,6 +9,19 @@ import {
 	ogYogaWasm,
 	readBundledIconBytes,
 } from '#src/og-assets.ts'
+import {
+	PAGE_OG_CACHE_MAX_AGE_SECONDS,
+	VIEW_OG_CACHE_MAX_AGE_SECONDS,
+	pageOgById,
+	pageOgCacheKey,
+	viewOgCacheKey,
+	viewOgLede,
+	viewOgStamp,
+	viewOgTitle,
+	type OgCardId,
+	type PageOgSpec,
+	type ViewOgFields,
+} from '#src/og-pages.ts'
 
 export const OG_WIDTH = 1200
 export const OG_HEIGHT = 630
@@ -37,7 +50,7 @@ export const RESEARCH_OG_STATS = [
 	{ value: '6', label: 'live rooms' },
 	{ value: '0', label: 'leaks' },
 ] as const
-export type OgCard = 'exchange' | 'research'
+export type OgCard = OgCardId
 
 export type SatoriChild = string | SatoriElement
 export type SatoriElement = {
@@ -183,52 +196,41 @@ export function createOgMarkup(iconDataUri: string): SatoriElement {
 	}
 }
 
-function researchStat(value: string, label: string): SatoriElement {
+function titleLines(
+	spec: Pick<PageOgSpec, 'title' | 'titleLine2'>,
+): SatoriElement {
+	const lines = spec.titleLine2 ? [spec.title, spec.titleLine2] : [spec.title]
 	return {
 		type: 'div',
 		props: {
 			style: {
 				display: 'flex',
 				flexDirection: 'column',
-				width: 220,
+				marginTop: 28,
+				fontFamily: 'Fraunces',
+				fontWeight: 700,
+				fontSize: spec.titleLine2 ? 64 : 72,
+				lineHeight: 1.05,
+				letterSpacing: '-0.03em',
+				color: INK,
 			},
-			children: [
-				{
-					type: 'div',
-					props: {
-						style: {
-							display: 'flex',
-							fontFamily: 'Fraunces',
-							fontWeight: 700,
-							fontSize: 72,
-							lineHeight: 1,
-							letterSpacing: '-0.03em',
-							color: INK,
-						},
-						children: value,
-					},
+			children: lines.map((line) => ({
+				type: 'div',
+				props: {
+					style: { display: 'flex' },
+					children: line,
 				},
-				{
-					type: 'div',
-					props: {
-						style: {
-							display: 'flex',
-							marginTop: 8,
-							fontFamily: 'Source Serif 4',
-							fontWeight: 400,
-							fontSize: 26,
-							lineHeight: 1.2,
-							color: MUTED,
-						},
-						children: label,
-					},
-				},
-			],
+			})),
 		},
 	}
 }
 
-export function createResearchOgMarkup(iconDataUri: string): SatoriElement {
+function ogReportCard(input: {
+	iconDataUri: string
+	stamp: string
+	title: SatoriElement
+	middle: SatoriElement
+}): SatoriElement {
 	return {
 		type: 'div',
 		props: {
@@ -287,57 +289,14 @@ export function createResearchOgMarkup(iconDataUri: string): SatoriElement {
 													fontSize: 22,
 													letterSpacing: '0.08em',
 												},
-												children: RESEARCH_OG_STAMP,
+												children: input.stamp,
 											},
 										},
-										{
-											type: 'div',
-											props: {
-												style: {
-													display: 'flex',
-													flexDirection: 'column',
-													marginTop: 28,
-													fontFamily: 'Fraunces',
-													fontWeight: 700,
-													fontSize: 64,
-													lineHeight: 1.05,
-													letterSpacing: '-0.03em',
-													color: INK,
-												},
-												children: [
-													{
-														type: 'div',
-														props: {
-															style: { display: 'flex' },
-															children: RESEARCH_OG_TITLE_LINE_1,
-														},
-													},
-													{
-														type: 'div',
-														props: {
-															style: { display: 'flex' },
-															children: RESEARCH_OG_TITLE_LINE_2,
-														},
-													},
-												],
-											},
-										},
+										input.title,
 									],
 								},
 							},
-							{
-								type: 'div',
-								props: {
-									style: {
-										display: 'flex',
-										flexDirection: 'row',
-										marginTop: 36,
-									},
-									children: RESEARCH_OG_STATS.map((stat) =>
-										researchStat(stat.value, stat.label),
-									),
-								},
-							},
+							input.middle,
 							{
 								type: 'div',
 								props: {
@@ -354,7 +313,7 @@ export function createResearchOgMarkup(iconDataUri: string): SatoriElement {
 										{
 											type: 'img',
 											props: {
-												src: iconDataUri,
+												src: input.iconDataUri,
 												width: RESEARCH_OG_ICON_SIZE,
 												height: RESEARCH_OG_ICON_SIZE,
 												style: {
@@ -388,6 +347,131 @@ export function createResearchOgMarkup(iconDataUri: string): SatoriElement {
 				},
 			],
 		},
+	}
+}
+
+function researchStat(value: string, label: string): SatoriElement {
+	return {
+		type: 'div',
+		props: {
+			style: {
+				display: 'flex',
+				flexDirection: 'column',
+				width: 220,
+			},
+			children: [
+				{
+					type: 'div',
+					props: {
+						style: {
+							display: 'flex',
+							fontFamily: 'Fraunces',
+							fontWeight: 700,
+							fontSize: 72,
+							lineHeight: 1,
+							letterSpacing: '-0.03em',
+							color: INK,
+						},
+						children: value,
+					},
+				},
+				{
+					type: 'div',
+					props: {
+						style: {
+							display: 'flex',
+							marginTop: 8,
+							fontFamily: 'Source Serif 4',
+							fontWeight: 400,
+							fontSize: 26,
+							lineHeight: 1.2,
+							color: MUTED,
+						},
+						children: label,
+					},
+				},
+			],
+		},
+	}
+}
+
+export function createResearchOgMarkup(iconDataUri: string): SatoriElement {
+	const spec = pageOgById('research')
+	return ogReportCard({
+		iconDataUri,
+		stamp: spec.stamp,
+		title: titleLines(spec),
+		middle: {
+			type: 'div',
+			props: {
+				style: {
+					display: 'flex',
+					flexDirection: 'row',
+					marginTop: 36,
+				},
+				children: RESEARCH_OG_STATS.map((stat) =>
+					researchStat(stat.value, stat.label),
+				),
+			},
+		},
+	})
+}
+
+export function createPageOgMarkup(
+	iconDataUri: string,
+	spec: Pick<PageOgSpec, 'stamp' | 'title' | 'titleLine2' | 'lede'>,
+): SatoriElement {
+	return ogReportCard({
+		iconDataUri,
+		stamp: spec.stamp,
+		title: titleLines(spec),
+		middle: {
+			type: 'div',
+			props: {
+				style: {
+					display: 'flex',
+					marginTop: 36,
+					fontFamily: 'Source Serif 4',
+					fontWeight: 400,
+					fontSize: 32,
+					lineHeight: 1.35,
+					color: MUTED,
+					width: 980,
+				},
+				children: spec.lede,
+			},
+		},
+	})
+}
+
+export type ViewOgCard = ViewOgFields & { viewToken: string }
+
+export function createViewOgMarkup(
+	iconDataUri: string,
+	card: ViewOgCard,
+): SatoriElement {
+	return createPageOgMarkup(iconDataUri, {
+		stamp: viewOgStamp(card.archived),
+		title: viewOgTitle(card.purpose),
+		lede: viewOgLede(card),
+	})
+}
+
+export function createOgMarkupForSpec(
+	iconDataUri: string,
+	spec: PageOgSpec,
+): SatoriElement {
+	switch (spec.kind) {
+		case 'hero':
+			return createOgMarkup(iconDataUri)
+		case 'research':
+			return createResearchOgMarkup(iconDataUri)
+		case 'page':
+			return createPageOgMarkup(iconDataUri, spec)
+		default: {
+			const exhaustive: never = spec.kind
+			throw new Error(`Unknown OG kind: ${String(exhaustive)}`)
+		}
 	}
 }
 
@@ -448,39 +532,101 @@ async function renderOgPng(
 	return png as Uint8Array<ArrayBuffer>
 }
 
-function pngImageResponse(png: Uint8Array<ArrayBuffer>): Response {
+export type OgImageCache = Pick<Cache, 'match' | 'put'>
+
+const ogCacheOrigin = 'https://og-cache.kody.exchange'
+
+export function workerOgCache(): OgImageCache | null {
+	try {
+		return typeof caches === 'undefined' ? null : caches.default
+	} catch {
+		return null
+	}
+}
+
+export function ogCacheRequest(key: string) {
+	return new Request(`${ogCacheOrigin}/${encodeURIComponent(key)}`)
+}
+
+function pngImageResponse(
+	png: Uint8Array<ArrayBuffer>,
+	maxAgeSeconds: number,
+): Response {
 	return new Response(png, {
 		headers: {
 			'content-type': 'image/png',
-			'cache-control': 'public, max-age=3600',
+			'cache-control': `public, max-age=${maxAgeSeconds}`,
 		},
 	})
+}
+
+export async function cachedOgPng(input: {
+	cache?: OgImageCache | null
+	key: string
+	maxAgeSeconds: number
+	render: () => Promise<Uint8Array<ArrayBuffer>>
+}): Promise<Response> {
+	const cache = input.cache === undefined ? workerOgCache() : input.cache
+	const request = ogCacheRequest(input.key)
+	const hit = cache ? await cache.match(request) : undefined
+	if (hit) return hit
+	const response = pngImageResponse(await input.render(), input.maxAgeSeconds)
+	if (cache) await cache.put(request, response.clone())
+	return response
+}
+
+export async function renderOgCard(
+	env: AppEnv,
+	card: OgCard = 'exchange',
+): Promise<Uint8Array<ArrayBuffer>> {
+	const spec = pageOgById(card)
+	return renderOgPng(
+		env,
+		createOgMarkupForSpec(await loadIconDataUri(env), spec),
+	)
+}
+
+export async function renderViewOgImage(
+	env: AppEnv,
+	card: ViewOgCard,
+): Promise<Uint8Array<ArrayBuffer>> {
+	return renderOgPng(env, createViewOgMarkup(await loadIconDataUri(env), card))
 }
 
 export async function renderExchangeOgImage(
 	env: AppEnv,
 ): Promise<Uint8Array<ArrayBuffer>> {
-	return renderOgPng(env, createOgMarkup(await loadIconDataUri(env)))
+	return renderOgCard(env, 'exchange')
 }
 
 export async function renderResearchOgImage(
 	env: AppEnv,
 ): Promise<Uint8Array<ArrayBuffer>> {
-	return renderOgPng(env, createResearchOgMarkup(await loadIconDataUri(env)))
+	return renderOgCard(env, 'research')
 }
 
 export async function ogImageResponse(
 	env: AppEnv,
 	card: OgCard = 'exchange',
+	cache?: OgImageCache | null,
 ): Promise<Response> {
-	switch (card) {
-		case 'exchange':
-			return pngImageResponse(await renderExchangeOgImage(env))
-		case 'research':
-			return pngImageResponse(await renderResearchOgImage(env))
-		default: {
-			const exhaustive: never = card
-			throw new Error(`unknown OG card: ${exhaustive}`)
-		}
-	}
+	return cachedOgPng({
+		cache,
+		key: pageOgCacheKey(card),
+		maxAgeSeconds: PAGE_OG_CACHE_MAX_AGE_SECONDS,
+		render: () => renderOgCard(env, card),
+	})
+}
+
+export async function viewOgImageResponse(
+	env: AppEnv,
+	card: ViewOgCard,
+	cache?: OgImageCache | null,
+): Promise<Response> {
+	return cachedOgPng({
+		cache,
+		key: viewOgCacheKey(card),
+		maxAgeSeconds: VIEW_OG_CACHE_MAX_AGE_SECONDS,
+		render: () => renderViewOgImage(env, card),
+	})
 }
