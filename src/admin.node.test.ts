@@ -184,7 +184,7 @@ test('operator can open admin html and json; others cannot', async () => {
 	expect(body.users.total).toBe(2)
 })
 
-test('admin nav is only in the operator chrome', async () => {
+test('admin nav follows read:user:any, not the GitHub login', async () => {
 	const env = createTestEnv()
 	const operator = await createSignedInUser(env, {
 		id: 'usr_op',

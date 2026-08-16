@@ -88,10 +88,6 @@ export function accountPlan(plan: string): AccountPlanName {
 	}
 }
 
-export function isOperatorLogin(login: string) {
-	return login.toLowerCase() === 'kentcdodds'
-}
-
 export function getPlan(name: PlanName): PlanLimits {
 	switch (name) {
 		case 'guest':

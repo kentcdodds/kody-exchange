@@ -6,6 +6,8 @@ import { csrfToken } from '#src/auth.ts'
 import { signPayload } from '#src/crypto.ts'
 import { run } from '#src/db.ts'
 import { type AppEnv } from '#src/env.ts'
+import { ensureAccountRoles } from '#src/permissions-db.ts'
+import { type SessionUser } from '#src/permissions.ts'
 import { type UserRow } from '#src/threads.ts'
 
 const migrationsDir = join(
@@ -178,6 +180,7 @@ export async function createSignedInUser(
 		user.stripe_subscription_id,
 		user.created_at,
 	)
+	const access = await ensureAccountRoles(env.DB, user.id, user.login)
 	const secret = env.COOKIE_SECRET ?? 'test-cookie-secret-at-least-32-bytes'
 	const session = await signPayload(
 		secret,
@@ -185,7 +188,7 @@ export async function createSignedInUser(
 	)
 	const csrf = await csrfToken(secret, user.id)
 	return {
-		user,
+		user: { ...user, ...access } satisfies SessionUser,
 		csrf,
 		cookie: `kx_session=${session}`,
 	}

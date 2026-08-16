@@ -2,7 +2,8 @@ import { githubOAuthConfigured } from '#src/auth.ts'
 import { type MessageEnvelope, type MessageKind } from '#src/envelope.ts'
 import { type AppEnv } from '#src/env.ts'
 import { examplePath } from '#src/example-thread.ts'
-import { isOperatorLogin, plans } from '#src/limits.ts'
+import { plans } from '#src/limits.ts'
+import { userHasPermission, type SessionUser } from '#src/permissions.ts'
 import {
 	defaultOgImage,
 	defaultOgImageAlt,
@@ -40,7 +41,7 @@ export function layout(input: {
 	title: string
 	description?: string
 	path: string
-	user: UserRow | null
+	user: SessionUser | UserRow | null
 	env: AppEnv
 	body: string
 	extraHead?: string
@@ -99,7 +100,7 @@ export function layout(input: {
 			${
 				signedIn
 					? `${
-							input.user && isOperatorLogin(input.user.login)
+							userHasPermission(input.user, 'read:user:any')
 								? `<a href="/admin" ${ariaCurrent(input.path, '/admin')}>Admin</a>
 						`
 								: ''

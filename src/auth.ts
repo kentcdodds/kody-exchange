@@ -4,6 +4,8 @@ import { type AppEnv, appBaseUrl } from '#src/env.ts'
 import { createId } from '#src/ids.ts'
 import { applyGrantedPlan } from '#src/grants.ts'
 import { accountPlan, type AccountPlanName } from '#src/limits.ts'
+import { type SessionUser } from '#src/permissions.ts'
+import { ensureAccountRoles, loadAccessOrEmpty } from '#src/permissions-db.ts'
 import { type UserRow } from '#src/threads.ts'
 
 const sessionCookie = 'kx_session'
@@ -74,10 +76,13 @@ export async function readSessionUser(request: Request, env: AppEnv) {
 		parsed.userId,
 	)
 	if (!user) return null
+	const access = await loadAccessOrEmpty(env.DB, user.id)
 	return {
 		...user,
 		plan: accountPlan(user.plan),
-	}
+		roles: access.roles,
+		permissions: access.permissions,
+	} satisfies SessionUser
 }
 
 export async function startGithubOAuth(request: Request, env: AppEnv) {
@@ -234,6 +239,7 @@ export async function finishGithubOAuth(request: Request, env: AppEnv) {
 			now,
 		)
 	}
+	await ensureAccountRoles(env.DB, userId, profile.login)
 	await applyGrantedPlan(env.DB, userId, profile.login)
 
 	const session = await signPayload(
