@@ -43,3 +43,7 @@ npm run validate
 
 That is the authoritative local gate (lint, types, unit tests). Agent workflows
 live in [`AGENTS.md`](../../AGENTS.md) and `.agents/skills/`.
+
+## Inbound contributions
+
+Outside pull requests need a signed CLA. See [Inbound contributions](./inbound-contributions.md).
