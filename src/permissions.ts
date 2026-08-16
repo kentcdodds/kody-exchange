@@ -20,12 +20,6 @@ export type AccessUser = {
 
 export type SessionUser = UserRow & AccessUser
 
-export const bootstrapAdminLogin = 'kentcdodds'
-
-export function isBootstrapAdminLogin(login: string) {
-	return login.toLowerCase() === bootstrapAdminLogin
-}
-
 export function isRoleName(value: string): value is RoleName {
 	return roleNames.includes(value as RoleName)
 }

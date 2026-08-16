@@ -18,6 +18,7 @@ test('admin insights count users, rooms, and messages without bodies', async () 
 		email: 'me@kentcdodds.com',
 		plan: 'max',
 		created_at: now - 86_400_000,
+		roles: ['admin'],
 	})
 	const friend = await createSignedInUser(env, {
 		id: 'usr_friend',
@@ -124,6 +125,7 @@ test('operator can open admin html and json; others cannot', async () => {
 		login: 'kentcdodds',
 		email: 'me@kentcdodds.com',
 		plan: 'max',
+		roles: ['admin'],
 	})
 	const stranger = await createSignedInUser(env, {
 		id: 'usr_stranger',
@@ -191,6 +193,7 @@ test('admin nav follows read:user:any, not the GitHub login', async () => {
 		github_id: '99',
 		login: 'kentcdodds',
 		plan: 'max',
+		roles: ['admin'],
 	})
 	const stranger = await createSignedInUser(env, {
 		id: 'usr_stranger',

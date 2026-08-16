@@ -46,10 +46,10 @@ test('permission registry matches the RBAC migration', () => {
 	)
 })
 
-test('signup assigns the user role and bootstraps admin for the first operator', async () => {
+test('signup assigns the user role and never grants admin from login', async () => {
 	const env = createTestEnv()
-	const operator = await createSignedInUser(env, {
-		id: 'usr_op',
+	const firstAccount = await createSignedInUser(env, {
+		id: 'usr_first',
 		github_id: '99',
 		login: 'kentcdodds',
 	})
@@ -59,9 +59,9 @@ test('signup assigns the user role and bootstraps admin for the first operator',
 		login: 'jane',
 	})
 
-	expect(operator.user.roles).toEqual(['admin', 'user'])
-	expect(userHasPermission(operator.user, 'read:user:any')).toBe(true)
-	expect(userHasPermission(operator.user, 'update:user:any')).toBe(true)
+	expect(firstAccount.user.roles).toEqual(['user'])
+	expect(userHasPermission(firstAccount.user, 'read:user:any')).toBe(false)
+	expect(userHasPermission(firstAccount.user, 'read:user:own')).toBe(true)
 	expect(member.user.roles).toEqual(['user'])
 	expect(userHasPermission(member.user, 'read:user:any')).toBe(false)
 	expect(userHasPermission(member.user, 'read:user:own')).toBe(true)
@@ -138,7 +138,7 @@ test('ensureAccountRoles is idempotent and unknown users fail closed', async () 
 		id: 'usr_once',
 		login: 'pat',
 	})
-	const again = await ensureAccountRoles(env.DB, created.user.id, 'pat')
+	const again = await ensureAccountRoles(env.DB, created.user.id)
 	expect(again.roles).toEqual(['user'])
 	const access = await getUserRolesAndPermissions(env.DB, created.user.id)
 	expect(access.roles).toEqual(['user'])

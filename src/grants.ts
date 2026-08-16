@@ -15,7 +15,7 @@ export async function applyGrantedPlan(
 	login: string,
 ) {
 	const normalized = login.toLowerCase()
-	const access = await ensureAccountRoles(db, userId, login)
+	const access = await ensureAccountRoles(db, userId)
 	if (userHasRole(access, 'admin')) {
 		await run(db, 'UPDATE users SET plan = ? WHERE id = ?', 'max', userId)
 		await run(

@@ -239,7 +239,7 @@ export async function finishGithubOAuth(request: Request, env: AppEnv) {
 			now,
 		)
 	}
-	await ensureAccountRoles(env.DB, userId, profile.login)
+	await ensureAccountRoles(env.DB, userId)
 	await applyGrantedPlan(env.DB, userId, profile.login)
 
 	const session = await signPayload(

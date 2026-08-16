@@ -1,7 +1,6 @@
 import { all, run } from '#src/db.ts'
 import {
 	emptyAccess,
-	isBootstrapAdminLogin,
 	isPermissionString,
 	isRoleName,
 	type AccessUser,
@@ -75,15 +74,8 @@ export async function removeUserRole(input: {
 	)
 }
 
-export async function ensureAccountRoles(
-	db: D1Database,
-	userId: string,
-	login: string,
-) {
+export async function ensureAccountRoles(db: D1Database, userId: string) {
 	await assignUserRole({ db, userId, roleName: 'user' })
-	if (isBootstrapAdminLogin(login)) {
-		await assignUserRole({ db, userId, roleName: 'admin' })
-	}
 	return getUserRolesAndPermissions(db, userId)
 }
 

@@ -1,16 +1,18 @@
 import { expect, test } from 'vitest'
 import { applyGrantedPlan, grantMaxToLogin } from '#src/grants.ts'
 import { first, run } from '#src/db.ts'
+import { assignUserRole } from '#src/permissions-db.ts'
 import { createTestEnv } from '#src/test-support.ts'
 
-test('operator login and stored grants assign the hidden plan', async () => {
+test('admin role and stored grants assign the hidden plan', async () => {
 	const env = createTestEnv()
 	await run(
 		env.DB,
 		`INSERT INTO users (id, github_id, login, name, avatar_url, email, plan, created_at)
-		 VALUES ('usr_op', '1', 'kentcdodds', 'Kent', null, null, 'free', 1)`,
+		 VALUES ('usr_op', '1', 'sam', 'Sam', null, null, 'free', 1)`,
 	)
-	await applyGrantedPlan(env.DB, 'usr_op', 'KentCDodds')
+	await assignUserRole({ db: env.DB, userId: 'usr_op', roleName: 'admin' })
+	await applyGrantedPlan(env.DB, 'usr_op', 'Sam')
 	expect(
 		(
 			await first<{ plan: string }>(

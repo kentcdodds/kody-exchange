@@ -6,8 +6,12 @@ import { csrfToken } from '#src/auth.ts'
 import { signPayload } from '#src/crypto.ts'
 import { run } from '#src/db.ts'
 import { type AppEnv } from '#src/env.ts'
-import { ensureAccountRoles } from '#src/permissions-db.ts'
-import { type SessionUser } from '#src/permissions.ts'
+import {
+	assignUserRole,
+	ensureAccountRoles,
+	getUserRolesAndPermissions,
+} from '#src/permissions-db.ts'
+import { type RoleName, type SessionUser } from '#src/permissions.ts'
 import { type UserRow } from '#src/threads.ts'
 
 const migrationsDir = join(
@@ -150,8 +154,9 @@ export function request(path: string, init: RequestInit = {}) {
 
 export async function createSignedInUser(
 	env: AppEnv,
-	overrides: Partial<UserRow> = {},
+	overrides: Partial<UserRow> & { roles?: Array<RoleName> } = {},
 ) {
+	const { roles: extraRoles, ...userOverrides } = overrides
 	const user: UserRow = {
 		id: 'usr_1',
 		github_id: '1',
@@ -163,7 +168,7 @@ export async function createSignedInUser(
 		stripe_customer_id: null,
 		stripe_subscription_id: null,
 		created_at: 1,
-		...overrides,
+		...userOverrides,
 	}
 	await run(
 		env.DB,
@@ -180,7 +185,14 @@ export async function createSignedInUser(
 		user.stripe_subscription_id,
 		user.created_at,
 	)
-	const access = await ensureAccountRoles(env.DB, user.id, user.login)
+	let access = await ensureAccountRoles(env.DB, user.id)
+	for (const roleName of extraRoles ?? []) {
+		if (roleName === 'user') continue
+		await assignUserRole({ db: env.DB, userId: user.id, roleName })
+	}
+	if (extraRoles?.length) {
+		access = await getUserRolesAndPermissions(env.DB, user.id)
+	}
 	const secret = env.COOKIE_SECRET ?? 'test-cookie-secret-at-least-32-bytes'
 	const session = await signPayload(
 		secret,
