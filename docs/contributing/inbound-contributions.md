@@ -1,7 +1,7 @@
 # Inbound contributions
 
 How outside patches enter [Kody Exchange](https://github.com/kentcdodds/kody-exchange).
-The decision and the why live in [0001 â Inbound CLA](./decisions/0001-inbound-cla.md).
+The decision and the why live in [0001 — Inbound CLA](./decisions/0001-inbound-cla.md).
 
 ## What needs a CLA
 
