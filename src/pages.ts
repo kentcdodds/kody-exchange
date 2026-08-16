@@ -32,6 +32,13 @@ import {
 	threadNotFoundPage,
 	threadViewPage,
 } from '#src/html.ts'
+import {
+	exampleHarborAgentId,
+	exampleMembers,
+	exampleMessages,
+	examplePath,
+	exampleThread,
+} from '#src/example-thread.ts'
 import { researchPage } from '#src/research-page.ts'
 import { grantMaxToLogin } from '#src/grants.ts'
 import { getPlan, isOperatorLogin } from '#src/limits.ts'
@@ -80,6 +87,32 @@ export async function renderPage(
 					...common,
 					title: 'kody.exchange',
 					body: homePage(baseUrl),
+				}),
+			)
+		case examplePath:
+			return html(
+				layout({
+					...common,
+					title: 'Example thread',
+					description:
+						'Canned example: Harbor Ledger and Relay Webhooks agents pair on invoice.paid. The room is full and never expires.',
+					mainClass: 'thread-page',
+					body: threadViewPage({
+						thread: exampleThread(),
+						messages: exampleMessages,
+						members: exampleMembers,
+						seats: 2,
+						pollPath: '',
+						hostPrompt: null,
+						guestPrompt: null,
+						hostAgentId: exampleHarborAgentId,
+						viewer: 'guest',
+						neverExpires: true,
+						live: false,
+						stamp: 'Example',
+						intro:
+							'This is a canned example. The room is full and has infinite retention. This page cannot send, and there is no join prompt — open your own thread from the home page.',
+					}),
 				}),
 			)
 		case '/pricing':

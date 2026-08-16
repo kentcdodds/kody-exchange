@@ -64,6 +64,8 @@ test('live script prefers a socket and pins when already at the bottom', () => {
 	expect(script).toContain("setLiveLabel('Live')")
 	expect(script).toContain('void tick()')
 	expect(script).toContain('pollGeneration')
+	expect(script).toContain('infinite retention')
+	expect(script).toContain("expiresRaw === 'infinite'")
 	expect(script).toContain('generation !== pollGeneration')
 	expect(
 		script.match(/generation !== pollGeneration/g)?.length,

@@ -47,6 +47,8 @@ test('guest thread: create, join, send, poll, and health', async () => {
 	expect(html).not.toContain('one-line why this thread exists')
 	expect(html).not.toContain('"your-agent-name"')
 	expect(html).toContain('while you watch the read-only chat')
+	expect(html).toContain('href="/example"')
+	expect(html).toContain('Watch an example thread')
 	expect(html).not.toContain('me@kentcdodds.com')
 	expect(html).not.toContain('Operator:')
 	expect(html).not.toContain('SMTP')

@@ -122,13 +122,15 @@ export function threadViewLiveScript() {
 			const list = Array.isArray(members) ? members : []
 			const names = list.length === 0 ? 'no agents yet' : list.map((member) => member.name).join(', ')
 			const waiting = list.length < seats ? ' · waiting for another agent' : ''
-			return list.length + ' of ' + seats + ' · ' + names + waiting + ' · expires ' + new Date(expiresAt).toISOString()
+			const retention = expiresAt === null ? 'infinite retention' : 'expires ' + new Date(expiresAt).toISOString()
+			return list.length + ' of ' + seats + ' · ' + names + waiting + ' · ' + retention
 		}
 		function updateRoster(members) {
 			if (!(roster instanceof HTMLElement)) return
 			const seats = Number(roster.getAttribute('data-seats'))
-			const expiresAt = Number(roster.getAttribute('data-expires'))
-			if (!Number.isFinite(seats) || !Number.isFinite(expiresAt)) return
+			const expiresRaw = roster.getAttribute('data-expires')
+			const expiresAt = expiresRaw === 'infinite' ? null : Number(expiresRaw)
+			if (!Number.isFinite(seats) || (expiresAt !== null && !Number.isFinite(expiresAt))) return
 			roster.textContent = rosterLine(members, seats, expiresAt)
 		}
 		function appendMessages(messages) {
@@ -201,12 +203,6 @@ export function threadViewLiveScript() {
 				socket.close()
 			})
 		}
-		const copyUrl = document.querySelector('[data-copy-url]')
-		copyUrl?.addEventListener('click', async () => {
-			await navigator.clipboard.writeText(window.location.href)
-			const done = copyUrl.parentElement?.querySelector('[data-copied]')
-			if (done instanceof HTMLElement) done.hidden = false
-		})
 		pinToBottom()
 		connectLive()
 	</script>`
