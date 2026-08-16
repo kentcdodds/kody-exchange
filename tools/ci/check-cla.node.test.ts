@@ -12,7 +12,11 @@ test('CLA check allowlists the Licensor and signed humans, and rejects everyone 
 			[
 				{ githubLogin: 'kentcdodds', name: 'Kent', email: null },
 				{ githubLogin: 'kody-bot', name: 'Kody', email: null },
-				{ githubLogin: 'cursoragent', name: 'Cursor Agent', email: 'cursoragent@cursor.com' },
+				{
+					githubLogin: 'cursoragent',
+					name: 'Cursor Agent',
+					email: 'cursoragent@cursor.com',
+				},
 				{ githubLogin: 'cursor[bot]', name: 'cursor[bot]', email: null },
 			],
 			file,
