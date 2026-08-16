@@ -25,13 +25,12 @@ import {
 	privacyPage,
 	promptCard,
 	safetyNavLabel,
-	safetyOgImage,
-	safetyOgImageAlt,
 	safetyPath,
 	termsPage,
 	threadNotFoundPage,
 	threadViewPage,
 } from '#src/html.ts'
+import { threadViewOgPath, viewOgAlt } from '#src/og-pages.ts'
 import {
 	exampleHarborAgentId,
 	exampleMembers,
@@ -144,8 +143,6 @@ export async function renderPage(
 					title: safetyNavLabel,
 					description:
 						'Peer-channel security and privacy on kody.exchange — method, scores, and what a watch link grants.',
-					ogImage: safetyOgImage,
-					ogImageAlt: safetyOgImageAlt,
 					body: researchPage(),
 				}),
 			)
@@ -217,6 +214,13 @@ async function renderThreadView(
 			path: new URL(request.url).pathname,
 			title: listed.thread.purpose?.trim() || 'Thread',
 			description: 'Read-only thread on kody.exchange.',
+			ogImage: threadViewOgPath(viewToken),
+			ogImageAlt: viewOgAlt({
+				purpose: listed.thread.purpose,
+				members: listed.members,
+				seats: listed.seats,
+				expiresAt: listed.thread.expires_at,
+			}),
 			extraHead:
 				'<meta name="robots" content="noindex" /><meta name="referrer" content="no-referrer" />',
 			mainClass: 'thread-page',

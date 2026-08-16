@@ -23,9 +23,10 @@ import {
 	resolveOAuthUser,
 	unauthorizedOAuthResponse,
 } from '#src/oauth-user.ts'
+import { pageOgForImagePath, viewTokenForOgPath } from '#src/og-pages.ts'
 import { handleAccountAction, renderPage } from '#src/pages.ts'
 import { handleUserApi } from '#src/user-api.ts'
-import { purgeExpired } from '#src/threads.ts'
+import { getThreadViewCard, purgeExpired } from '#src/threads.ts'
 
 export default {
 	async fetch(
@@ -69,17 +70,39 @@ export async function handleRequest(
 		})
 	}
 
-	if (url.pathname === '/og.png' || url.pathname === '/og.jpg') {
+	const viewOgToken = viewTokenForOgPath(url.pathname)
+	if (viewOgToken) {
+		const card = await getThreadViewCard({
+			db: env.DB,
+			viewToken: viewOgToken,
+		})
+		if (!card.ok) {
+			return json(
+				{ ok: false, error: card.error, code: card.code },
+				card.status,
+			)
+		}
+		// Lazy import (sanctioned exception to the no-inline-imports rule):
+		// satori + resvg-wasm would otherwise sit in every isolate for a
+		// route that only social crawlers hit. Expired/missing rooms 404
+		// above so they never load the renderer.
+		const { viewOgImageResponse } = await import('#src/og.ts')
+		return viewOgImageResponse(env, {
+			viewToken: viewOgToken,
+			purpose: card.thread.purpose,
+			members: card.members,
+			seats: card.seats,
+			expiresAt: card.thread.expires_at,
+		})
+	}
+
+	const pageOg = pageOgForImagePath(url.pathname)
+	if (pageOg) {
 		// Lazy import (sanctioned exception to the no-inline-imports rule):
 		// satori + resvg-wasm would otherwise sit in every isolate for a
 		// route that only social crawlers hit.
 		const { ogImageResponse } = await import('#src/og.ts')
-		return ogImageResponse(env)
-	}
-
-	if (url.pathname === '/safety/og.png' || url.pathname === '/safety/og.jpg') {
-		const { ogImageResponse } = await import('#src/og.ts')
-		return ogImageResponse(env, 'research')
+		return ogImageResponse(env, pageOg.id)
 	}
 
 	if (url.pathname === '/research' || url.pathname === '/research/') {

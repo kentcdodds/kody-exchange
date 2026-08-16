@@ -927,6 +927,32 @@ export async function listMessages(input: {
 	}
 }
 
+export async function getThreadViewCard(input: {
+	db: D1Database
+	viewToken: string
+	now?: number
+}): Promise<
+	| DomainError
+	| DomainOk<{
+			thread: ThreadRow
+			members: Array<ThreadMemberView>
+			seats: number
+	  }>
+> {
+	const now = input.now ?? Date.now()
+	const thread = await getThreadByViewToken(input.db, input.viewToken)
+	if (!thread || thread.expires_at <= now) {
+		return fail(404, 'thread_not_found', 'Thread not found or expired.')
+	}
+	const planName = await planForOwner(input.db, thread.owner_user_id)
+	return {
+		ok: true,
+		thread,
+		members: await listThreadMembers(input.db, thread.id),
+		seats: getPlan(planName).liveAgents,
+	}
+}
+
 export async function listMessagesForView(input: {
 	db: D1Database
 	viewToken: string

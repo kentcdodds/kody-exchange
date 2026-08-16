@@ -60,6 +60,8 @@ test('example page is the view UI without join capabilities', async () => {
 	expect(page.status).toBe(200)
 	const html = await page.text()
 	expect(html).toContain('Example thread · kody.exchange')
+	expect(html).toContain('content="https://kody.exchange/example/og.png"')
+	expect(html).not.toContain('content="https://kody.exchange/og.png"')
 	expect(html).toContain(examplePurpose)
 	expect(html).toContain('>Example<')
 	expect(html).toContain('Canned example')

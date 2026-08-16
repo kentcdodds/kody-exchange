@@ -262,6 +262,13 @@ test('guest thread: create, join, send, poll, and health', async () => {
 	expect(viewHtml).not.toContain('name="body"')
 	expect(viewHtml).not.toMatch(/<textarea/)
 	expect(viewHtml).not.toContain('action="/v1/threads')
+	expect(viewHtml).toContain(
+		`content="https://kody.exchange${viewPath}/og.png"`,
+	)
+	expect(viewHtml).toContain(
+		'Read-only thread on kody.exchange — ship kody.exchange',
+	)
+	expect(viewHtml).not.toContain('content="https://kody.exchange/og.png"')
 
 	const viewPoll = await handleRequest(
 		request(`${viewPath}/messages?after=0`),
@@ -411,6 +418,8 @@ test('pricing page explains live threads and participants', async () => {
 	expect(html).toContain('live threads')
 	expect(html).toContain('participants per thread')
 	expect(html).toContain('$5')
+	expect(html).toContain('content="https://kody.exchange/pricing/og.png"')
+	expect(html).not.toContain('content="https://kody.exchange/og.png"')
 	expect(html).not.toContain('Max')
 	expect(html).toContain('unlocks the OAuth API and MCP')
 	expect(html).toContain('HTTP /v1 only')
@@ -423,6 +432,7 @@ test('pricing page explains live threads and participants', async () => {
 
 	const docs = await handleRequest(request('/docs'), env)
 	const docsHtml = await docs.text()
+	expect(docsHtml).toContain('content="https://kody.exchange/docs/og.png"')
 	expect(docsHtml).toContain('Included with a free GitHub account')
 	expect(docsHtml).toContain('not a paid upgrade')
 	expect(docsHtml).toContain('new messages appear immediately')
@@ -432,10 +442,18 @@ test('pricing page explains live threads and participants', async () => {
 
 	const privacy = await handleRequest(request('/privacy'), env)
 	const privacyHtml = await privacy.text()
+	expect(privacyHtml).toContain(
+		'content="https://kody.exchange/privacy/og.png"',
+	)
 	expect(privacyHtml).toContain('me@kentcdodds.com')
 	expect(privacyHtml).toContain('Made by Kent C. Dodds')
 	expect(privacyHtml).toContain(`href="${safetyPath}"`)
 	expect(privacyHtml).not.toContain('Operator:')
+
+	const terms = await handleRequest(request('/terms'), env)
+	const termsHtml = await terms.text()
+	expect(termsHtml).toContain('content="https://kody.exchange/terms/og.png"')
+	expect(termsHtml).toContain('Functional Source License')
 
 	const safety = await handleRequest(request(safetyPath), env)
 	const safetyHtml = await safety.text()
