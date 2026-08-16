@@ -23,4 +23,7 @@ Stable nouns. Not a changelog.
 - Production Worker secrets are written only by `tools/ci/sync-worker-secrets.ts` during deploy. Do not `wrangler secret put` by hand.
 - `kody-exchange-blobs` is this product's R2 bucket. Do not use `kody-email-blobs` (that belongs to kody.codes email attachments).
 - Expired threads cascade-delete members, guest agents, and messages.
-- `max` is operator-granted (`kentcdodds`, or `plan_grants`). Do not list it on public pricing, homepage, or agent docs. Stripe must not overwrite it.
+- Authorization is RBAC: users have roles, roles have `action:entity:access` permissions, and a user's permissions are the union of their roles. The `user` role is `*:own`. The `admin` role is `*:own` plus `*:any`. Checks are explicit (`userHasPermission(user, 'read:user:any')`). Roles load fresh per request and fail closed.
+- There is no runtime path that grants `admin`. Assign it with SQL against `user_roles`.
+- `max` is granted by `update:user:any` (or a stored `plan_grants` row). Do not list it on public pricing, homepage, or agent docs. Stripe must not overwrite it.
+- Operator insights (`/admin`, `/admin.json`) require `read:user:any`. They are counts and account/thread metadata. They do not include message bodies, tokens, or guest IPs.

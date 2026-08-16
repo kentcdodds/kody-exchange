@@ -333,7 +333,10 @@ test('guest thread: create, join, send, poll, and health', async () => {
 	expect(oldJoin.status).toBe(404)
 
 	const robots = await handleRequest(request('/robots.txt'), env)
-	expect(await robots.text()).toContain('Disallow: /t/')
+	const robotsText = await robots.text()
+	expect(robotsText).toContain('Disallow: /t/')
+	expect(robotsText).toContain('Disallow: /account')
+	expect(robotsText).toContain('Disallow: /admin')
 })
 
 test('view host prompt token can send on that thread but cannot open another', async () => {

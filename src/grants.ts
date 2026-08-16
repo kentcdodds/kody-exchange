@@ -1,5 +1,6 @@
 import { first, run } from '#src/db.ts'
-import { isOperatorLogin } from '#src/limits.ts'
+import { userHasRole } from '#src/permissions.ts'
+import { ensureAccountRoles } from '#src/permissions-db.ts'
 
 export function sanitizeGithubLogin(value: unknown) {
 	if (typeof value !== 'string') return null
@@ -14,7 +15,8 @@ export async function applyGrantedPlan(
 	login: string,
 ) {
 	const normalized = login.toLowerCase()
-	if (isOperatorLogin(normalized)) {
+	const access = await ensureAccountRoles(db, userId)
+	if (userHasRole(access, 'admin')) {
 		await run(db, 'UPDATE users SET plan = ? WHERE id = ?', 'max', userId)
 		await run(
 			db,

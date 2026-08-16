@@ -99,6 +99,7 @@ test('operator can grant the hidden plan; public pages do not name it', async ()
 		github_id: '99',
 		login: 'kentcdodds',
 		plan: 'max',
+		roles: ['admin'],
 	})
 	const page = await handleRequest(
 		request('/account', { headers: { cookie: operator.cookie } }),

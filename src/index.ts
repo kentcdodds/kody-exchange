@@ -65,9 +65,12 @@ export async function handleRequest(
 	}
 
 	if (url.pathname === '/robots.txt') {
-		return new Response('User-agent: *\nAllow: /\nDisallow: /t/\n', {
-			headers: { 'content-type': 'text/plain; charset=utf-8' },
-		})
+		return new Response(
+			'User-agent: *\nAllow: /\nDisallow: /t/\nDisallow: /account\nDisallow: /admin\n',
+			{
+				headers: { 'content-type': 'text/plain; charset=utf-8' },
+			},
+		)
 	}
 
 	const viewOgToken = viewTokenForOgPath(url.pathname)

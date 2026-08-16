@@ -40,7 +40,14 @@ import {
 } from '#src/example-thread.ts'
 import { researchPage } from '#src/research-page.ts'
 import { grantMaxToLogin } from '#src/grants.ts'
-import { getPlan, isOperatorLogin } from '#src/limits.ts'
+import {
+	adminJsonPath,
+	adminPage,
+	adminPath,
+	loadAdminInsights,
+} from '#src/admin.ts'
+import { getPlan } from '#src/limits.ts'
+import { userHasPermission, type SessionUser } from '#src/permissions.ts'
 import { clientIp, limitViewPoll, workerPollCache } from '#src/rate-limit.ts'
 import {
 	maybeBroadcastThreadView,
@@ -66,7 +73,7 @@ type ThreadListRow = ThreadRow & { member_count: number }
 export async function renderPage(
 	request: Request,
 	env: AppEnv,
-	user: UserRow | null,
+	user: SessionUser | UserRow | null,
 ) {
 	const url = new URL(request.url)
 	const baseUrl = appBaseUrl(env, request)
@@ -167,6 +174,9 @@ export async function renderPage(
 				return Response.redirect(`${baseUrl}/auth/github`, 302)
 			}
 			return renderAccountPage(request, env, user)
+		case adminPath:
+		case adminJsonPath:
+			return renderAdmin(request, env, user, url.pathname === adminJsonPath)
 		default:
 			return null
 	}
@@ -343,10 +353,55 @@ async function pollThreadView(
 	)
 }
 
+function adminJson(data: unknown, status = 200) {
+	return new Response(JSON.stringify(data), {
+		status,
+		headers: {
+			'content-type': 'application/json; charset=utf-8',
+			'cache-control': 'no-store',
+		},
+	})
+}
+
+async function renderAdmin(
+	request: Request,
+	env: AppEnv,
+	user: SessionUser | UserRow | null,
+	asJson: boolean,
+) {
+	if (!user) {
+		if (asJson) {
+			return adminJson({ ok: false, error: 'Sign in required.' }, 401)
+		}
+		const next = new URL('/auth/github', appBaseUrl(env, request))
+		next.searchParams.set('next', adminPath)
+		return Response.redirect(next.toString(), 302)
+	}
+	if (!userHasPermission(user, 'read:user:any')) {
+		return asJson
+			? adminJson({ ok: false, error: 'Not found.' }, 404)
+			: json({ ok: false, error: 'Not found.' }, 404)
+	}
+	const insights = await loadAdminInsights(env.DB)
+	if (asJson) return adminJson({ ok: true, ...insights })
+	return html(
+		layout({
+			user,
+			env,
+			path: adminPath,
+			title: 'Usage',
+			description: 'Operator usage snapshot for kody.exchange.',
+			extraHead: '<meta name="robots" content="noindex" />',
+			mainClass: 'admin-page',
+			body: adminPage(insights),
+		}),
+	)
+}
+
 async function renderAccountPage(
 	request: Request,
 	env: AppEnv,
-	user: UserRow,
+	user: SessionUser | UserRow,
 	flash: ThreadFlash | null = null,
 ) {
 	const secret = env.COOKIE_SECRET?.trim() ?? 'dev'
@@ -368,7 +423,7 @@ async function renderAccountPage(
 async function accountPage(
 	env: AppEnv,
 	request: Request,
-	user: UserRow,
+	user: SessionUser | UserRow,
 	flash: ThreadFlash | null,
 ) {
 	const plan = getPlan(planOf(user))
@@ -473,7 +528,7 @@ async function accountPage(
 	}
 	${accountBillingHtml({ user, csrf, checkoutAvailable, link })}
 	${
-		isOperatorLogin(user.login)
+		userHasPermission(user, 'update:user:any')
 			? `<h2>Operator</h2>
 	${new URL(request.url).searchParams.get('granted') === '1' ? '<p class="card">Granted.</p>' : ''}
 	<form class="card" method="post" action="/account/grants">
@@ -590,7 +645,7 @@ function accountError(code: string | null) {
 export async function handleAccountAction(
 	request: Request,
 	env: AppEnv,
-	user: UserRow,
+	user: SessionUser | UserRow,
 ) {
 	const url = new URL(request.url)
 	const secret = env.COOKIE_SECRET?.trim()
@@ -665,7 +720,7 @@ export async function handleAccountAction(
 		})
 	}
 	if (url.pathname === '/account/grants') {
-		if (!isOperatorLogin(user.login)) {
+		if (!userHasPermission(user, 'update:user:any')) {
 			return new Response('Not found', { status: 404 })
 		}
 		const granted = await grantMaxToLogin(
