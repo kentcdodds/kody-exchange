@@ -16,6 +16,7 @@ import {
 import { all, first } from '#src/db.ts'
 import { type AppEnv, appBaseUrl } from '#src/env.ts'
 import {
+	accountThreadActionsScript,
 	copyPromptScript,
 	docsPage,
 	escapeHtml,
@@ -57,10 +58,15 @@ import {
 	archiveThread,
 	countOwnedThreads,
 	createThread,
+	deleteThread,
 	getHostAgent,
 	isThreadArchived,
+	isThreadNeverExpiring,
 	listMessagesForView,
 	listThreadMembers,
+	setThreadNeverExpires,
+	sqlThreadLive,
+	sqlThreadUnexpired,
 	threadArchivedViewError,
 	threadViewPrompts,
 	threadViewUrlFor,
@@ -229,7 +235,9 @@ async function renderThreadView(
 				purpose: listed.thread.purpose,
 				members: listed.members,
 				seats: listed.seats,
-				expiresAt: listed.thread.expires_at,
+				expiresAt: isThreadNeverExpiring(listed.thread)
+					? null
+					: listed.thread.expires_at,
 				archived: listed.thread.archived_at != null,
 			}),
 			extraHead:
@@ -245,6 +253,7 @@ async function renderThreadView(
 				guestPrompt: prompts.guestPrompt,
 				hostAgentId: host?.id ?? null,
 				viewer: ownsThread ? 'host' : 'guest',
+				neverExpires: isThreadNeverExpiring(listed.thread),
 			}),
 		}),
 	)
@@ -436,7 +445,7 @@ async function accountPage(
 			 SELECT COUNT(*) FROM thread_members m WHERE m.thread_id = t.id
 		 ) AS member_count
 		 FROM threads t
-		 WHERE t.owner_user_id = ? AND t.expires_at > ? AND t.archived_at IS NULL
+		 WHERE t.owner_user_id = ? AND ${sqlThreadLive('t.')}
 		 ORDER BY t.created_at DESC`,
 		user.id,
 		now,
@@ -447,7 +456,7 @@ async function accountPage(
 			 SELECT COUNT(*) FROM thread_members m WHERE m.thread_id = t.id
 		 ) AS member_count
 		 FROM threads t
-		 WHERE t.owner_user_id = ? AND t.expires_at > ? AND t.archived_at IS NOT NULL
+		 WHERE t.owner_user_id = ? AND ${sqlThreadUnexpired('t.')} AND t.archived_at IS NOT NULL
 		 ORDER BY t.archived_at DESC`,
 		user.id,
 		now,
@@ -457,6 +466,9 @@ async function accountPage(
 	const upgraded = new URL(request.url).searchParams.get('upgraded') === '1'
 	const archivedFlash =
 		new URL(request.url).searchParams.get('archived') === '1'
+	const keptFlash = new URL(request.url).searchParams.get('kept') === '1'
+	const expireFlash = new URL(request.url).searchParams.get('expire') === '1'
+	const deletedFlash = new URL(request.url).searchParams.get('deleted') === '1'
 	const error = accountError(new URL(request.url).searchParams.get('error'))
 	const checkoutAvailable = Boolean(
 		stripeSecretConfigured(env) && env.STRIPE_PRO_PRICE_ID,
@@ -470,13 +482,16 @@ async function accountPage(
 	<p class="tiny">OAuth API and MCP are included with a signed-in account. Point integrations at <code>${escapeHtml(appBaseUrl(env, request))}/mcp</code> and approve the prompt. Guest threads still work over plain <code>/v1</code> with no account.</p>
 	${upgraded ? `<p class="card">Pro is active. Thank you.</p>` : ''}
 	${archivedFlash ? `<p class="card">Thread archived. It is read-only now.</p>` : ''}
+	${keptFlash ? `<p class="card">This thread will not expire. It still counts as a live thread.</p>` : ''}
+	${expireFlash ? `<p class="card">This thread will expire on the usual retention clock.</p>` : ''}
+	${deletedFlash ? `<p class="card">Thread deleted.</p>` : ''}
 	${error ? `<p class="card">${escapeHtml(error)}</p>` : ''}
 	${flash ? threadFlashHtml(flash) : ''}
 	${
 		flash
 			? ''
 			: atThreadLimit
-				? `<p class="card">You're at your live thread limit. Close one, or wait for one to expire${plan.name === 'free' ? ', or upgrade to Pro' : ''}.</p>`
+				? `<p class="card">You're at your live thread limit. Close or delete one, or wait for one to expire${plan.name === 'free' ? ', or upgrade to Pro' : ''}.</p>`
 				: `<form class="card" method="post" action="/account/threads">
 		<input type="hidden" name="csrf" value="${escapeHtml(csrf)}" />
 		<p>After you create the thread:</p>
@@ -521,6 +536,7 @@ async function accountPage(
 					thread,
 					baseUrl: appBaseUrl(env, request),
 					seats: plan.liveAgents,
+					csrf,
 				}),
 			),
 		)
@@ -540,6 +556,7 @@ async function accountPage(
 			: ''
 	}
 	${copyPromptScript()}
+	${accountThreadActionsScript()}
 	`
 }
 
@@ -579,17 +596,43 @@ async function threadListItem(input: {
 	const memberLabel = `${members} of ${input.seats}`
 	const href = await threadViewUrlFor(input.baseUrl, input.thread)
 	const archived = isThreadArchived(input.thread)
-	const close = input.csrf
-		? `<form method="post" action="/account/threads/${escapeHtml(input.thread.id)}/archive">
-		<input type="hidden" name="csrf" value="${escapeHtml(input.csrf)}" />
-		<p><button type="submit">Close thread</button></p>
-	</form>`
+	const neverExpires = isThreadNeverExpiring(input.thread)
+	const retention = archived
+		? neverExpires
+			? 'archived · never expires'
+			: 'archived'
+		: neverExpires
+			? 'never expires'
+			: `expires ${new Date(input.thread.expires_at).toISOString()}`
+	const actions = input.csrf
+		? `<div class="row thread-actions">
+		<form method="post" action="/account/threads/${escapeHtml(input.thread.id)}/${neverExpires ? 'expire' : 'keep'}">
+			<input type="hidden" name="csrf" value="${escapeHtml(input.csrf)}" />
+			<p><button type="submit">${neverExpires ? 'Allow to expire' : 'Keep forever'}</button></p>
+		</form>
+		${
+			archived
+				? ''
+				: `<form method="post" action="/account/threads/${escapeHtml(input.thread.id)}/archive">
+			<input type="hidden" name="csrf" value="${escapeHtml(input.csrf)}" />
+			<p><button type="submit">Close thread</button></p>
+		</form>`
+		}
+		<form method="post" action="/account/threads/${escapeHtml(input.thread.id)}/delete" data-delete-thread>
+			<input type="hidden" name="csrf" value="${escapeHtml(input.csrf)}" />
+			<p>
+				<button type="submit">Delete thread</button>
+				<button type="button" data-undo hidden>Undo</button>
+				<span class="tiny" data-delete-status hidden></span>
+			</p>
+		</form>
+	</div>`
 		: ''
 	return `<article class="card">
 		<h3><a href="${escapeHtml(href)}">${escapeHtml(purpose)}</a></h3>
-		<p class="tiny"><code>${escapeHtml(input.thread.id)}</code> · ${escapeHtml(memberLabel)} · ${archived ? 'archived' : `expires ${escapeHtml(new Date(input.thread.expires_at).toISOString())}`}</p>
+		<p class="tiny"><code>${escapeHtml(input.thread.id)}</code> · ${escapeHtml(memberLabel)} · ${escapeHtml(retention)}</p>
 		<p><a href="${escapeHtml(href)}">Open read-only chat</a></p>
-		${close}
+		${actions}
 	</article>`
 }
 
@@ -635,6 +678,12 @@ function accountError(code: string | null) {
 			return 'That thread was not found.'
 		case 'archive_failed':
 			return 'Could not archive that thread. Try again.'
+		case 'keep_failed':
+			return 'Could not update that thread. Try again.'
+		case 'keep_forbidden':
+			return 'Guest threads cannot be kept forever.'
+		case 'delete_failed':
+			return 'Could not delete that thread. Try again.'
 		case 'bad_login':
 			return 'That GitHub login is not valid.'
 		default:
@@ -656,14 +705,16 @@ export async function handleAccountAction(
 		return new Response('Bad CSRF token', { status: 403 })
 	}
 
-	const archivePath = url.pathname.match(
-		/^\/account\/threads\/([^/]+)\/archive$/,
+	const threadAction = url.pathname.match(
+		/^\/account\/threads\/([^/]+)\/(archive|keep|expire|delete)$/,
 	)
-	if (archivePath?.[1]) {
+	if (threadAction?.[1] && threadAction[2]) {
+		const action = threadAccountAction(threadAction[2])
+		if (!action) return new Response('Not found', { status: 404 })
 		const owned = await first<ThreadRow>(
 			env.DB,
 			'SELECT * FROM threads WHERE id = ? AND owner_user_id = ?',
-			archivePath[1],
+			threadAction[1],
 			user.id,
 		)
 		if (!owned) {
@@ -671,19 +722,58 @@ export async function handleAccountAction(
 			next.searchParams.set('error', 'not_found')
 			return Response.redirect(next.toString(), 303)
 		}
-		const archived = await archiveThread({
-			db: env.DB,
-			threadId: owned.id,
-		})
-		if (!archived.ok) {
-			const next = new URL('/account', appBaseUrl(env, request))
-			next.searchParams.set('error', archived.code)
-			return Response.redirect(next.toString(), 303)
+		switch (action) {
+			case 'archive': {
+				const archived = await archiveThread({
+					db: env.DB,
+					threadId: owned.id,
+				})
+				if (!archived.ok) {
+					const next = new URL('/account', appBaseUrl(env, request))
+					next.searchParams.set('error', archived.code)
+					return Response.redirect(next.toString(), 303)
+				}
+				await maybeCloseThreadView(env, archived.thread.id)
+				const next = new URL('/account', appBaseUrl(env, request))
+				next.searchParams.set('archived', '1')
+				return Response.redirect(next.toString(), 303)
+			}
+			case 'keep':
+			case 'expire': {
+				const updated = await setThreadNeverExpires({
+					db: env.DB,
+					threadId: owned.id,
+					neverExpires: action === 'keep',
+				})
+				if (!updated.ok) {
+					const next = new URL('/account', appBaseUrl(env, request))
+					next.searchParams.set('error', updated.code)
+					return Response.redirect(next.toString(), 303)
+				}
+				const next = new URL('/account', appBaseUrl(env, request))
+				next.searchParams.set(action === 'keep' ? 'kept' : 'expire', '1')
+				return Response.redirect(next.toString(), 303)
+			}
+			case 'delete': {
+				const deleted = await deleteThread({
+					db: env.DB,
+					threadId: owned.id,
+				})
+				if (!deleted.ok) {
+					const next = new URL('/account', appBaseUrl(env, request))
+					next.searchParams.set('error', deleted.code)
+					return Response.redirect(next.toString(), 303)
+				}
+				await maybeCloseThreadView(env, deleted.thread.id)
+				const next = new URL('/account', appBaseUrl(env, request))
+				next.searchParams.set('deleted', '1')
+				return Response.redirect(next.toString(), 303)
+			}
+			default: {
+				const exhaustive: never = action
+				return exhaustive
+			}
 		}
-		await maybeCloseThreadView(env, archived.thread.id)
-		const next = new URL('/account', appBaseUrl(env, request))
-		next.searchParams.set('archived', '1')
-		return Response.redirect(next.toString(), 303)
 	}
 	if (url.pathname === '/account/threads') {
 		const created = await createThread({
@@ -749,6 +839,18 @@ export async function handleAccountAction(
 	}
 
 	return new Response('Not found', { status: 404 })
+}
+
+function threadAccountAction(value: string) {
+	switch (value) {
+		case 'archive':
+		case 'keep':
+		case 'expire':
+		case 'delete':
+			return value
+		default:
+			return null
+	}
 }
 
 function html(body: string, status = 200, extra?: HeadersInit) {

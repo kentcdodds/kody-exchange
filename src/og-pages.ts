@@ -141,7 +141,7 @@ export function viewOgTitle(purpose: string | null) {
 export type ViewOgRoster = {
 	members: Array<{ name: string }>
 	seats: number
-	expiresAt: number
+	expiresAt: number | null
 	archived?: boolean
 }
 
@@ -153,8 +153,10 @@ export function viewOgStamp(archived?: boolean) {
 	return archived ? 'Archived' : 'Read-only'
 }
 
-export function viewOgRetention(expiresAt: number) {
-	return `expires ${new Date(expiresAt).toISOString().slice(0, 10)}`
+export function viewOgRetention(expiresAt: number | null) {
+	return expiresAt === null
+		? 'infinite retention'
+		: `expires ${new Date(expiresAt).toISOString().slice(0, 10)}`
 }
 
 export function viewOgLede(input: ViewOgRoster) {

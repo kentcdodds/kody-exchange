@@ -1,6 +1,7 @@
 import { all, first } from '#src/db.ts'
 import { escapeHtml } from '#src/html.ts'
 import { accountPlan, yearMonth, type AccountPlanName } from '#src/limits.ts'
+import { sqlThreadLive, sqlThreadUnexpired } from '#src/threads.ts'
 
 export const adminPath = '/admin'
 export const adminJsonPath = '/admin.json'
@@ -27,7 +28,8 @@ export type AdminThreadInsight = {
 	guest: boolean
 	memberCount: number
 	createdAt: string
-	expiresAt: string
+	expiresAt: string | null
+	neverExpires: boolean
 	archived: boolean
 	lastMessageAt: string | null
 }
@@ -89,6 +91,7 @@ type ThreadRow = {
 	created_at: number
 	expires_at: number
 	archived_at: number | null
+	never_expires_at: number | null
 	member_count: number | string | null
 	last_message_at: number | string | null
 }
@@ -159,19 +162,19 @@ export async function loadAdminInsights(
 		count(
 			db,
 			`SELECT COUNT(*) AS n FROM threads
-			 WHERE owner_user_id IS NOT NULL AND expires_at > ? AND archived_at IS NULL`,
+			 WHERE owner_user_id IS NOT NULL AND ${sqlThreadLive()}`,
 			now,
 		),
 		count(
 			db,
 			`SELECT COUNT(*) AS n FROM threads
-			 WHERE owner_user_id IS NULL AND expires_at > ? AND archived_at IS NULL`,
+			 WHERE owner_user_id IS NULL AND ${sqlThreadLive()}`,
 			now,
 		),
 		count(
 			db,
 			`SELECT COUNT(*) AS n FROM threads
-			 WHERE expires_at > ? AND archived_at IS NOT NULL`,
+			 WHERE ${sqlThreadUnexpired()} AND archived_at IS NOT NULL`,
 			now,
 		),
 		count(db, 'SELECT COUNT(*) AS n FROM threads'),
@@ -195,8 +198,7 @@ export async function loadAdminInsights(
 			`SELECT COUNT(DISTINCT creator_ip) AS n FROM threads
 			 WHERE owner_user_id IS NULL
 			   AND creator_ip IS NOT NULL
-			   AND expires_at > ?
-			   AND archived_at IS NULL`,
+			   AND ${sqlThreadLive()}`,
 			now,
 		),
 		all<UserRow>(
@@ -204,7 +206,7 @@ export async function loadAdminInsights(
 			`SELECT u.login, u.name, u.email, u.plan, u.created_at,
 				 (
 					 SELECT COUNT(*) FROM threads t
-					 WHERE t.owner_user_id = u.id AND t.expires_at > ? AND t.archived_at IS NULL
+					 WHERE t.owner_user_id = u.id AND ${sqlThreadLive('t.')}
 				 ) AS live_threads,
 				 COALESCE((
 					 SELECT um.message_count FROM usage_months um
@@ -220,12 +222,12 @@ export async function loadAdminInsights(
 		all<ThreadRow>(
 			db,
 			`SELECT t.id, t.purpose, u.login AS owner_login, t.created_at, t.expires_at,
-				 t.archived_at,
+				 t.archived_at, t.never_expires_at,
 				 (SELECT COUNT(*) FROM thread_members m WHERE m.thread_id = t.id) AS member_count,
 				 (SELECT MAX(msg.created_at) FROM messages msg WHERE msg.thread_id = t.id) AS last_message_at
 			 FROM threads t
 			 LEFT JOIN users u ON u.id = t.owner_user_id
-			 WHERE t.expires_at > ?
+			 WHERE ${sqlThreadUnexpired('t.')}
 			 ORDER BY t.created_at DESC
 			 LIMIT ?`,
 			now,
@@ -291,7 +293,8 @@ export async function loadAdminInsights(
 			guest: row.owner_login == null,
 			memberCount: asCount(row.member_count),
 			createdAt: iso(row.created_at),
-			expiresAt: iso(row.expires_at),
+			expiresAt: row.never_expires_at != null ? null : iso(row.expires_at),
+			neverExpires: row.never_expires_at != null,
 			archived: row.archived_at != null,
 			lastMessageAt:
 				row.last_message_at == null ? null : iso(asCount(row.last_message_at)),

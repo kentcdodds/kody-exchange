@@ -320,3 +320,113 @@ test('OAuth user API creates, lists, sends, and sets a webhook', async () => {
 	expect(mcpPayload.ok).toBe(true)
 	expect(mcpPayload.thread.archived).toBe(true)
 })
+
+test('OAuth user API can keep and hard-delete a thread', async () => {
+	const env = createTestEnv()
+	const owner = await createSignedInUser(env)
+	env.OAUTH_USER = owner.user
+
+	const created = await handleRequest(
+		request('/api/threads', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ purpose: 'keep forever', name: 'host' }),
+		}),
+		env,
+	)
+	const createdBody = (await created.json()) as {
+		ok: boolean
+		thread: { id: string; never_expires: boolean; expires_at: string | null }
+	}
+	expect(createdBody.thread.never_expires).toBe(false)
+	expect(createdBody.thread.expires_at).toBeTruthy()
+
+	const kept = await handleRequest(
+		request(`/api/threads/${createdBody.thread.id}/keep`, {
+			method: 'POST',
+		}),
+		env,
+	)
+	expect(kept.status).toBe(200)
+	const keptBody = (await kept.json()) as {
+		ok: boolean
+		thread: { never_expires: boolean; expires_at: string | null }
+	}
+	expect(keptBody.thread.never_expires).toBe(true)
+	expect(keptBody.thread.expires_at).toBeNull()
+
+	const listed = await handleRequest(request('/api/threads'), env)
+	const listedBody = (await listed.json()) as {
+		threads: Array<{ id: string; never_expires: boolean }>
+	}
+	expect(
+		listedBody.threads.find((thread) => thread.id === createdBody.thread.id)
+			?.never_expires,
+	).toBe(true)
+
+	const mcpKeep = await handleRequest(
+		request('/mcp', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({
+				jsonrpc: '2.0',
+				id: 3,
+				method: 'tools/call',
+				params: {
+					name: 'keep_thread',
+					arguments: { thread_id: createdBody.thread.id },
+				},
+			}),
+		}),
+		env,
+	)
+	expect(mcpKeep.status).toBe(200)
+
+	const deleted = await handleRequest(
+		request(`/api/threads/${createdBody.thread.id}/delete`, {
+			method: 'POST',
+		}),
+		env,
+	)
+	expect(deleted.status).toBe(200)
+	const deletedBody = (await deleted.json()) as {
+		ok: boolean
+		deleted: boolean
+	}
+	expect(deletedBody.deleted).toBe(true)
+
+	const listedAfter = await handleRequest(request('/api/threads'), env)
+	const listedAfterBody = (await listedAfter.json()) as {
+		threads: Array<{ id: string }>
+	}
+	expect(listedAfterBody.threads.map((thread) => thread.id)).not.toContain(
+		createdBody.thread.id,
+	)
+
+	const mcpDelete = await handleRequest(
+		request('/mcp', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({
+				jsonrpc: '2.0',
+				id: 4,
+				method: 'tools/call',
+				params: {
+					name: 'delete_thread',
+					arguments: { thread_id: createdBody.thread.id },
+				},
+			}),
+		}),
+		env,
+	)
+	expect(mcpDelete.status).toBe(200)
+	const mcpRpc = (await mcpDelete.json()) as {
+		result: { content: Array<{ text: string }> }
+	}
+	const mcpPayload = JSON.parse(mcpRpc.result.content[0]?.text ?? '{}') as {
+		ok: boolean
+		code?: string
+	}
+	expect(mcpPayload.ok).toBe(false)
+	expect(mcpPayload.code).toBe('not_found')
+})

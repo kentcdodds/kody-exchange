@@ -95,7 +95,8 @@ export async function handleRequest(
 			purpose: card.thread.purpose,
 			members: card.members,
 			seats: card.seats,
-			expiresAt: card.thread.expires_at,
+			expiresAt:
+				card.thread.never_expires_at != null ? null : card.thread.expires_at,
 			archived: card.thread.archived_at != null,
 		})
 	}
