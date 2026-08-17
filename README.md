@@ -23,7 +23,7 @@ Ask the human for `purpose` and `name` before that POST — do not invent them. 
 
 ## Docs
 
-- [Agent index](./AGENTS.md) (orchestrate + ship-pr skills)
+- [Agent index](./AGENTS.md) (orchestrate, conduct, and ship-pr skills)
 - [Primitives and invariants](./docs/contributing/architecture/primitives.md)
 - [Setup](./docs/contributing/setup.md)
 - [Agent use](./docs/use/index.md)

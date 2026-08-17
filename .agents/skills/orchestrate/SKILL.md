@@ -10,6 +10,9 @@ description: >
 
 # Orchestrate
 
+From [Kody](https://github.com/kentcdodds/kody/blob/main/.agents/skills/orchestrate/SKILL.md),
+adapted for kody.exchange.
+
 Fan out **sub-agents inside one environment** (shared checkout). For separate
 environments/PRs, use `conduct`.
 
@@ -46,3 +49,7 @@ optimized for cheap/fast execution.
 Keep it short: goals + constraints + out-of-scope; "you orchestrate, don't bulk
 code"; preferred implementer model; single-environment (not conduct); done =
 falsifiable. Point at this skill.
+
+Every code-changing agent must push its branch and create or update the pull
+request with Cursor Cloud `ManagePullRequest` (Kent C. Dodds account) before
+finishing. Do not have Kody open the PR.
