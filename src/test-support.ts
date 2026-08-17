@@ -88,11 +88,18 @@ function createD1(db: DatabaseSync): D1Database {
 class MemoryKv {
 	#map = new Map<string, string>()
 
-	async get(key: string) {
-		return this.#map.get(key) ?? null
+	async get(key: string, options?: { type?: string }) {
+		const value = this.#map.get(key)
+		if (value === undefined) return null
+		if (options?.type === 'json') return JSON.parse(value) as unknown
+		return value
 	}
 
-	async put(key: string, value: string) {
+	async put(
+		key: string,
+		value: string,
+		_options?: { expirationTtl?: number; expiration?: number },
+	) {
 		this.#map.set(key, value)
 	}
 
@@ -100,8 +107,21 @@ class MemoryKv {
 		this.#map.delete(key)
 	}
 
-	async list() {
-		return { keys: [...this.#map.keys()].map((name) => ({ name })) }
+	async list(options?: { prefix?: string; cursor?: string; limit?: number }) {
+		const prefix = options?.prefix ?? ''
+		const all = [...this.#map.keys()]
+			.filter((key) => key.startsWith(prefix))
+			.toSorted()
+		const start = options?.cursor ? Number.parseInt(options.cursor, 10) || 0 : 0
+		const limit = options?.limit ?? 1000
+		const page = all.slice(start, start + limit)
+		const next = start + page.length
+		const listComplete = next >= all.length
+		return {
+			keys: page.map((name) => ({ name })),
+			list_complete: listComplete,
+			cursor: listComplete ? undefined : String(next),
+		}
 	}
 }
 
@@ -140,6 +160,7 @@ export function createTestEnv(overrides: Partial<AppEnv> = {}): AppEnv {
 	return {
 		DB: createD1(sqlite),
 		RATE_LIMIT: new MemoryKv() as unknown as KVNamespace,
+		OAUTH_KV: new MemoryKv() as unknown as KVNamespace,
 		BLOBS: new MemoryR2() as unknown as R2Bucket,
 		COOKIE_SECRET: 'test-cookie-secret-at-least-32-bytes',
 		APP_BASE_URL: 'https://kody.exchange',
