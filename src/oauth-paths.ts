@@ -17,8 +17,9 @@ export const protectedResourceMetadataPath =
 
 export function isProtectedResourceMetadataPath(pathname: string) {
 	// Root + /mcp only. Leave /api to OAuthProvider so that document still
-	// advertises https://kody.exchange/api; an /mcp audience does not cover
-	// /api/* on the provider's apiRoute check.
+	// advertises https://kody.exchange/api. Omitted or origin-only authorize
+	// resources mint the shared product audience (origin, /api, /mcp) so
+	// apiRoute accepts the token; an explicit /mcp audience stays MCP-scoped.
 	return (
 		pathname === protectedResourceMetadataPath ||
 		pathname === `${protectedResourceMetadataPath}${mcpResourcePath}`

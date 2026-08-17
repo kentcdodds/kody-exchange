@@ -5,12 +5,15 @@ import {
 	audienceMatches,
 	type OAuthAuthRequest,
 	type OAuthHelpers,
+	resolveAuthorizationResource,
+	sharedProductResources,
 } from '#src/oauth-user.ts'
 import {
 	createSignedInUser,
 	createTestEnv,
 	request,
 } from '#src/test-support.ts'
+import worker from '#src/worker.ts'
 
 function authRequest(
 	overrides: Partial<OAuthAuthRequest> = {},
@@ -58,6 +61,24 @@ test('audienceMatches accepts origin, /mcp, /api, and trailing slashes', () => {
 	expect(audienceMatches([`${origin}/api`], origin)).toBe(true)
 	expect(audienceMatches(`${origin}/other`, origin)).toBe(false)
 	expect(audienceMatches(['https://example.com'], origin)).toBe(false)
+})
+
+test('omitted or origin resource becomes the shared product audience', () => {
+	const origin = 'https://kody.exchange'
+	const shared = sharedProductResources(origin)
+	expect(shared).toEqual([origin, `${origin}/api`, `${origin}/mcp`])
+	expect(resolveAuthorizationResource(undefined, origin)).toEqual(shared)
+	expect(resolveAuthorizationResource(origin, origin)).toEqual(shared)
+	expect(resolveAuthorizationResource(`${origin}/`, origin)).toEqual(shared)
+	expect(resolveAuthorizationResource(`${origin}/mcp`, origin)).toBe(
+		`${origin}/mcp`,
+	)
+	expect(resolveAuthorizationResource(`${origin}/api`, origin)).toBe(
+		`${origin}/api`,
+	)
+	expect(resolveAuthorizationResource('https://evil.example/mcp', origin)).toBe(
+		'https://evil.example/mcp',
+	)
 })
 
 test('protected resource metadata advertises /mcp', async () => {
@@ -153,6 +174,74 @@ test('signed-in owner can approve an OAuth client', async () => {
 	expect(approved.headers.get('location')).toBe(
 		'https://kody.codes/connect/oauth?code=ok&state=state-1',
 	)
+})
+
+test('authorize without resource mints the shared product audience, not /mcp-only', async () => {
+	const origin = 'https://kody.exchange'
+	let completed: OAuthAuthRequest | undefined
+	const env = createTestEnv({
+		OAUTH_PROVIDER: mockHelpers({
+			completeAuthorization: async (input) => {
+				completed = input.request
+				return {
+					redirectTo: 'https://kody.codes/connect/oauth?code=ok&state=state-1',
+				}
+			},
+		}),
+	})
+	const owner = await createSignedInUser(env)
+	const approved = await handleRequest(
+		request(`${oauthPaths.authorize}?client_id=client_1`, {
+			method: 'POST',
+			headers: {
+				cookie: owner.cookie,
+				'content-type': 'application/x-www-form-urlencoded',
+			},
+			body: new URLSearchParams({
+				csrf: owner.csrf,
+				decision: 'approve',
+			}),
+		}),
+		env,
+	)
+	expect(approved.status).toBe(302)
+	expect(completed?.resource).toEqual(sharedProductResources(origin))
+	expect(completed?.resource).not.toBe(`${origin}/mcp`)
+})
+
+test('authorize with explicit /mcp keeps an MCP-scoped resource', async () => {
+	let completed: OAuthAuthRequest | undefined
+	const env = createTestEnv({
+		OAUTH_PROVIDER: mockHelpers(
+			{
+				completeAuthorization: async (input) => {
+					completed = input.request
+					return {
+						redirectTo:
+							'https://kody.codes/connect/oauth?code=ok&state=state-1',
+					}
+				},
+			},
+			authRequest({ resource: 'https://kody.exchange/mcp' }),
+		),
+	})
+	const owner = await createSignedInUser(env)
+	const approved = await handleRequest(
+		request(`${oauthPaths.authorize}?client_id=client_1`, {
+			method: 'POST',
+			headers: {
+				cookie: owner.cookie,
+				'content-type': 'application/x-www-form-urlencoded',
+			},
+			body: new URLSearchParams({
+				csrf: owner.csrf,
+				decision: 'approve',
+			}),
+		}),
+		env,
+	)
+	expect(approved.status).toBe(302)
+	expect(completed?.resource).toBe('https://kody.exchange/mcp')
 })
 
 test('OAuth user API creates, lists, sends, and sets a webhook', async () => {
@@ -429,4 +518,241 @@ test('OAuth user API can keep and hard-delete a thread', async () => {
 	}
 	expect(mcpPayload.ok).toBe(false)
 	expect(mcpPayload.code).toBe('not_found')
+})
+
+function executionContext(): ExecutionContext {
+	return {
+		waitUntil() {},
+		passThroughOnException() {},
+		props: {},
+	} as unknown as ExecutionContext
+}
+
+async function pkcePair() {
+	const verifierBytes = crypto.getRandomValues(new Uint8Array(32))
+	const verifier = Buffer.from(verifierBytes).toString('base64url')
+	const digest = await crypto.subtle.digest(
+		'SHA-256',
+		new TextEncoder().encode(verifier),
+	)
+	return { verifier, challenge: Buffer.from(digest).toString('base64url') }
+}
+
+type TokenResponse = {
+	access_token: string
+	refresh_token?: string
+	token_type?: string
+	resource?: string | Array<string>
+	error?: string
+	error_description?: string
+}
+
+async function registerPublicClient(env: ReturnType<typeof createTestEnv>) {
+	const response = await worker.fetch(
+		request(oauthPaths.register, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({
+				client_name: 'kody.codes',
+				redirect_uris: ['https://kody.codes/connect/oauth'],
+				token_endpoint_auth_method: 'none',
+				grant_types: ['authorization_code', 'refresh_token'],
+				response_types: ['code'],
+			}),
+		}),
+		env,
+		executionContext(),
+	)
+	expect(response.status).toBe(201)
+	return (await response.json()) as { client_id: string }
+}
+
+async function approveAuthorization(
+	env: ReturnType<typeof createTestEnv>,
+	input: {
+		clientId: string
+		challenge: string
+		resource?: string
+	},
+) {
+	const owner = await createSignedInUser(env)
+	const authorize = new URL('https://kody.exchange/oauth/authorize')
+	authorize.searchParams.set('response_type', 'code')
+	authorize.searchParams.set('client_id', input.clientId)
+	authorize.searchParams.set('redirect_uri', 'https://kody.codes/connect/oauth')
+	authorize.searchParams.set('scope', 'profile threads')
+	authorize.searchParams.set('state', 'state-1')
+	authorize.searchParams.set('code_challenge', input.challenge)
+	authorize.searchParams.set('code_challenge_method', 'S256')
+	if (input.resource) authorize.searchParams.set('resource', input.resource)
+
+	const page = await worker.fetch(
+		new Request(authorize, { headers: { cookie: owner.cookie } }),
+		env,
+		executionContext(),
+	)
+	expect(page.status).toBe(200)
+
+	const approved = await worker.fetch(
+		new Request(authorize, {
+			method: 'POST',
+			headers: {
+				cookie: owner.cookie,
+				'content-type': 'application/x-www-form-urlencoded',
+			},
+			body: new URLSearchParams({
+				csrf: owner.csrf,
+				decision: 'approve',
+			}),
+		}),
+		env,
+		executionContext(),
+	)
+	expect(approved.status).toBe(302)
+	const location = approved.headers.get('location')
+	expect(location).toBeTruthy()
+	const redirected = new URL(location ?? '')
+	const code = redirected.searchParams.get('code')
+	expect(code).toBeTruthy()
+	return { owner, code: code ?? '' }
+}
+
+async function exchangeToken(
+	env: ReturnType<typeof createTestEnv>,
+	input: {
+		clientId: string
+		code?: string
+		verifier?: string
+		refreshToken?: string
+		resource?: string
+	},
+) {
+	const body = new URLSearchParams({ client_id: input.clientId })
+	if (input.refreshToken) {
+		body.set('grant_type', 'refresh_token')
+		body.set('refresh_token', input.refreshToken)
+	} else {
+		body.set('grant_type', 'authorization_code')
+		body.set('code', input.code ?? '')
+		body.set('redirect_uri', 'https://kody.codes/connect/oauth')
+		body.set('code_verifier', input.verifier ?? '')
+	}
+	if (input.resource) body.set('resource', input.resource)
+	const response = await worker.fetch(
+		request(oauthPaths.token, {
+			method: 'POST',
+			headers: { 'content-type': 'application/x-www-form-urlencoded' },
+			body,
+		}),
+		env,
+		executionContext(),
+	)
+	return {
+		status: response.status,
+		body: (await response.json()) as TokenResponse,
+	}
+}
+
+async function bearerGet(
+	env: ReturnType<typeof createTestEnv>,
+	path: string,
+	token: string,
+) {
+	return worker.fetch(
+		request(path, { headers: { authorization: `Bearer ${token}` } }),
+		env,
+		executionContext(),
+	)
+}
+
+test('resource-less authorize token works on /api and /mcp, and refresh stays valid', async () => {
+	const origin = 'https://kody.exchange'
+	const env = createTestEnv()
+	const client = await registerPublicClient(env)
+	const pkce = await pkcePair()
+	const { owner, code } = await approveAuthorization(env, {
+		clientId: client.client_id,
+		challenge: pkce.challenge,
+	})
+	const issued = await exchangeToken(env, {
+		clientId: client.client_id,
+		code,
+		verifier: pkce.verifier,
+	})
+	expect(issued.status).toBe(200)
+	expect(issued.body.access_token).toBeTruthy()
+	expect(issued.body.refresh_token).toBeTruthy()
+	expect(issued.body.resource).toEqual(sharedProductResources(origin))
+	expect(issued.body.resource).not.toBe(`${origin}/mcp`)
+
+	const api = await bearerGet(env, '/api/me', issued.body.access_token)
+	expect(api.status).toBe(200)
+	const apiBody = (await api.json()) as {
+		ok: boolean
+		user: { id: string; login: string }
+	}
+	expect(apiBody.ok).toBe(true)
+	expect(apiBody.user.id).toBe(owner.user.id)
+	expect(apiBody.user.login).toBe(owner.user.login)
+
+	const threads = await bearerGet(env, '/api/threads', issued.body.access_token)
+	expect(threads.status).toBe(200)
+
+	const mcp = await bearerGet(env, '/mcp', issued.body.access_token)
+	expect(mcp.status).toBe(200)
+	const mcpBody = (await mcp.json()) as {
+		ok: boolean
+		user: { login: string }
+		tools: Array<string>
+	}
+	expect(mcpBody.ok).toBe(true)
+	expect(mcpBody.user.login).toBe(owner.user.login)
+	expect(mcpBody.tools).toContain('list_threads')
+
+	const refreshResources = [undefined, origin, `${origin}/api`, `${origin}/mcp`]
+	let refreshToken = issued.body.refresh_token ?? ''
+	for (const resource of refreshResources) {
+		const refreshed = await exchangeToken(env, {
+			clientId: client.client_id,
+			refreshToken,
+			resource,
+		})
+		expect(refreshed.status).toBe(200)
+		expect(refreshed.body.error).not.toBe('invalid_grant')
+		expect(refreshed.body.access_token).toBeTruthy()
+		expect(refreshed.body.refresh_token).toBeTruthy()
+		refreshToken = refreshed.body.refresh_token ?? refreshToken
+	}
+})
+
+test('explicit /mcp authorize still works for MCP and stays API-scoped', async () => {
+	const origin = 'https://kody.exchange'
+	const env = createTestEnv()
+	const client = await registerPublicClient(env)
+	const pkce = await pkcePair()
+	const { code } = await approveAuthorization(env, {
+		clientId: client.client_id,
+		challenge: pkce.challenge,
+		resource: `${origin}/mcp`,
+	})
+	const issued = await exchangeToken(env, {
+		clientId: client.client_id,
+		code,
+		verifier: pkce.verifier,
+		resource: `${origin}/mcp`,
+	})
+	expect(issued.status).toBe(200)
+	expect(issued.body.resource).toBe(`${origin}/mcp`)
+
+	const mcp = await bearerGet(env, '/mcp', issued.body.access_token)
+	expect(mcp.status).toBe(200)
+
+	const api = await bearerGet(env, '/api/me', issued.body.access_token)
+	expect(api.status).toBe(401)
+	const apiBody = (await api.json()) as {
+		error: string
+		error_description?: string
+	}
+	expect(apiBody.error).toBe('invalid_token')
+	expect(apiBody.error_description).toContain('audience')
 })

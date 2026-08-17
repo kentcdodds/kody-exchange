@@ -50,10 +50,11 @@ export { ThreadRoom }
 
 export default {
 	fetch(request: Request, env: AppEnv, ctx: ExecutionContext) {
-		// OAuthProvider serves this URL first and defaults `resource` to the
-		// origin only. MCP clients follow RFC 9728 from WWW-Authenticate and
-		// must see `<origin>/mcp` on the root PRM, or the token audience fails
-		// and Kody stays "authenticating".
+		// OAuthProvider serves this URL first and defaults omitted `resource`
+		// to the origin. MCP clients follow RFC 9728 from WWW-Authenticate and
+		// must see `<origin>/mcp` on the root PRM. Authorize still mints a
+		// shared product audience (origin, /api, /mcp) when the client omits
+		// resource or sends the origin, so /api and /mcp both accept the token.
 		const pathname = new URL(request.url).pathname
 		if (isProtectedResourceMetadataPath(pathname)) {
 			return handleProtectedResourceMetadata(request, env)

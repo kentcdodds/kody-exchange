@@ -38,7 +38,7 @@ export type OAuthAuthRequest = {
 	state?: string
 	codeChallenge?: string
 	codeChallengeMethod?: string
-	resource?: string
+	resource?: string | Array<string>
 }
 
 export type OAuthClientInfo = {
@@ -93,6 +93,38 @@ export function defaultMcpResource(origin: string) {
 
 export function canonicalizeAudience(value: string) {
 	return value.replace(/\/+$/, '')
+}
+
+export function sharedProductResources(origin: string) {
+	const base = canonicalizeAudience(origin)
+	return [base, `${base}${apiResourcePath}`, `${base}${mcpResourcePath}`]
+}
+
+function resourceValues(resource: string | Array<string> | undefined) {
+	if (resource === undefined) return []
+	return typeof resource === 'string' ? [resource] : resource
+}
+
+export function isSharedProductResource(
+	resource: string | Array<string> | undefined,
+	origin: string,
+) {
+	if (resource === undefined) return true
+	const values = resourceValues(resource)
+	return (
+		values.length === 1 &&
+		canonicalizeAudience(values[0] ?? '') === canonicalizeAudience(origin)
+	)
+}
+
+export function resolveAuthorizationResource(
+	resource: string | Array<string> | undefined,
+	origin: string,
+) {
+	if (isSharedProductResource(resource, origin)) {
+		return sharedProductResources(origin)
+	}
+	return resource
 }
 
 export function audienceMatches(

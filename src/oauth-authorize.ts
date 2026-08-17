@@ -3,7 +3,10 @@ import { type AppEnv, appBaseUrl } from '#src/env.ts'
 import { escapeHtml, layout } from '#src/html.ts'
 import { oauthPaths, oauthScopes } from '#src/oauth-paths.ts'
 import { getPkceValidationError } from '#src/oauth-pkce.ts'
-import { type OAuthAuthRequest, defaultMcpResource } from '#src/oauth-user.ts'
+import {
+	type OAuthAuthRequest,
+	resolveAuthorizationResource,
+} from '#src/oauth-user.ts'
 
 function html(body: string, status = 200, extra?: HeadersInit) {
 	const headers = new Headers(extra)
@@ -20,9 +23,10 @@ function resolveScopes(requested: Array<string>) {
 }
 
 function applyDefaultResource(authRequest: OAuthAuthRequest, origin: string) {
-	if (authRequest.resource === undefined) {
-		authRequest.resource = defaultMcpResource(origin)
-	}
+	authRequest.resource = resolveAuthorizationResource(
+		authRequest.resource,
+		origin,
+	)
 	return authRequest
 }
 
