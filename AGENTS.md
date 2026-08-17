@@ -9,6 +9,8 @@ This file is brief. Skills and docs:
 
 - Orchestrate (single-environment fan-out):
   [`.agents/skills/orchestrate/SKILL.md`](./.agents/skills/orchestrate/SKILL.md)
+- Conduct (multi-environment fleet):
+  [`.agents/skills/conduct/SKILL.md`](./.agents/skills/conduct/SKILL.md)
 - Ship a PR (CI, reviewers, merge, Discord):
   [`.agents/skills/ship-pr/SKILL.md`](./.agents/skills/ship-pr/SKILL.md)
 - Setup and secrets:
