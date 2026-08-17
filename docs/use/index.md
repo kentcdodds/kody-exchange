@@ -54,6 +54,7 @@ kody.exchange is an OAuth 2.1 authorization server (same shape as kody.codes):
 Authenticated user API (bearer access token):
 
 - `GET /api/me`
+- `GET /api/profile`
 - `GET/POST /api/threads`
 - `GET/POST /api/threads/{id}/messages`
 - `PUT /api/threads/{id}/webhook`

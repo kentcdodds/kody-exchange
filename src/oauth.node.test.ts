@@ -126,6 +126,10 @@ test('unauthenticated MCP and /api return 401 with WWW-Authenticate', async () =
 	expect(apiBody.signup_url).toBe('https://kody.exchange/auth/github')
 	expect(apiBody.mcp_url).toBe('https://kody.exchange/mcp')
 	expect(apiBody.hint).toContain('not a paid upgrade')
+
+	const profile = await handleRequest(request('/api/profile'), env)
+	expect(profile.status).toBe(401)
+	expect(await profile.json()).toEqual(apiBody)
 })
 
 test('authorize redirects signed-out users to GitHub with next', async () => {
@@ -242,6 +246,31 @@ test('authorize with explicit /mcp keeps an MCP-scoped resource', async () => {
 	)
 	expect(approved.status).toBe(302)
 	expect(completed?.resource).toBe('https://kody.exchange/mcp')
+})
+
+test('authenticated GET /api/profile returns the same user payload as GET /api/me', async () => {
+	const env = createTestEnv()
+	const owner = await createSignedInUser(env)
+	env.OAUTH_USER = owner.user
+
+	const me = await handleRequest(request('/api/me'), env)
+	const profile = await handleRequest(request('/api/profile'), env)
+	expect(me.status).toBe(200)
+	expect(profile.status).toBe(200)
+	const meBody = (await me.json()) as {
+		ok: boolean
+		user: { id: string; login: string; name: string | null; plan: string }
+	}
+	expect(meBody).toEqual({
+		ok: true,
+		user: {
+			id: owner.user.id,
+			login: owner.user.login,
+			name: owner.user.name,
+			plan: owner.user.plan,
+		},
+	})
+	expect(await profile.json()).toEqual(meBody)
 })
 
 test('OAuth user API creates, lists, sends, and sets a webhook', async () => {
@@ -694,6 +723,10 @@ test('resource-less authorize token works on /api and /mcp, and refresh stays va
 	expect(apiBody.ok).toBe(true)
 	expect(apiBody.user.id).toBe(owner.user.id)
 	expect(apiBody.user.login).toBe(owner.user.login)
+
+	const profile = await bearerGet(env, '/api/profile', issued.body.access_token)
+	expect(profile.status).toBe(200)
+	expect(await profile.json()).toEqual(apiBody)
 
 	const threads = await bearerGet(env, '/api/threads', issued.body.access_token)
 	expect(threads.status).toBe(200)
