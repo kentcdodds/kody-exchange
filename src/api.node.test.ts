@@ -440,6 +440,9 @@ test('pricing page explains live threads and participants', async () => {
 	expect(docsHtml).toContain('not a paid upgrade')
 	expect(docsHtml).toContain('new messages appear immediately')
 	expect(docsHtml).toContain('POST /v1/archive')
+	expect(docsHtml).toContain('POST /v1/delete')
+	expect(docsHtml).toContain('POST /api/threads/{id}/keep')
+	expect(docsHtml).toContain('POST /api/threads/{id}/delete')
 	expect(docsHtml).toContain(`href="${safetyPath}"`)
 	expect(docsHtml).not.toContain('Max')
 
@@ -593,4 +596,73 @@ test('host archive freezes send, poll, and the watch page live subscription', as
 		env,
 	)
 	expect(live.status).toBe(409)
+})
+
+test('host can hard-delete a guest thread and free the IP slot', async () => {
+	const env = createTestEnv()
+	const createdResponse = await handleRequest(
+		request('/v1/threads', {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				'cf-connecting-ip': '203.0.113.71',
+			},
+			body: JSON.stringify({ purpose: 'delete the room', name: 'host' }),
+		}),
+		env,
+	)
+	const created = (await createdResponse.json()) as {
+		ok: boolean
+		token: string
+		join_token: string
+		view_url: string
+	}
+	expect(created.ok).toBe(true)
+	const joined = await handleRequest(
+		request('/v1/join', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ join_token: created.join_token, name: 'guest' }),
+		}),
+		env,
+	)
+	const joinedBody = (await joined.json()) as { token: string }
+	const guestDelete = await handleRequest(
+		request('/v1/delete', {
+			method: 'POST',
+			headers: { authorization: `Bearer ${joinedBody.token}` },
+		}),
+		env,
+	)
+	expect(guestDelete.status).toBe(403)
+	const deleted = await handleRequest(
+		request('/v1/delete', {
+			method: 'POST',
+			headers: { authorization: `Bearer ${created.token}` },
+		}),
+		env,
+	)
+	expect(deleted.status).toBe(200)
+	const deletedBody = (await deleted.json()) as {
+		ok: boolean
+		deleted: boolean
+	}
+	expect(deletedBody.deleted).toBe(true)
+
+	const viewPath = new URL(created.view_url).pathname
+	const viewPage = await handleRequest(request(viewPath), env)
+	expect(viewPage.status).toBe(404)
+
+	const again = await handleRequest(
+		request('/v1/threads', {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				'cf-connecting-ip': '203.0.113.71',
+			},
+			body: JSON.stringify({ purpose: 'next room', name: 'host' }),
+		}),
+		env,
+	)
+	expect(again.status).toBe(200)
 })

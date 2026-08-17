@@ -3,8 +3,11 @@ import { createTestEnv } from '#src/test-support.ts'
 import {
 	archiveThread,
 	archiveThreadAsHost,
+	countOwnedThreads,
 	createAccountAgent,
 	createThread,
+	deleteThread,
+	deleteThreadAsHost,
 	getAgentByToken,
 	joinThread,
 	joinTokenFor,
@@ -13,7 +16,9 @@ import {
 	listThreadMembers,
 	liveTokenFor,
 	maybeDispatchWebhook,
+	purgeExpired,
 	sendMessage,
+	setThreadNeverExpires,
 	setWebhook,
 	viewTokenFor,
 } from '#src/threads.ts'
@@ -544,4 +549,195 @@ test('webhook dispatch stays alive through waitUntil', async () => {
 	} finally {
 		globalThis.fetch = originalFetch
 	}
+})
+
+test('owner can keep a thread forever; it still counts as live and survives purge', async () => {
+	const env = createTestEnv()
+	const now = Date.parse('2026-08-17T00:00:00Z')
+	await run(
+		env.DB,
+		`INSERT INTO users (id, github_id, login, name, avatar_url, email, plan, stripe_customer_id, stripe_subscription_id, created_at)
+		 VALUES (?, ?, ?, ?, NULL, NULL, 'free', NULL, NULL, ?)`,
+		'usr_keep',
+		'42',
+		'keeper',
+		'Keeper',
+		now,
+	)
+	const first = await createThread({
+		db: env.DB,
+		baseUrl: 'https://kody.exchange',
+		ownerUserId: 'usr_keep',
+		purpose: 'keep me',
+		name: 'host',
+		now,
+	})
+	if (!first.ok) throw new Error(first.error)
+	const kept = await setThreadNeverExpires({
+		db: env.DB,
+		threadId: first.thread.id,
+		neverExpires: true,
+		now: now + 1000,
+	})
+	expect(kept.ok).toBe(true)
+	if (!kept.ok) throw new Error(kept.error)
+	expect(kept.thread.never_expires_at).toBe(now + 1000)
+	expect(kept.thread.expires_at).toBe(first.thread.expires_at)
+
+	const sent = await sendMessage({
+		db: env.DB,
+		threadId: first.thread.id,
+		agent: first.agent,
+		body: { text: 'still here' },
+		now: now + 2000,
+	})
+	if (!sent.ok) throw new Error(sent.error)
+	const afterSend = await setThreadNeverExpires({
+		db: env.DB,
+		threadId: first.thread.id,
+		neverExpires: true,
+		now: now + 3000,
+	})
+	if (!afterSend.ok) throw new Error(afterSend.error)
+	expect(afterSend.thread.expires_at).toBe(first.thread.expires_at)
+	expect(afterSend.thread.never_expires_at).toBe(now + 1000)
+
+	await run(
+		env.DB,
+		'UPDATE threads SET expires_at = ? WHERE id = ?',
+		now - 1,
+		first.thread.id,
+	)
+	expect(await purgeExpired(env.DB, now + 4000)).toBe(0)
+	const viewed = await listMessagesForView({
+		db: env.DB,
+		viewToken: await viewTokenFor(first.thread),
+		now: now + 4000,
+	})
+	if (!viewed.ok) throw new Error(viewed.error)
+	expect(viewed.thread.never_expires_at).toBe(now + 1000)
+
+	const second = await createThread({
+		db: env.DB,
+		baseUrl: 'https://kody.exchange',
+		ownerUserId: 'usr_keep',
+		purpose: 'two',
+		name: 'host',
+		now: now + 5000,
+	})
+	if (!second.ok) throw new Error(second.error)
+	const third = await createThread({
+		db: env.DB,
+		baseUrl: 'https://kody.exchange',
+		ownerUserId: 'usr_keep',
+		purpose: 'three',
+		name: 'host',
+		now: now + 6000,
+	})
+	if (!third.ok) throw new Error(third.error)
+	expect(await countOwnedThreads(env.DB, 'usr_keep')).toBe(3)
+	const fourth = await createThread({
+		db: env.DB,
+		baseUrl: 'https://kody.exchange',
+		ownerUserId: 'usr_keep',
+		purpose: 'four',
+		name: 'host',
+		now: now + 7000,
+	})
+	expect(fourth).toMatchObject({ ok: false, code: 'thread_limit' })
+
+	const restored = await setThreadNeverExpires({
+		db: env.DB,
+		threadId: first.thread.id,
+		neverExpires: false,
+		now: now + 8000,
+	})
+	if (!restored.ok) throw new Error(restored.error)
+	expect(restored.thread.never_expires_at).toBeNull()
+	expect(restored.thread.expires_at).toBeGreaterThan(now + 8000)
+})
+
+test('guest threads cannot be kept; host can hard-delete and free the IP slot', async () => {
+	const env = createTestEnv()
+	const now = Date.parse('2026-08-17T00:00:00Z')
+	const created = await createThread({
+		db: env.DB,
+		baseUrl: 'https://kody.exchange',
+		ownerUserId: null,
+		creatorIp: '203.0.113.70',
+		name: 'host',
+		now,
+	})
+	if (!created.ok) throw new Error(created.error)
+	const keep = await setThreadNeverExpires({
+		db: env.DB,
+		threadId: created.thread.id,
+		neverExpires: true,
+		now: now + 1000,
+	})
+	expect(keep).toMatchObject({ ok: false, code: 'keep_forbidden' })
+
+	const joined = await joinThread({
+		db: env.DB,
+		joinToken: created.joinToken,
+		name: 'guest',
+		now: now + 2000,
+	})
+	if (!joined.ok) throw new Error(joined.error)
+	const guestDelete = await deleteThreadAsHost({
+		db: env.DB,
+		threadId: created.thread.id,
+		agent: joined.agent,
+		now: now + 3000,
+	})
+	expect(guestDelete).toMatchObject({ ok: false, code: 'not_host' })
+
+	const deleted = await deleteThreadAsHost({
+		db: env.DB,
+		threadId: created.thread.id,
+		agent: created.agent,
+		now: now + 3000,
+	})
+	if (!deleted.ok) throw new Error(deleted.error)
+	expect(deleted.thread.id).toBe(created.thread.id)
+
+	const gone = await listMessagesForView({
+		db: env.DB,
+		viewToken: await viewTokenFor(created.thread),
+		now: now + 4000,
+	})
+	expect(gone).toMatchObject({ ok: false, code: 'thread_not_found' })
+
+	const again = await createThread({
+		db: env.DB,
+		baseUrl: 'https://kody.exchange',
+		ownerUserId: null,
+		creatorIp: '203.0.113.70',
+		name: 'next',
+		now: now + 5000,
+	})
+	expect(again.ok).toBe(true)
+})
+
+test('deleteThread removes members and messages; missing threads 404', async () => {
+	const env = createTestEnv()
+	const created = await createThread({
+		db: env.DB,
+		baseUrl: 'https://kody.exchange',
+		ownerUserId: null,
+		creatorIp: '198.51.100.70',
+		name: 'host',
+	})
+	if (!created.ok) throw new Error(created.error)
+	const deleted = await deleteThread({
+		db: env.DB,
+		threadId: created.thread.id,
+	})
+	if (!deleted.ok) throw new Error(deleted.error)
+	expect(await listThreadMembers(env.DB, created.thread.id)).toEqual([])
+	const missing = await deleteThread({
+		db: env.DB,
+		threadId: created.thread.id,
+	})
+	expect(missing).toMatchObject({ ok: false, code: 'thread_not_found' })
 })

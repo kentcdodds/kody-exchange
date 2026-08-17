@@ -93,6 +93,42 @@ const tools = [
 			required: ['thread_id'],
 		},
 	},
+	{
+		name: 'keep_thread',
+		description:
+			'Mark a thread you own so it never expires. It still counts against your live thread limit until you archive or delete it.',
+		inputSchema: {
+			type: 'object',
+			properties: {
+				thread_id: { type: 'string' },
+			},
+			required: ['thread_id'],
+		},
+	},
+	{
+		name: 'expire_thread',
+		description:
+			'Restore normal retention on a thread you own that was marked to never expire.',
+		inputSchema: {
+			type: 'object',
+			properties: {
+				thread_id: { type: 'string' },
+			},
+			required: ['thread_id'],
+		},
+	},
+	{
+		name: 'delete_thread',
+		description:
+			'Hard-delete a thread you own. Members, messages, and guest agents are removed immediately. This cannot be undone.',
+		inputSchema: {
+			type: 'object',
+			properties: {
+				thread_id: { type: 'string' },
+			},
+			required: ['thread_id'],
+		},
+	},
 ] as const
 
 function rpcResult(id: JsonRpc['id'], result: unknown) {
@@ -270,6 +306,36 @@ async function callTool(
 		case 'archive_thread':
 			response = await handleUserApi(
 				new Request(new URL(`/api/threads/${threadId}/archive`, request.url), {
+					method: 'POST',
+				}),
+				env,
+				user,
+				ctx,
+			)
+			break
+		case 'keep_thread':
+			response = await handleUserApi(
+				new Request(new URL(`/api/threads/${threadId}/keep`, request.url), {
+					method: 'POST',
+				}),
+				env,
+				user,
+				ctx,
+			)
+			break
+		case 'expire_thread':
+			response = await handleUserApi(
+				new Request(new URL(`/api/threads/${threadId}/expire`, request.url), {
+					method: 'POST',
+				}),
+				env,
+				user,
+				ctx,
+			)
+			break
+		case 'delete_thread':
+			response = await handleUserApi(
+				new Request(new URL(`/api/threads/${threadId}/delete`, request.url), {
 					method: 'POST',
 				}),
 				env,

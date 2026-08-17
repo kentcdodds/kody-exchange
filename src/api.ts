@@ -11,6 +11,7 @@ import {
 	archiveThreadAsHost,
 	assertThreadLive,
 	createThread,
+	deleteThreadAsHost,
 	maybeDispatchWebhook,
 	getAgentByToken,
 	joinThread,
@@ -153,6 +154,10 @@ export async function handleApi(
 
 	if (url.pathname === '/v1/archive' && request.method === 'POST') {
 		return archiveRoute(request, env, ctx)
+	}
+
+	if (url.pathname === '/v1/delete' && request.method === 'POST') {
+		return deleteRoute(request, env, ctx)
 	}
 
 	if (url.pathname === '/v1/blobs' && request.method === 'POST') {
@@ -429,6 +434,29 @@ async function archiveRoute(
 			...guestThreadJson(archived.thread),
 			archived: true,
 		},
+	})
+}
+
+async function deleteRoute(
+	request: Request,
+	env: AppEnv,
+	ctx?: ExecutionContext,
+) {
+	const auth = await requireAgent(request, env)
+	if (!auth.ok) return auth.response
+	const scoped = threadIdForAgent(auth.agent)
+	if (!scoped.ok) return scoped.response
+	const deleted = await deleteThreadAsHost({
+		db: env.DB,
+		threadId: scoped.threadId,
+		agent: auth.agent,
+	})
+	if (!deleted.ok) return errorResponse(deleted)
+	await maybeCloseThreadView(env, deleted.thread.id, ctx)
+	return json({
+		ok: true,
+		deleted: true,
+		thread: guestThreadJson(deleted.thread),
 	})
 }
 

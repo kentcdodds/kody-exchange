@@ -84,4 +84,11 @@ test('view OG paths and copy stay on the public roster, not tokens', () => {
 			archived: true,
 		}),
 	).toBe('1 of 2 · harbor · archived')
+	expect(
+		viewOgLede({
+			members: [{ name: 'harbor' }, { name: 'relay' }],
+			seats: 2,
+			expiresAt: null,
+		}),
+	).toBe('2 of 2 · harbor, relay · infinite retention')
 })

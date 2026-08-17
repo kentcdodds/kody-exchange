@@ -448,3 +448,86 @@ test('signed-in host can close a thread from the account page', async () => {
 	)
 	expect(await expiredPage.text()).toContain('That thread was not found.')
 })
+
+test('signed-in host can keep and hard-delete a thread from the account page', async () => {
+	const env = createTestEnv()
+	const { cookie, csrf } = await createSignedInUser(env)
+	const created = await handleRequest(
+		request('/account/threads', {
+			method: 'POST',
+			headers: {
+				cookie,
+				'content-type': 'application/x-www-form-urlencoded',
+			},
+			body: new URLSearchParams({
+				csrf,
+				purpose: 'keep then delete',
+				name: 'host-agent',
+			}),
+		}),
+		env,
+	)
+	expect(created.status).toBe(303)
+	const flash = firstSetCookie(created)
+	const withPrompts = await handleRequest(
+		request('/account', { headers: { cookie: `${cookie}; ${flash}` } }),
+		env,
+	)
+	const accountHtml = await withPrompts.text()
+	expect(accountHtml).toContain('Keep forever')
+	expect(accountHtml).toContain('Delete thread')
+	expect(accountHtml).toContain('data-delete-thread')
+	expect(accountHtml).toContain('Deleting in ')
+	expect(accountHtml).toContain('left = 10')
+	const threadId = /th_[a-z0-9]+/.exec(accountHtml)?.[0]
+	expect(threadId).toBeTruthy()
+
+	const kept = await handleRequest(
+		request(`/account/threads/${threadId}/keep`, {
+			method: 'POST',
+			headers: {
+				cookie,
+				'content-type': 'application/x-www-form-urlencoded',
+			},
+			body: new URLSearchParams({ csrf }),
+		}),
+		env,
+	)
+	expect(kept.status).toBe(303)
+	expect(kept.headers.get('location')).toBe(
+		'https://kody.exchange/account?kept=1',
+	)
+	const keptPage = await handleRequest(
+		request('/account?kept=1', { headers: { cookie } }),
+		env,
+	)
+	const keptHtml = await keptPage.text()
+	expect(keptHtml).toContain('This thread will not expire.')
+	expect(keptHtml).toContain('never expires')
+	expect(keptHtml).toContain('Allow to expire')
+	expect(keptHtml).toContain('still counts as a live thread')
+
+	const deleted = await handleRequest(
+		request(`/account/threads/${threadId}/delete`, {
+			method: 'POST',
+			headers: {
+				cookie,
+				'content-type': 'application/x-www-form-urlencoded',
+			},
+			body: new URLSearchParams({ csrf }),
+		}),
+		env,
+	)
+	expect(deleted.status).toBe(303)
+	expect(deleted.headers.get('location')).toBe(
+		'https://kody.exchange/account?deleted=1',
+	)
+	const later = await handleRequest(
+		request('/account?deleted=1', { headers: { cookie } }),
+		env,
+	)
+	const laterHtml = await later.text()
+	expect(laterHtml).toContain('Thread deleted.')
+	expect(laterHtml).not.toContain('keep then delete')
+	expect(laterHtml).toContain("What's this thread for?")
+})

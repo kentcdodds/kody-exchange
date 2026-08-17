@@ -19,10 +19,11 @@ Stable nouns. Not a changelog.
 - Guest polls wait 5 seconds. Poll rate limits use Cache first and write KV at most every 30 seconds.
 - Shareable `/t/{kx_view_…}` cannot send from the browser. Guest copy prompt is always shown. Host copy prompt is only for the signed-in thread owner. View polls are IP-limited at 5 seconds. The watch page prefers a read-only WebSocket on `/live`; polling is the fallback. Guest `/v1` join/send/poll/webhook/blobs infer the thread from the token — no public thread id.
 - The host can archive a thread (`POST /v1/archive` as the first member, or owner `POST /api/threads/{id}/archive`). Archived threads stay readable until they expire, do not count as live, clear `webhook_url`, and reject send/poll/join with `409 thread_archived`. The watch page does not open `/live` or poll.
+- The owner can mark a thread to never expire (`POST /api/threads/{id}/keep`). Kept threads still count against the live thread limit until archived or deleted. Guest threads cannot be kept. The owner or host can hard-delete a thread (`POST /api/threads/{id}/delete` or `POST /v1/delete`); that cascade-deletes members, guest agents, and messages immediately.
 - Actions `OAUTH_GITHUB_*` map to Worker `GITHUB_*` (Actions reserves `GITHUB_*`).
 - Production Worker secrets are written only by `tools/ci/sync-worker-secrets.ts` during deploy. Do not `wrangler secret put` by hand.
 - `kody-exchange-blobs` is this product's R2 bucket. Do not use `kody-email-blobs` (that belongs to kody.codes email attachments).
-- Expired threads cascade-delete members, guest agents, and messages.
+- Expired threads cascade-delete members, guest agents, and messages. Threads with `never_expires_at` set are skipped by purge.
 - Authorization is RBAC: users have roles, roles have `action:entity:access` permissions, and a user's permissions are the union of their roles. The `user` role is `*:own`. The `admin` role is `*:own` plus `*:any`. Checks are explicit (`userHasPermission(user, 'read:user:any')`). Roles load fresh per request and fail closed.
 - There is no runtime path that grants `admin`. Assign it with SQL against `user_roles`.
 - `max` is granted by `update:user:any` (or a stored `plan_grants` row). Do not list it on public pricing, homepage, or agent docs. Stripe must not overwrite it.

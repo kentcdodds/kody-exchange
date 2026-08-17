@@ -56,6 +56,7 @@ export type ThreadRow = {
 	created_at: number
 	expires_at: number
 	archived_at: number | null
+	never_expires_at: number | null
 }
 
 const tokenBodyLen = 48
@@ -207,6 +208,31 @@ export function isThreadArchived(
 	return thread?.archived_at != null
 }
 
+export function isThreadNeverExpiring(
+	thread: { never_expires_at?: number | null } | null | undefined,
+) {
+	return thread?.never_expires_at != null
+}
+
+export function isThreadExpired(
+	thread: {
+		expires_at: number
+		never_expires_at?: number | null
+	},
+	now: number,
+) {
+	return !isThreadNeverExpiring(thread) && thread.expires_at <= now
+}
+
+/** Bind `now` for the `?`. Kept threads stay unexpired. */
+export function sqlThreadUnexpired(prefix = '') {
+	return `(${prefix}never_expires_at IS NOT NULL OR ${prefix}expires_at > ?)`
+}
+
+export function sqlThreadLive(prefix = '') {
+	return `${sqlThreadUnexpired(prefix)} AND ${prefix}archived_at IS NULL`
+}
+
 export function threadArchivedError(): DomainError {
 	return fail(
 		409,
@@ -341,7 +367,7 @@ function sanitizeIp(value: unknown) {
 export async function countLiveGuestThreads(db: D1Database, now = Date.now()) {
 	const row = await first<{ n: number }>(
 		db,
-		'SELECT COUNT(*) AS n FROM threads WHERE owner_user_id IS NULL AND expires_at > ? AND archived_at IS NULL',
+		`SELECT COUNT(*) AS n FROM threads WHERE owner_user_id IS NULL AND ${sqlThreadLive()}`,
 		now,
 	)
 	return row?.n ?? 0
@@ -354,7 +380,7 @@ export async function countGuestThreadsForIp(
 ) {
 	const row = await first<{ n: number }>(
 		db,
-		'SELECT COUNT(*) AS n FROM threads WHERE owner_user_id IS NULL AND creator_ip = ? AND expires_at > ? AND archived_at IS NULL',
+		`SELECT COUNT(*) AS n FROM threads WHERE owner_user_id IS NULL AND creator_ip = ? AND ${sqlThreadLive()}`,
 		ip,
 		now,
 	)
@@ -364,7 +390,7 @@ export async function countGuestThreadsForIp(
 export async function countOwnedThreads(db: D1Database, userId: string) {
 	const row = await first<{ n: number }>(
 		db,
-		'SELECT COUNT(*) AS n FROM threads WHERE owner_user_id = ? AND expires_at > ? AND archived_at IS NULL',
+		`SELECT COUNT(*) AS n FROM threads WHERE owner_user_id = ? AND ${sqlThreadLive()}`,
 		userId,
 		Date.now(),
 	)
@@ -643,7 +669,7 @@ export async function joinThread(input: {
 > {
 	const now = input.now ?? Date.now()
 	const thread = await getThreadByJoinToken(input.db, input.joinToken)
-	if (!thread || thread.expires_at <= now) {
+	if (!thread || isThreadExpired(thread, now)) {
 		return fail(404, 'thread_not_found', 'Thread not found or expired.')
 	}
 	const live = assertThreadLive(thread)
@@ -712,7 +738,7 @@ export async function requireMember(input: {
 		'SELECT * FROM threads WHERE id = ?',
 		input.threadId,
 	)
-	if (!thread || thread.expires_at <= now) {
+	if (!thread || isThreadExpired(thread, now)) {
 		return fail(404, 'thread_not_found', 'Thread not found or expired.')
 	}
 	const member = await first<{ agent_id: string }>(
@@ -803,7 +829,7 @@ export async function sendMessage(input: {
 	)
 	await run(
 		input.db,
-		'UPDATE threads SET expires_at = ? WHERE id = ?',
+		'UPDATE threads SET expires_at = ? WHERE id = ? AND never_expires_at IS NULL',
 		now + plan.retentionMs,
 		membership.thread.id,
 	)
@@ -941,7 +967,7 @@ export async function getThreadViewCard(input: {
 > {
 	const now = input.now ?? Date.now()
 	const thread = await getThreadByViewToken(input.db, input.viewToken)
-	if (!thread || thread.expires_at <= now) {
+	if (!thread || isThreadExpired(thread, now)) {
 		return fail(404, 'thread_not_found', 'Thread not found or expired.')
 	}
 	const planName = await planForOwner(input.db, thread.owner_user_id)
@@ -971,7 +997,7 @@ export async function listMessagesForView(input: {
 > {
 	const now = input.now ?? Date.now()
 	const thread = await getThreadByViewToken(input.db, input.viewToken)
-	if (!thread || thread.expires_at <= now) {
+	if (!thread || isThreadExpired(thread, now)) {
 		return fail(404, 'thread_not_found', 'Thread not found or expired.')
 	}
 	const planName = await planForOwner(input.db, thread.owner_user_id)
@@ -1029,7 +1055,7 @@ export async function archiveThread(input: {
 		'SELECT * FROM threads WHERE id = ?',
 		input.threadId,
 	)
-	if (!thread || thread.expires_at <= now) {
+	if (!thread || isThreadExpired(thread, now)) {
 		return fail(404, 'thread_not_found', 'Thread not found or expired.')
 	}
 	if (isThreadArchived(thread)) return { ok: true, thread }
@@ -1074,6 +1100,103 @@ export async function archiveThreadAsHost(input: {
 		db: input.db,
 		threadId: membership.thread.id,
 		now: input.now,
+	})
+}
+
+export async function setThreadNeverExpires(input: {
+	db: D1Database
+	threadId: string
+	neverExpires: boolean
+	now?: number
+}): Promise<DomainError | DomainOk<{ thread: ThreadRow }>> {
+	const now = input.now ?? Date.now()
+	const thread = await first<ThreadRow>(
+		input.db,
+		'SELECT * FROM threads WHERE id = ?',
+		input.threadId,
+	)
+	if (!thread || isThreadExpired(thread, now)) {
+		return fail(404, 'thread_not_found', 'Thread not found or expired.')
+	}
+	if (!thread.owner_user_id) {
+		return fail(
+			403,
+			'keep_forbidden',
+			'Guest threads expire on the guest retention clock. Sign in to keep a thread forever.',
+		)
+	}
+	if (input.neverExpires) {
+		if (isThreadNeverExpiring(thread)) return { ok: true, thread }
+		await run(
+			input.db,
+			'UPDATE threads SET never_expires_at = ? WHERE id = ?',
+			now,
+			thread.id,
+		)
+	} else {
+		if (!isThreadNeverExpiring(thread)) return { ok: true, thread }
+		const planName = await planForOwner(input.db, thread.owner_user_id)
+		await run(
+			input.db,
+			'UPDATE threads SET never_expires_at = NULL, expires_at = ? WHERE id = ?',
+			now + getPlan(planName).retentionMs,
+			thread.id,
+		)
+	}
+	const updated = await first<ThreadRow>(
+		input.db,
+		'SELECT * FROM threads WHERE id = ?',
+		thread.id,
+	)
+	if (!updated) {
+		return fail(500, 'keep_failed', 'Could not update thread retention.')
+	}
+	return { ok: true, thread: updated }
+}
+
+async function cascadeDeleteThread(db: D1Database, threadId: string) {
+	await run(db, 'DELETE FROM messages WHERE thread_id = ?', threadId)
+	await run(db, 'DELETE FROM thread_members WHERE thread_id = ?', threadId)
+	await run(db, 'DELETE FROM agents WHERE thread_id = ?', threadId)
+	await run(db, 'DELETE FROM threads WHERE id = ?', threadId)
+}
+
+export async function deleteThread(input: {
+	db: D1Database
+	threadId: string
+}): Promise<DomainError | DomainOk<{ thread: ThreadRow }>> {
+	const thread = await first<ThreadRow>(
+		input.db,
+		'SELECT * FROM threads WHERE id = ?',
+		input.threadId,
+	)
+	if (!thread) {
+		return fail(404, 'thread_not_found', 'Thread not found or expired.')
+	}
+	await cascadeDeleteThread(input.db, thread.id)
+	return { ok: true, thread }
+}
+
+export async function deleteThreadAsHost(input: {
+	db: D1Database
+	threadId: string
+	agent: AgentRow
+	now?: number
+}): Promise<DomainError | DomainOk<{ thread: ThreadRow }>> {
+	const membership = await requireMember({
+		db: input.db,
+		threadId: input.threadId,
+		agent: input.agent,
+		now: input.now,
+	})
+	if (!membership.ok) return membership
+	const host = await getHostAgent(input.db, membership.thread.id)
+	if (!host || host.id !== input.agent.id) {
+		return fail(403, 'not_host', 'Only the host can delete this thread.')
+	}
+	return deleteThread({
+		db: input.db,
+		threadId: membership.thread.id,
 	})
 }
 
@@ -1139,14 +1262,11 @@ export async function revokeAgent(input: {
 export async function purgeExpired(db: D1Database, now = Date.now()) {
 	const expired = await all<{ id: string }>(
 		db,
-		'SELECT id FROM threads WHERE expires_at <= ?',
+		'SELECT id FROM threads WHERE never_expires_at IS NULL AND expires_at <= ?',
 		now,
 	)
 	for (const thread of expired) {
-		await run(db, 'DELETE FROM messages WHERE thread_id = ?', thread.id)
-		await run(db, 'DELETE FROM thread_members WHERE thread_id = ?', thread.id)
-		await run(db, 'DELETE FROM agents WHERE thread_id = ?', thread.id)
-		await run(db, 'DELETE FROM threads WHERE id = ?', thread.id)
+		await cascadeDeleteThread(db, thread.id)
 	}
 	return expired.length
 }
