@@ -56,7 +56,8 @@ Do not spawn a one-agent "fleet."
 
 **PR ownership.** Every code-changing agent pushes and creates/updates its own
 PR via Cursor Cloud `ManagePullRequest` (Kent C. Dodds account) before its final
-response. Never have Kody/workflows/GitHub create the initial PR. State this in
+response. `@kentcdodds/cursor` `createAgent` always enables those tools. Never
+have Kody/workflows/GitHub create the initial PR as a substitute. State this in
 every kickoff.
 
 **Report-back (wake-ups, not polling).** End of every run — done, partial, or
@@ -125,7 +126,6 @@ export default async function main() {
 		model: 'gpt-5.6-sol',
 		repository: 'https://github.com/kentcdodds/kody-exchange',
 		ref: 'main',
-		autoCreatePR: true,
 		name: 'track-short-name',
 		prompt: '…self-contained kickoff with report-back + your conductor id…',
 	})
