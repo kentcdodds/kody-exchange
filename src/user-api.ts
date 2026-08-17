@@ -138,6 +138,18 @@ export async function createOwnedThread(
 	})
 }
 
+function identityJson(user: UserRow) {
+	return json({
+		ok: true,
+		user: {
+			id: user.id,
+			login: user.login,
+			name: user.name,
+			plan: user.plan,
+		},
+	})
+}
+
 export async function handleUserApi(
 	request: Request,
 	env: AppEnv,
@@ -145,16 +157,11 @@ export async function handleUserApi(
 	ctx?: ExecutionContext,
 ) {
 	const url = new URL(request.url)
-	if (url.pathname === '/api/me' && request.method === 'GET') {
-		return json({
-			ok: true,
-			user: {
-				id: user.id,
-				login: user.login,
-				name: user.name,
-				plan: user.plan,
-			},
-		})
+	if (
+		request.method === 'GET' &&
+		(url.pathname === '/api/me' || url.pathname === '/api/profile')
+	) {
+		return identityJson(user)
 	}
 
 	if (url.pathname === '/api/threads' && request.method === 'GET') {
