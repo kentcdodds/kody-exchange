@@ -52,4 +52,5 @@ falsifiable. Point at this skill.
 
 Every code-changing agent must push its branch and create or update the pull
 request with Cursor Cloud `ManagePullRequest` (Kent C. Dodds account) before
-finishing. Do not have Kody open the PR.
+finishing. `@kentcdodds/cursor` `createAgent` always enables those tools. Never
+have Kody/workflows/GitHub create the initial PR as a substitute.
