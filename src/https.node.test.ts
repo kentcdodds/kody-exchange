@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { expect, test } from 'vitest'
 import { applySecurityHeaders, httpsRedirect } from '#src/https.ts'
 import { handleRequest } from '#src/index.ts'
@@ -82,4 +85,12 @@ test('HTTPS responses send HSTS and nosniff', () => {
 		'max-age=31536000; includeSubDomains; preload',
 	)
 	expect(overwritten.headers.get('x-content-type-options')).toBe('nosniff')
+})
+
+test('static assets run through the worker so HTTP can 301', () => {
+	const config = readFileSync(
+		join(dirname(fileURLToPath(import.meta.url)), '../wrangler.jsonc'),
+		'utf8',
+	)
+	expect(config).toMatch(/"run_worker_first":\s*true/)
 })
