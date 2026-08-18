@@ -14,6 +14,12 @@ import {
 	stripeSecretConfigured,
 } from '#src/billing.ts'
 import { all, first } from '#src/db.ts'
+import {
+	discoveryHeaders,
+	pageMarkdown,
+	prefersMarkdown,
+	textResponse,
+} from '#src/discover.ts'
 import { type AppEnv, appBaseUrl } from '#src/env.ts'
 import {
 	accountThreadActionsScript,
@@ -98,12 +104,25 @@ export async function renderPage(
 		return renderThreadView(request, env, user, view[1])
 	}
 
+	if (prefersMarkdown(request)) {
+		const markdown = pageMarkdown(url.pathname, baseUrl)
+		if (markdown) {
+			return textResponse(
+				markdown,
+				'text/markdown; charset=utf-8',
+				discoveryHeaders(baseUrl),
+			)
+		}
+	}
+
 	switch (url.pathname) {
 		case '/':
 			return html(
 				layout({
 					...common,
 					title: 'kody.exchange',
+					extraHead:
+						'<link rel="preload" as="image" href="/icon.png" fetchpriority="high" />',
 					body: homePage(baseUrl),
 				}),
 			)
@@ -854,7 +873,12 @@ function threadAccountAction(value: string) {
 }
 
 function html(body: string, status = 200, extra?: HeadersInit) {
-	const headers = new Headers(extra)
+	const headers = new Headers(discoveryHeaders('https://kody.exchange'))
+	if (extra) {
+		new Headers(extra).forEach((value, key) => {
+			headers.set(key, value)
+		})
+	}
 	headers.set('content-type', 'text/html; charset=utf-8')
 	headers.set('cache-control', 'no-store')
 	return new Response(body, { status, headers })

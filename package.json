@@ -16,7 +16,8 @@
 		"format:check": "oxfmt --check",
 		"typecheck": "tsc --noEmit",
 		"test": "vitest run",
-		"validate": "npm run format:check && npm run lint && npm run typecheck && npm run test",
+		"generate:sitemap": "node --experimental-strip-types tools/generate-sitemap.ts",
+		"validate": "npm run generate:sitemap -- --check && npm run format:check && npm run lint && npm run typecheck && npm run test",
 		"validate:fix": "npm run format && npm run lint:fix"
 	},
 	"dependencies": {

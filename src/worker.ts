@@ -2,6 +2,7 @@ import { OAuthProvider } from '@cloudflare/workers-oauth-provider'
 import { ThreadRoom } from '#src/thread-room.ts'
 import { handleRequest } from '#src/index.ts'
 import { type AppEnv } from '#src/env.ts'
+import { applySecurityHeaders, httpsRedirect } from '#src/https.ts'
 import {
 	isProtectedResourceMetadataPath,
 	oauthPaths,
@@ -50,6 +51,8 @@ export { ThreadRoom }
 
 export default {
 	fetch(request: Request, env: AppEnv, ctx: ExecutionContext) {
+		const redirected = httpsRedirect(request)
+		if (redirected) return redirected
 		// OAuthProvider serves this URL first and defaults omitted `resource`
 		// to the origin. MCP clients follow RFC 9728 from WWW-Authenticate and
 		// must see `<origin>/mcp` on the root PRM. Authorize still mints a
@@ -57,9 +60,14 @@ export default {
 		// resource or sends the origin, so /api and /mcp both accept the token.
 		const pathname = new URL(request.url).pathname
 		if (isProtectedResourceMetadataPath(pathname)) {
-			return handleProtectedResourceMetadata(request, env)
+			return applySecurityHeaders(
+				request,
+				handleProtectedResourceMetadata(request, env),
+			)
 		}
-		return oauthProvider.fetch(request, env, ctx)
+		return oauthProvider
+			.fetch(request, env, ctx)
+			.then((response) => applySecurityHeaders(request, response))
 	},
 	async scheduled(_event: ScheduledEvent, env: AppEnv) {
 		await purgeExpired(env.DB)
