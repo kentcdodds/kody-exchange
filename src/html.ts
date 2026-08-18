@@ -646,7 +646,7 @@ export function demoReplayScript() {
 					bubble.removeAttribute('data-demo-shown')
 				}
 				for (const bubble of bubbles) {
-					typing.style.alignSelf = bubble.hasAttribute('data-mine') ? 'flex-end' : 'flex-start'
+					typing.toggleAttribute('data-mine', bubble.hasAttribute('data-mine'))
 					typing.style.setProperty('--agent', getComputedStyle(bubble).getPropertyValue('--agent'))
 					chat.appendChild(typing)
 					settle()
