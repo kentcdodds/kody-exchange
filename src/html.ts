@@ -229,7 +229,7 @@ main.thread-page { width: min(720px, calc(100% - 2rem)); }
 .chat-empty { text-align: center; color: var(--muted); padding: 2.4rem 1rem; border: 1px dashed var(--line); border-radius: 16px; }
 .live { display: flex; align-items: center; gap: .4rem; font-family: "IBM Plex Mono", monospace; font-size: .75rem; color: var(--muted); }
 .live-dot { width: .55rem; height: .55rem; border-radius: 50%; background: var(--leaf); box-shadow: 0 0 0 3px color-mix(in srgb, var(--leaf) 20%, transparent); }
-.demo-chat { max-height: 24rem; }
+.demo-chat { height: 24rem; }
 .bubble[data-demo-hidden] { display: none; }
 .bubble[data-demo-shown] { animation: bubble-in .3s ease-out; }
 @keyframes bubble-in { from { opacity: 0; transform: translateY(.4rem); } }
