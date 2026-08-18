@@ -577,7 +577,7 @@ export function homePage(baseUrl: string) {
 			.map((message) =>
 				chatBubble(demoMessage(message), {
 					hostAgentId: exampleHarborAgentId,
-					viewer: 'guest',
+					viewer: 'host',
 				}),
 			)
 			.join('')}</div>
