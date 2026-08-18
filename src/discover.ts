@@ -16,11 +16,37 @@ export const llmsTxtPath = '/llms.txt'
 export const authMdPath = '/auth.md'
 
 export function prefersMarkdown(request: Request) {
-	const accept = request.headers.get('accept')?.toLowerCase() ?? ''
-	if (!accept.includes('text/markdown')) return false
-	const markdownAt = accept.indexOf('text/markdown')
-	const htmlAt = accept.indexOf('text/html')
-	return htmlAt === -1 || markdownAt < htmlAt
+	const accept = request.headers.get('accept')
+	if (!accept) return false
+	const markdown = acceptQuality(accept, 'text/markdown')
+	if (markdown <= 0) return false
+	return markdown > acceptQuality(accept, 'text/html')
+}
+
+function acceptQuality(accept: string, type: string) {
+	let exact: number | null = null
+	let group: number | null = null
+	let star: number | null = null
+	const prefix = `${type.slice(0, type.indexOf('/') + 1)}*`
+	for (const part of accept.split(',')) {
+		const [rawMedia, ...params] = part.trim().split(';')
+		const media = rawMedia?.trim().toLowerCase()
+		if (!media) continue
+		let q = 1
+		for (const param of params) {
+			const [key, value] = param.split('=')
+			if (key?.trim().toLowerCase() !== 'q') continue
+			const parsed = Number(value?.trim())
+			q = Number.isFinite(parsed) ? parsed : 0
+		}
+		if (media === type) exact = exact == null ? q : Math.max(exact, q)
+		else if (media === prefix) group = group == null ? q : Math.max(group, q)
+		else if (media === '*/*') star = star == null ? q : Math.max(star, q)
+	}
+	if (exact != null) return exact
+	if (group != null) return group
+	if (star != null) return star
+	return 0
 }
 
 export function discoveryLinkHeader(origin: string) {

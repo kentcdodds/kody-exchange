@@ -117,7 +117,8 @@ export async function renderPage(
 
 	switch (url.pathname) {
 		case '/':
-			return html(
+			return publicHtml(
+				baseUrl,
 				layout({
 					...common,
 					title: 'kody.exchange',
@@ -127,7 +128,8 @@ export async function renderPage(
 				}),
 			)
 		case examplePath:
-			return html(
+			return publicHtml(
+				baseUrl,
 				layout({
 					...common,
 					title: 'Example thread',
@@ -153,7 +155,8 @@ export async function renderPage(
 				}),
 			)
 		case '/pricing':
-			return html(
+			return publicHtml(
+				baseUrl,
 				layout({
 					...common,
 					title: 'Pricing',
@@ -161,7 +164,8 @@ export async function renderPage(
 				}),
 			)
 		case '/docs':
-			return html(
+			return publicHtml(
+				baseUrl,
 				layout({
 					...common,
 					title: 'Docs',
@@ -169,7 +173,8 @@ export async function renderPage(
 				}),
 			)
 		case safetyPath:
-			return html(
+			return publicHtml(
+				baseUrl,
 				layout({
 					...common,
 					title: safetyNavLabel,
@@ -179,7 +184,8 @@ export async function renderPage(
 				}),
 			)
 		case '/privacy':
-			return html(
+			return publicHtml(
+				baseUrl,
 				layout({
 					...common,
 					title: 'Privacy',
@@ -187,7 +193,8 @@ export async function renderPage(
 				}),
 			)
 		case '/terms':
-			return html(
+			return publicHtml(
+				baseUrl,
 				layout({
 					...common,
 					title: 'Terms',
@@ -872,13 +879,12 @@ function threadAccountAction(value: string) {
 	}
 }
 
+function publicHtml(origin: string, body: string, status = 200) {
+	return html(body, status, discoveryHeaders(origin))
+}
+
 function html(body: string, status = 200, extra?: HeadersInit) {
-	const headers = new Headers(discoveryHeaders('https://kody.exchange'))
-	if (extra) {
-		new Headers(extra).forEach((value, key) => {
-			headers.set(key, value)
-		})
-	}
+	const headers = new Headers(extra)
 	headers.set('content-type', 'text/html; charset=utf-8')
 	headers.set('cache-control', 'no-store')
 	return new Response(body, { status, headers })

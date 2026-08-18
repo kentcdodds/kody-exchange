@@ -68,4 +68,18 @@ test('HTTPS responses send HSTS and nosniff', () => {
 			new Response('ok'),
 		).headers.get('strict-transport-security'),
 	).toBeNull()
+
+	const overwritten = applySecurityHeaders(
+		request,
+		new Response('ok', {
+			headers: {
+				'strict-transport-security': 'max-age=0',
+				'x-content-type-options': 'invalid',
+			},
+		}),
+	)
+	expect(overwritten.headers.get('strict-transport-security')).toBe(
+		'max-age=31536000; includeSubDomains; preload',
+	)
+	expect(overwritten.headers.get('x-content-type-options')).toBe('nosniff')
 })

@@ -13,7 +13,11 @@ import {
 	sitemapXml,
 } from '#src/discover.ts'
 import { handleRequest } from '#src/index.ts'
-import { createTestEnv, request } from '#src/test-support.ts'
+import {
+	createSignedInUser,
+	createTestEnv,
+	request,
+} from '#src/test-support.ts'
 import { publicPages } from '#src/site-pages.ts'
 
 const origin = 'https://kody.exchange'
@@ -84,6 +88,27 @@ test('public pages negotiate Markdown and expose discovery documents', async () 
 	expect(
 		prefersMarkdown(new Request(origin, { headers: { accept: 'text/html' } })),
 	).toBe(false)
+	expect(
+		prefersMarkdown(
+			new Request(origin, {
+				headers: { accept: 'text/html;q=1, text/markdown;q=0' },
+			}),
+		),
+	).toBe(false)
+	expect(
+		prefersMarkdown(
+			new Request(origin, {
+				headers: { accept: 'text/markdown;q=0.1, text/html;q=0.9' },
+			}),
+		),
+	).toBe(false)
+	expect(
+		prefersMarkdown(
+			new Request(origin, {
+				headers: { accept: 'text/html;q=0.1, text/markdown;q=0.9' },
+			}),
+		),
+	).toBe(true)
 
 	const markdown = await handleRequest(
 		request('/', { headers: { accept: 'text/markdown' } }),
@@ -126,4 +151,22 @@ test('public pages negotiate Markdown and expose discovery documents', async () 
 	}
 	expect(cardJson.name).toBe('kody.exchange/mcp')
 	expect(cardJson.remotes[0]?.url).toBe(`${origin}/mcp`)
+})
+
+test('discovery headers stay on public pages and follow APP_BASE_URL', async () => {
+	const env = createTestEnv({ APP_BASE_URL: 'https://preview.example.test' })
+	const home = await handleRequest(request('/'), env)
+	expect(home.headers.get('link')).toContain(
+		'https://preview.example.test/.well-known/api-catalog',
+	)
+	expect(home.headers.get('content-signal')).toContain('ai-train=yes')
+
+	const { cookie } = await createSignedInUser(env)
+	const account = await handleRequest(
+		request('/account', { headers: { cookie } }),
+		env,
+	)
+	expect(account.status).toBe(200)
+	expect(account.headers.get('link') ?? '').not.toContain('rel="api-catalog"')
+	expect(account.headers.get('content-signal')).toBeNull()
 })
