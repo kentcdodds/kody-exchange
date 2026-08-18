@@ -55,15 +55,35 @@ class MemoryPrepared {
 		const results = this.#db
 			.prepare(this.#sql)
 			.all(...this.#bound()) as Array<T>
-		return { results, success: true }
+		return {
+			results,
+			success: true,
+			meta: {
+				duration: 0,
+				rows_read: results.length,
+				rows_written: 0,
+				changes: 0,
+				last_row_id: 0,
+			},
+		}
 	}
 
 	async run() {
 		const result = this.#db.prepare(this.#sql).run(...this.#bound())
 		return {
 			success: true,
-			meta: { changes: result.changes, last_row_id: result.lastInsertRowid },
+			meta: {
+				duration: 0,
+				rows_read: 0,
+				rows_written: result.changes,
+				changes: result.changes,
+				last_row_id: result.lastInsertRowid,
+			},
 		}
+	}
+
+	async raw() {
+		throw new Error('raw not implemented in test D1')
 	}
 }
 

@@ -10,6 +10,8 @@
 	"vars": {
 		"APP_BASE_URL": "https://kody.exchange",
 		"APP_COMMIT_SHA": "dev",
+		"SENTRY_ENVIRONMENT": "production",
+		"SENTRY_DSN": "https://a93669d3bb5c7300d212d5be02ee5ede@o913766.ingest.us.sentry.io/4511934498734080",
 		"STRIPE_PRO_PRICE_ID": "price_1U4OLgLAQpAnsYszMGhuI5pu",
 		"STRIPE_PAYMENT_LINK_URL": "https://buy.stripe.com/7sY7sMfxO6zJa1Ubq22Ry09",
 	},

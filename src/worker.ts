@@ -1,8 +1,13 @@
 import { OAuthProvider } from '@cloudflare/workers-oauth-provider'
-import { ThreadRoom } from '#src/thread-room.ts'
+import * as Sentry from '@sentry/cloudflare'
 import { handleRequest } from '#src/index.ts'
 import { type AppEnv } from '#src/env.ts'
 import { applySecurityHeaders, httpsRedirect } from '#src/https.ts'
+import {
+	buildSentryOptions,
+	getWorkerSentryOptions,
+} from '#src/sentry-options.ts'
+import { ThreadRoom as ThreadRoomBase } from '#src/thread-room.ts'
 import {
 	isProtectedResourceMetadataPath,
 	oauthPaths,
@@ -47,9 +52,15 @@ const oauthProvider = new OAuthProvider({
 	onError: () => undefined,
 })
 
-export { ThreadRoom }
+export const ThreadRoom = Sentry.instrumentDurableObjectWithSentry(
+	(env: AppEnv) => buildSentryOptions(env),
+	// @sentry/cloudflare types DurableObject from `cloudflare:workers`;
+	// this repo uses `@cloudflare/workers-types`, whose global DurableObject
+	// is a different, non-generic interface.
+	ThreadRoomBase as never,
+)
 
-export default {
+const workerHandler = {
 	fetch(request: Request, env: AppEnv, ctx: ExecutionContext) {
 		const redirected = httpsRedirect(request)
 		if (redirected) return redirected
@@ -69,7 +80,12 @@ export default {
 			.fetch(request, env, ctx)
 			.then((response) => applySecurityHeaders(request, response))
 	},
-	async scheduled(_event: ScheduledEvent, env: AppEnv) {
+	async scheduled(_controller: ScheduledController, env: AppEnv) {
 		await purgeExpired(env.DB)
 	},
 }
+
+export default Sentry.withSentry(
+	(env: AppEnv) => getWorkerSentryOptions(env),
+	workerHandler as ExportedHandler<AppEnv>,
+) as typeof workerHandler

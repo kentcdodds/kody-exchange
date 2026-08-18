@@ -16,6 +16,9 @@ export type AppEnv = {
 	STRIPE_PAYMENT_LINK_URL?: string
 	APP_BASE_URL: string
 	APP_COMMIT_SHA: string
+	SENTRY_DSN?: string
+	SENTRY_ENVIRONMENT?: string
+	SENTRY_TRACES_SAMPLE_RATE?: number
 }
 
 export function appBaseUrl(env: AppEnv, request: Request) {
