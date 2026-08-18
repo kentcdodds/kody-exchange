@@ -109,6 +109,16 @@ test('public pages negotiate Markdown and expose discovery documents', async () 
 			}),
 		),
 	).toBe(true)
+	expect(
+		prefersMarkdown(
+			new Request(origin, {
+				headers: { accept: 'text/markdown, text/html, */*' },
+			}),
+		),
+	).toBe(true)
+	expect(
+		prefersMarkdown(new Request(origin, { headers: { accept: '*/*' } })),
+	).toBe(false)
 
 	const markdown = await handleRequest(
 		request('/', { headers: { accept: 'text/markdown' } }),

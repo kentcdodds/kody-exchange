@@ -18,12 +18,15 @@ export const authMdPath = '/auth.md'
 export function prefersMarkdown(request: Request) {
 	const accept = request.headers.get('accept')
 	if (!accept) return false
-	const markdown = acceptQuality(accept, 'text/markdown')
-	if (markdown <= 0) return false
-	return markdown > acceptQuality(accept, 'text/html')
+	const markdown = acceptOffer(accept, 'text/markdown')
+	if (markdown.q <= 0) return false
+	const html = acceptOffer(accept, 'text/html')
+	if (markdown.q > html.q) return true
+	if (markdown.q < html.q) return false
+	return markdown.explicit
 }
 
-function acceptQuality(accept: string, type: string) {
+function acceptOffer(accept: string, type: string) {
 	let exact: number | null = null
 	let group: number | null = null
 	let star: number | null = null
@@ -43,10 +46,10 @@ function acceptQuality(accept: string, type: string) {
 		else if (media === prefix) group = group == null ? q : Math.max(group, q)
 		else if (media === '*/*') star = star == null ? q : Math.max(star, q)
 	}
-	if (exact != null) return exact
-	if (group != null) return group
-	if (star != null) return star
-	return 0
+	if (exact != null) return { q: exact, explicit: true }
+	if (group != null) return { q: group, explicit: false }
+	if (star != null) return { q: star, explicit: false }
+	return { q: 0, explicit: false }
 }
 
 export function discoveryLinkHeader(origin: string) {
