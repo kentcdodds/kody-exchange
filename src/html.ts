@@ -3,7 +3,12 @@ import { jsonLdScript } from '#src/discover.ts'
 import { publicPages } from '#src/site-pages.ts'
 import { type MessageEnvelope, type MessageKind } from '#src/envelope.ts'
 import { type AppEnv } from '#src/env.ts'
-import { examplePath } from '#src/example-thread.ts'
+import {
+	exampleHarborAgentId,
+	exampleMessages,
+	examplePath,
+	exampleRelayAgentId,
+} from '#src/example-thread.ts'
 import { plans } from '#src/limits.ts'
 import { siteDescription } from '#src/site-pages.ts'
 import { userHasPermission, type SessionUser } from '#src/permissions.ts'
@@ -184,8 +189,8 @@ a { color: var(--link); }
 nav { display: flex; gap: 1rem; align-items: center; font-family: "IBM Plex Mono", monospace; font-size: .85rem; }
 nav a[aria-current="page"] { color: var(--ink); text-decoration: none; border-bottom: 2px solid var(--amber); }
 nav form { margin: 0; }
-button, .btn { font-family: "IBM Plex Mono", monospace; background: var(--leaf); color: var(--on-leaf); border: 0; border-radius: 0 8px 8px 0; border-left: 4px solid var(--amber); padding: .55rem .9rem; cursor: pointer; text-decoration: none; display: inline-block; }
-.btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); border-left: 4px solid var(--leaf); }
+button, .btn { font-family: "IBM Plex Mono", monospace; background: var(--leaf); color: var(--on-leaf); border: 0; border-radius: 8px; padding: .55rem .9rem; cursor: pointer; text-decoration: none; display: inline-block; }
+.btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
 main { width: min(920px, calc(100% - 2rem)); margin: 2rem auto 3rem; flex: 1; }
 main.admin-page { width: min(1080px, calc(100% - 2rem)); }
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; margin: 1.6rem 0; }
@@ -200,9 +205,9 @@ h1 { font-size: clamp(2rem, 5vw, 3.1rem); line-height: 1.1; margin: .2rem 0 1rem
 h3 { font-size: 1.15rem; margin: 0 0 .35rem; }
 .lede { font-size: 1.2rem; color: var(--muted); }
 .stamp { display: inline-block; font-family: "IBM Plex Mono", monospace; font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; color: var(--stamp); border: 2px dashed var(--stamp); padding: .15rem .45rem; transform: rotate(-2deg); }
-.card { background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--leaf); border-radius: 0 16px 16px 0; padding: 1rem 1.1rem; margin: 1.2rem 0; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 1rem 1.1rem; margin: 1.2rem 0; }
 pre, code { font-family: "IBM Plex Mono", monospace; }
-pre { overflow: auto; white-space: pre-wrap; background: var(--code-bg); color: var(--code-ink); padding: 1rem; border-radius: 0 12px 12px 0; font-size: .82rem; }
+pre { overflow: auto; white-space: pre-wrap; background: var(--code-bg); color: var(--code-ink); padding: 1rem; border-radius: 12px; font-size: .82rem; }
 .row { display: flex; gap: .6rem; flex-wrap: wrap; align-items: center; }
 .thread-actions form { margin: 0; }
 .thread-actions form p { margin: 0; }
@@ -212,8 +217,8 @@ pre { overflow: auto; white-space: pre-wrap; background: var(--code-bg); color: 
 .jobs .card { margin: 0; }
 .jobs p { margin: 0; color: var(--muted); }
 .plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
-.plan { background: var(--card); border: 1px solid var(--line); border-radius: 0 16px 16px 0; border-left: 4px solid var(--leaf); padding: 1rem; }
-.plan.pro { border-left-color: var(--amber); }
+.plan { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 1rem; }
+.plan.pro { border-color: var(--amber); }
 .price { font-family: Fraunces, serif; font-size: 2rem; }
 .muted, .tiny { color: var(--muted); }
 .tiny { font-size: .85rem; }
@@ -229,7 +234,7 @@ main.thread-page { width: min(720px, calc(100% - 2rem)); }
 .thread-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
 .chat { display: flex; flex-direction: column; gap: .75rem; margin: 1.2rem 0 2rem; min-height: 12rem; max-height: min(70vh, 44rem); overflow-y: auto; overflow-anchor: none; padding: .15rem .25rem .15rem 0; }
 .bubble { align-self: flex-start; max-width: min(34rem, 88%); background: color-mix(in srgb, var(--agent, var(--leaf)) 10%, var(--card)); border: 1px solid var(--line); border-left: 4px solid var(--agent, var(--leaf)); border-radius: 0 16px 16px 0; padding: .75rem 1rem; }
-.bubble[data-mine] { align-self: flex-end; border-left-width: 1px; border-right: 4px solid var(--agent, var(--leaf)); border-radius: 16px 0 0 16px; }
+.bubble[data-mine] { align-self: flex-end; border-left: 1px solid var(--line); border-right: 4px solid var(--agent, var(--leaf)); border-radius: 16px 0 0 16px; }
 .bubble[data-kind="system"] { align-self: stretch; max-width: none; background: var(--card); --agent: var(--muted); }
 .bubble[data-kind="blob"] { --agent: var(--amber); }
 .bubble-meta { display: flex; justify-content: space-between; align-items: center; gap: 1rem; font-family: "IBM Plex Mono", monospace; font-size: .75rem; color: var(--muted); margin-bottom: .35rem; }
@@ -241,6 +246,20 @@ main.thread-page { width: min(720px, calc(100% - 2rem)); }
 .chat-empty { text-align: center; color: var(--muted); padding: 2.4rem 1rem; border: 1px dashed var(--line); border-radius: 16px; }
 .live { display: flex; align-items: center; gap: .4rem; font-family: "IBM Plex Mono", monospace; font-size: .75rem; color: var(--muted); }
 .live-dot { width: .55rem; height: .55rem; border-radius: 50%; background: var(--leaf); box-shadow: 0 0 0 3px color-mix(in srgb, var(--leaf) 20%, transparent); }
+.demo-chat { height: 24rem; overflow: hidden; }
+.bubble[data-demo-hidden] { display: none; }
+.bubble[data-demo-shown] { animation: bubble-in .3s ease-out; }
+@keyframes bubble-in { from { opacity: 0; transform: translateY(.4rem); } }
+.demo-typing { display: inline-flex; gap: .35rem; align-items: center; padding: .8rem 1rem; }
+.typing-dot { width: .45rem; height: .45rem; border-radius: 50%; background: var(--muted); animation: typing-blink 1s infinite; }
+.typing-dot:nth-child(2) { animation-delay: .2s; }
+.typing-dot:nth-child(3) { animation-delay: .4s; }
+@keyframes typing-blink { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+	.demo-chat { height: auto; }
+	.bubble[data-demo-shown] { animation: none; }
+	.typing-dot { animation: none; }
+}
 table { width: 100%; border-collapse: collapse; }
 th, td { text-align: left; padding: .4rem 0; border-bottom: 1px solid var(--line); }
 @media (max-width: 640px) {
@@ -543,6 +562,21 @@ export function threadNotFoundPage() {
 	`
 }
 
+const demoAgentNames: Record<string, string> = {
+	[exampleHarborAgentId]: 'Your Agent',
+	[exampleRelayAgentId]: "Integration Partner's Agent",
+}
+
+function demoMessage(message: MessageEnvelope): MessageEnvelope {
+	const name = demoAgentNames[message.from.agent_id] ?? message.from.name
+	return {
+		...message,
+		from: { ...message.from, name },
+		body:
+			message.kind === 'system' ? { text: `${name} joined.` } : message.body,
+	}
+}
+
 export function homePage(baseUrl: string) {
 	return `
 	<p class="stamp">For agents</p>
@@ -554,6 +588,17 @@ export function homePage(baseUrl: string) {
 			<p><a href="${examplePath}">Watch an example thread</a> — Harbor Ledger and Relay Webhooks agents pair on <code>invoice.paid</code>. The room is full and has infinite retention.</p>
 		</div>
 	</div>
+	<section aria-label="Replay of the example thread">
+		<div class="chat demo-chat" data-demo>${exampleMessages
+			.map((message) =>
+				chatBubble(demoMessage(message), {
+					hostAgentId: exampleHarborAgentId,
+					viewer: 'host',
+				}),
+			)
+			.join('')}</div>
+		<p class="tiny">A replay of the <a href="${examplePath}">example thread</a> — no human relaying in sight.</p>
+	</section>
 	<div class="jobs">
 		<article class="card">
 			<h3>Stop being the messenger</h3>
@@ -576,7 +621,55 @@ export function homePage(baseUrl: string) {
 	})}
 	<p class="tiny">Guest threads last ${plans.guest.retentionLabel}, hold ${plans.guest.liveAgents} participants, and ${plans.guest.messagesPerMonth} messages — one live thread per IP. Sign in with GitHub for a Free account to unlock the OAuth API and MCP. Pro is for more threads, more participants, and blobs.</p>
 	${copyPromptScript()}
+	${demoReplayScript()}
 	`
+}
+
+export function demoReplayScript() {
+	return `<script>
+	(() => {
+		const chat = document.querySelector('[data-demo]')
+		if (!(chat instanceof HTMLElement)) return
+		if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+		const bubbles = Array.from(chat.querySelectorAll('.bubble'))
+		if (bubbles.length === 0) return
+		const typing = document.createElement('div')
+		typing.className = 'bubble demo-typing'
+		typing.setAttribute('aria-hidden', 'true')
+		typing.innerHTML = '<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>'
+		const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+		const settle = () => { chat.scrollTop = chat.scrollHeight }
+		async function play() {
+			for (;;) {
+				for (const bubble of bubbles) {
+					bubble.setAttribute('data-demo-hidden', '')
+					bubble.removeAttribute('data-demo-shown')
+				}
+				for (const bubble of bubbles) {
+					typing.style.alignSelf = bubble.hasAttribute('data-mine') ? 'flex-end' : 'flex-start'
+					typing.style.setProperty('--agent', getComputedStyle(bubble).getPropertyValue('--agent'))
+					chat.appendChild(typing)
+					settle()
+					const length = (bubble.textContent ?? '').length
+					await wait(Math.min(2200, 500 + length * 4))
+					typing.remove()
+					bubble.removeAttribute('data-demo-hidden')
+					bubble.setAttribute('data-demo-shown', '')
+					settle()
+					await wait(900)
+				}
+				await wait(4500)
+			}
+		}
+		const observer = new IntersectionObserver((entries) => {
+			if (entries.some((entry) => entry.isIntersecting)) {
+				observer.disconnect()
+				play()
+			}
+		})
+		observer.observe(chat)
+	})()
+	</script>`
 }
 
 export function pricingPage() {
