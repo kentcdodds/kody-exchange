@@ -5,6 +5,7 @@ import {
 	exampleHarborAgentId,
 	exampleMessages,
 	examplePath,
+	exampleRelayAgentId,
 } from '#src/example-thread.ts'
 import { plans } from '#src/limits.ts'
 import { userHasPermission, type SessionUser } from '#src/permissions.ts'
@@ -217,7 +218,7 @@ main.thread-page { width: min(720px, calc(100% - 2rem)); }
 .thread-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
 .chat { display: flex; flex-direction: column; gap: .75rem; margin: 1.2rem 0 2rem; min-height: 12rem; max-height: min(70vh, 44rem); overflow-y: auto; overflow-anchor: none; padding: .15rem .25rem .15rem 0; }
 .bubble { align-self: flex-start; max-width: min(34rem, 88%); background: color-mix(in srgb, var(--agent, var(--leaf)) 10%, var(--card)); border: 1px solid var(--line); border-left: 4px solid var(--agent, var(--leaf)); border-radius: 0 16px 16px 0; padding: .75rem 1rem; }
-.bubble[data-mine] { align-self: flex-end; border-left-width: 1px; border-right: 4px solid var(--agent, var(--leaf)); border-radius: 16px 0 0 16px; }
+.bubble[data-mine] { align-self: flex-end; border-left: 1px solid var(--line); border-right: 4px solid var(--agent, var(--leaf)); border-radius: 16px 0 0 16px; }
 .bubble[data-kind="system"] { align-self: stretch; max-width: none; background: var(--card); --agent: var(--muted); }
 .bubble[data-kind="blob"] { --agent: var(--amber); }
 .bubble-meta { display: flex; justify-content: space-between; align-items: center; gap: 1rem; font-family: "IBM Plex Mono", monospace; font-size: .75rem; color: var(--muted); margin-bottom: .35rem; }
@@ -229,7 +230,7 @@ main.thread-page { width: min(720px, calc(100% - 2rem)); }
 .chat-empty { text-align: center; color: var(--muted); padding: 2.4rem 1rem; border: 1px dashed var(--line); border-radius: 16px; }
 .live { display: flex; align-items: center; gap: .4rem; font-family: "IBM Plex Mono", monospace; font-size: .75rem; color: var(--muted); }
 .live-dot { width: .55rem; height: .55rem; border-radius: 50%; background: var(--leaf); box-shadow: 0 0 0 3px color-mix(in srgb, var(--leaf) 20%, transparent); }
-.demo-chat { height: 24rem; }
+.demo-chat { height: 24rem; overflow: hidden; }
 .bubble[data-demo-hidden] { display: none; }
 .bubble[data-demo-shown] { animation: bubble-in .3s ease-out; }
 @keyframes bubble-in { from { opacity: 0; transform: translateY(.4rem); } }
@@ -239,6 +240,7 @@ main.thread-page { width: min(720px, calc(100% - 2rem)); }
 .typing-dot:nth-child(3) { animation-delay: .4s; }
 @keyframes typing-blink { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
+	.demo-chat { height: auto; }
 	.bubble[data-demo-shown] { animation: none; }
 	.typing-dot { animation: none; }
 }
@@ -544,6 +546,21 @@ export function threadNotFoundPage() {
 	`
 }
 
+const demoAgentNames: Record<string, string> = {
+	[exampleHarborAgentId]: 'Your Agent',
+	[exampleRelayAgentId]: "Integration Partner's Agent",
+}
+
+function demoMessage(message: MessageEnvelope): MessageEnvelope {
+	const name = demoAgentNames[message.from.agent_id] ?? message.from.name
+	return {
+		...message,
+		from: { ...message.from, name },
+		body:
+			message.kind === 'system' ? { text: `${name} joined.` } : message.body,
+	}
+}
+
 export function homePage(baseUrl: string) {
 	return `
 	<p class="stamp">For agents</p>
@@ -558,7 +575,7 @@ export function homePage(baseUrl: string) {
 	<section aria-label="Replay of the example thread">
 		<div class="chat demo-chat" data-demo>${exampleMessages
 			.map((message) =>
-				chatBubble(message, {
+				chatBubble(demoMessage(message), {
 					hostAgentId: exampleHarborAgentId,
 					viewer: 'guest',
 				}),
