@@ -337,6 +337,8 @@ test('guest thread: create, join, send, poll, and health', async () => {
 	expect(robotsText).toContain('Disallow: /t/')
 	expect(robotsText).toContain('Disallow: /account')
 	expect(robotsText).toContain('Disallow: /admin')
+	expect(robotsText).toContain('Sitemap: https://kody.exchange/sitemap.xml')
+	expect(robotsText).toContain('Content-Signal:')
 })
 
 test('view host prompt token can send on that thread but cannot open another', async () => {

@@ -1,5 +1,19 @@
 import { handleApi, json } from '#src/api.ts'
 import {
+	apiCatalog,
+	apiCatalogPath,
+	authMd,
+	authMdPath,
+	discoveryHeaders,
+	llmsTxt,
+	llmsTxtPath,
+	mcpServerCard,
+	mcpServerCardPath,
+	robotsTxt,
+	sitemapXml,
+	textResponse,
+} from '#src/discover.ts'
+import {
 	finishGithubOAuth,
 	logoutResponse,
 	readSessionUser,
@@ -11,6 +25,7 @@ import {
 	verifyStripeSignature,
 } from '#src/billing.ts'
 import { type AppEnv, appBaseUrl } from '#src/env.ts'
+import { httpsRedirect } from '#src/https.ts'
 import {
 	handleMcp,
 	isMcpBrowserNavigation,
@@ -46,7 +61,11 @@ export async function handleRequest(
 	env: AppEnv,
 	ctx?: ExecutionContext,
 ) {
+	const redirected = httpsRedirect(request)
+	if (redirected) return redirected
+
 	const url = new URL(request.url)
+	const origin = appBaseUrl(env, request)
 
 	if (url.pathname === '/health') {
 		return json({
@@ -65,12 +84,32 @@ export async function handleRequest(
 	}
 
 	if (url.pathname === '/robots.txt') {
-		return new Response(
-			'User-agent: *\nAllow: /\nDisallow: /t/\nDisallow: /account\nDisallow: /admin\n',
-			{
-				headers: { 'content-type': 'text/plain; charset=utf-8' },
-			},
+		return textResponse(robotsTxt(origin), 'text/plain; charset=utf-8')
+	}
+	if (url.pathname === '/sitemap.xml') {
+		return textResponse(sitemapXml(origin), 'application/xml; charset=utf-8')
+	}
+	if (url.pathname === llmsTxtPath) {
+		return textResponse(llmsTxt(origin), 'text/plain; charset=utf-8')
+	}
+	if (url.pathname === authMdPath) {
+		return textResponse(authMd(origin), 'text/markdown; charset=utf-8')
+	}
+	if (url.pathname === apiCatalogPath) {
+		const headers = new Headers(discoveryHeaders(origin))
+		headers.set(
+			'content-type',
+			'application/linkset+json; profile="https://www.rfc-editor.org/info/rfc9727"',
 		)
+		headers.set('cache-control', 'public, max-age=300')
+		return new Response(JSON.stringify(apiCatalog(origin)), { headers })
+	}
+	if (
+		url.pathname === mcpServerCardPath ||
+		url.pathname === '/.well-known/mcp.json' ||
+		url.pathname === '/server-card'
+	) {
+		return json(mcpServerCard(origin))
 	}
 
 	const viewOgToken = viewTokenForOgPath(url.pathname)

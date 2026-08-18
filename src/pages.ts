@@ -14,6 +14,12 @@ import {
 	stripeSecretConfigured,
 } from '#src/billing.ts'
 import { all, first } from '#src/db.ts'
+import {
+	discoveryHeaders,
+	pageMarkdown,
+	prefersMarkdown,
+	textResponse,
+} from '#src/discover.ts'
 import { type AppEnv, appBaseUrl } from '#src/env.ts'
 import {
 	accountThreadActionsScript,
@@ -98,17 +104,32 @@ export async function renderPage(
 		return renderThreadView(request, env, user, view[1])
 	}
 
+	if (prefersMarkdown(request)) {
+		const markdown = pageMarkdown(url.pathname, baseUrl)
+		if (markdown) {
+			return textResponse(
+				markdown,
+				'text/markdown; charset=utf-8',
+				discoveryHeaders(baseUrl),
+			)
+		}
+	}
+
 	switch (url.pathname) {
 		case '/':
-			return html(
+			return publicHtml(
+				baseUrl,
 				layout({
 					...common,
 					title: 'kody.exchange',
+					extraHead:
+						'<link rel="preload" as="image" href="/icon.png" fetchpriority="high" />',
 					body: homePage(baseUrl),
 				}),
 			)
 		case examplePath:
-			return html(
+			return publicHtml(
+				baseUrl,
 				layout({
 					...common,
 					title: 'Example thread',
@@ -134,7 +155,8 @@ export async function renderPage(
 				}),
 			)
 		case '/pricing':
-			return html(
+			return publicHtml(
+				baseUrl,
 				layout({
 					...common,
 					title: 'Pricing',
@@ -142,7 +164,8 @@ export async function renderPage(
 				}),
 			)
 		case '/docs':
-			return html(
+			return publicHtml(
+				baseUrl,
 				layout({
 					...common,
 					title: 'Docs',
@@ -150,7 +173,8 @@ export async function renderPage(
 				}),
 			)
 		case safetyPath:
-			return html(
+			return publicHtml(
+				baseUrl,
 				layout({
 					...common,
 					title: safetyNavLabel,
@@ -160,7 +184,8 @@ export async function renderPage(
 				}),
 			)
 		case '/privacy':
-			return html(
+			return publicHtml(
+				baseUrl,
 				layout({
 					...common,
 					title: 'Privacy',
@@ -168,7 +193,8 @@ export async function renderPage(
 				}),
 			)
 		case '/terms':
-			return html(
+			return publicHtml(
+				baseUrl,
 				layout({
 					...common,
 					title: 'Terms',
@@ -851,6 +877,10 @@ function threadAccountAction(value: string) {
 		default:
 			return null
 	}
+}
+
+function publicHtml(origin: string, body: string, status = 200) {
+	return html(body, status, discoveryHeaders(origin))
 }
 
 function html(body: string, status = 200, extra?: HeadersInit) {

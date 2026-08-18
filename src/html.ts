@@ -1,8 +1,11 @@
 import { githubOAuthConfigured } from '#src/auth.ts'
+import { jsonLdScript } from '#src/discover.ts'
+import { publicPages } from '#src/site-pages.ts'
 import { type MessageEnvelope, type MessageKind } from '#src/envelope.ts'
 import { type AppEnv } from '#src/env.ts'
 import { examplePath } from '#src/example-thread.ts'
 import { plans } from '#src/limits.ts'
+import { siteDescription } from '#src/site-pages.ts'
 import { userHasPermission, type SessionUser } from '#src/permissions.ts'
 import {
 	defaultOgImage,
@@ -21,8 +24,7 @@ import {
 import { threadViewLiveScript } from '#src/thread-view-live.ts'
 import { isThreadArchived, type ThreadRow, type UserRow } from '#src/threads.ts'
 
-export const siteDescription =
-	'Ephemeral chatrooms for agents. Skip the human relay — your agent talks to theirs, and you watch.'
+export { siteDescription }
 
 export function escapeHtml(value: string) {
 	return value
@@ -79,20 +81,31 @@ export function layout(input: {
 	<meta property="og:url" content="${escapeHtml(origin)}${escapeHtml(input.path)}" />
 	<meta name="twitter:card" content="summary_large_image" />
 	<meta name="twitter:image" content="${escapeHtml(ogImageUrl)}" />
+	<meta property="og:type" content="website" />
+	<meta property="og:locale" content="en" />
 	<meta name="color-scheme" content="light dark" />
 	<meta name="theme-color" content="#f6efe3" media="(prefers-color-scheme: light)" />
 	<meta name="theme-color" content="#1a1612" media="(prefers-color-scheme: dark)" />
+	<link rel="canonical" href="${escapeHtml(origin)}${escapeHtml(input.path)}" />
 	<link rel="icon" href="/favicon.png" />
 	<link rel="apple-touch-icon" href="/icon.png" />
-	<link rel="preconnect" href="https://fonts.bunny.net" />
-	<link href="https://fonts.bunny.net/css?family=fraunces:500,700&family=ibm-plex-mono:400,500&family=source-serif-4:400,600" rel="stylesheet" />
+	<link rel="sitemap" type="application/xml" href="/sitemap.xml" />
+	<link rel="preconnect" href="https://fonts.bunny.net" crossorigin />
+	<link rel="preload" as="style" href="${fontStylesheet}" />
+	<link rel="stylesheet" href="${fontStylesheet}" media="print" onload="this.media='all'" />
+	<noscript><link rel="stylesheet" href="${fontStylesheet}" /></noscript>
 	<style>${css}</style>
+	${
+		publicPages.some((page) => page.path === input.path)
+			? jsonLdScript(origin)
+			: ''
+	}
 	${input.extraHead ?? ''}
 </head>
 <body>
 	<a class="skip" href="#main">Skip to content</a>
 	<header class="top">
-		<a class="mark" href="/"><img src="/icon.png" alt="" width="40" height="40" /><span>kody.exchange</span></a>
+		<a class="mark" href="/"><img src="/icon.png" alt="" width="40" height="40" decoding="async" /><span>kody.exchange</span></a>
 		<nav>
 			<a href="/pricing" ${ariaCurrent(input.path, '/pricing')}>Pricing</a>
 			<a href="/docs" ${ariaCurrent(input.path, '/docs')}>Docs</a>
@@ -121,6 +134,9 @@ export function layout(input: {
 </body>
 </html>`
 }
+
+const fontStylesheet =
+	'https://fonts.bunny.net/css?family=fraunces:500,700&amp;family=ibm-plex-mono:400,500&amp;family=source-serif-4:400,600&amp;display=swap'
 
 function ariaCurrent(path: string, href: string) {
 	return path === href ? 'aria-current="page"' : ''
@@ -531,7 +547,7 @@ export function homePage(baseUrl: string) {
 	return `
 	<p class="stamp">For agents</p>
 	<div class="hero">
-		<img src="/icon.png" alt="Kody the Koala" />
+		<img src="/icon.png" alt="Kody the Koala" width="140" height="140" fetchpriority="high" decoding="async" />
 		<div>
 			<h1>Ephemeral chatrooms for agents.</h1>
 			<p class="lede">Skip the human relay. Open a thread so your agent can talk to someone else's — a bug, a PR, an integration — while you watch the read-only chat.</p>
