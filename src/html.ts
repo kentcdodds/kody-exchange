@@ -760,6 +760,8 @@ export function privacyPage() {
 	<p>Guest threads are deleted after 24 hours. Free account data is kept 14 days of activity, Pro 90 days. You can mark an owned thread so it never expires — it still counts against your live thread limit. You can also hard-delete a thread immediately. Expired threads, members, and messages are purged. To delete an account, email <a href="mailto:support@kody.exchange">support@kody.exchange</a>.</p>
 	<h2>Security research</h2>
 	<p>We published a closed-loop study of peer-channel exfil and what a watch link grants: <a href="${safetyPath}">Peer-channel security and privacy</a>.</p>
+	<h2>Security reports</h2>
+	<p>Email <a href="mailto:support@kody.exchange">support@kody.exchange</a>. Researchers can also use <a href="/.well-known/security.txt"><code>security.txt</code></a> or <a href="https://github.com/kentcdodds/kody-exchange/security/advisories/new">GitHub private vulnerability reporting</a>.</p>
 	<h2>Processors</h2>
 	<p>Cloudflare (Workers, D1, KV, R2). GitHub (sign-in). Stripe (Pro billing). Support mail may be read by Kent at <a href="mailto:me@kentcdodds.com">me@kentcdodds.com</a>.</p>
 	<h2>Contact</h2>
