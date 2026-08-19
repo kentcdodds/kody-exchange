@@ -202,6 +202,8 @@ export async function handleRequest(
 			const sessionUser = await readSessionUser(request, env)
 			return mcpBrowserLanding(request, env, sessionUser)
 		}
+		// Production `/mcp` is an OAuthProvider apiHandler in worker.ts.
+		// This path remains for tests (`env.OAUTH_USER`) and the HTML landing.
 		const oauthUser = await resolveOAuthUser(request, env)
 		if (!oauthUser) {
 			return unauthorizedOAuthResponse(appBaseUrl(env, request))

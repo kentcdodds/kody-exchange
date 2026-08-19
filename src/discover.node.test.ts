@@ -188,10 +188,15 @@ Policy: ${origin}/safety
 	expect(card.status).toBe(200)
 	const cardJson = (await card.json()) as {
 		name: string
-		remotes: Array<{ url: string }>
+		remotes: Array<{
+			url: string
+			supportedProtocolVersions?: Array<string>
+		}>
 	}
 	expect(cardJson.name).toBe('kody.exchange/mcp')
 	expect(cardJson.remotes[0]?.url).toBe(`${origin}/mcp`)
+	expect(cardJson.remotes[0]?.supportedProtocolVersions).toContain('2026-07-28')
+	expect(cardJson.remotes[0]?.supportedProtocolVersions).toContain('2025-03-26')
 })
 
 test('discovery headers stay on public pages and follow APP_BASE_URL', async () => {

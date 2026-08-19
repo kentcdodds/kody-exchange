@@ -1,10 +1,54 @@
+import {
+	LATEST_PROTOCOL_VERSION,
+	PROTOCOL_VERSION_META_KEY,
+	SUPPORTED_PROTOCOL_VERSIONS,
+} from '@modelcontextprotocol/server'
 import { expect, test } from 'vitest'
 import { handleRequest } from '#src/index.ts'
+import {
+	mcpLatestProtocolVersion,
+	mcpLegacyProtocolVersions,
+} from '#src/mcp-protocol.ts'
 import {
 	createSignedInUser,
 	createTestEnv,
 	request,
 } from '#src/test-support.ts'
+import worker from '#src/worker.ts'
+
+function executionContext(): ExecutionContext {
+	return {
+		waitUntil() {},
+		passThroughOnException() {},
+		props: {},
+	} as unknown as ExecutionContext
+}
+
+type RpcResult = {
+	jsonrpc?: string
+	id?: unknown
+	result?: Record<string, unknown>
+	error?: { code?: number; message?: string }
+}
+
+async function mcpRpc(
+	env: ReturnType<typeof createTestEnv>,
+	message: Record<string, unknown>,
+	headers: HeadersInit = {},
+) {
+	const response = await handleRequest(
+		request('/mcp', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json', ...headers },
+			body: JSON.stringify(message),
+		}),
+		env,
+	)
+	return {
+		status: response.status,
+		body: (await response.json()) as RpcResult,
+	}
+}
 
 test('MCP guest creates are no longer allowed without OAuth', async () => {
 	const env = createTestEnv()
@@ -87,4 +131,85 @@ test('OAuth MCP create_thread opens an account-owned thread', async () => {
 	expect(payload.ok).toBe(true)
 	expect(payload.plan).toBe('free')
 	expect(payload.thread.id).toMatch(/^th_/)
+})
+
+test('advertised protocol versions match the MCP server SDK plus 2026-07-28', () => {
+	expect(mcpLatestProtocolVersion).toBe('2026-07-28')
+	expect([...mcpLegacyProtocolVersions]).toEqual([
+		...SUPPORTED_PROTOCOL_VERSIONS,
+	])
+	expect(LATEST_PROTOCOL_VERSION).toBe('2025-11-25')
+})
+
+test('legacy initialize negotiates a 2025-era protocol version', async () => {
+	const env = createTestEnv()
+	const owner = await createSignedInUser(env)
+	env.OAUTH_USER = owner.user
+	const { status, body } = await mcpRpc(env, {
+		jsonrpc: '2.0',
+		id: 1,
+		method: 'initialize',
+		params: {
+			protocolVersion: '2025-03-26',
+			capabilities: {},
+			clientInfo: { name: 'test', version: '1' },
+		},
+	})
+	expect(status).toBe(200)
+	expect(body.error).toBeUndefined()
+	expect(body.result?.protocolVersion).toBe('2025-03-26')
+	expect(body.result?.serverInfo).toMatchObject({ name: 'kody.exchange' })
+})
+
+test('modern server/discover answers 2026-07-28', async () => {
+	const env = createTestEnv()
+	const owner = await createSignedInUser(env)
+	env.OAUTH_USER = owner.user
+	const { status, body } = await mcpRpc(
+		env,
+		{
+			jsonrpc: '2.0',
+			id: 1,
+			method: 'server/discover',
+			params: {
+				_meta: {
+					[PROTOCOL_VERSION_META_KEY]: mcpLatestProtocolVersion,
+					'io.modelcontextprotocol/clientCapabilities': {},
+					'io.modelcontextprotocol/clientInfo': {
+						name: 'test',
+						version: '1',
+					},
+				},
+			},
+		},
+		{
+			'mcp-protocol-version': mcpLatestProtocolVersion,
+			'mcp-method': 'server/discover',
+		},
+	)
+	if (status !== 200) {
+		throw new Error(`discover failed ${status}: ${JSON.stringify(body)}`)
+	}
+	expect(body.error).toBeUndefined()
+	const versions = body.result?.supportedVersions
+	expect(Array.isArray(versions) ? versions : []).toContain(
+		mcpLatestProtocolVersion,
+	)
+})
+
+test('worker OAuthProvider challenges unauthenticated MCP POSTs', async () => {
+	const env = createTestEnv()
+	const response = await worker.fetch(
+		request('/mcp', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+		}),
+		env,
+		executionContext(),
+	)
+	expect(response.status).toBe(401)
+	expect(response.headers.get('www-authenticate') ?? '').toMatch(
+		/resource_metadata=/,
+	)
 })

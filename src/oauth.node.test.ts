@@ -737,10 +737,13 @@ test('resource-less authorize token works on /api and /mcp, and refresh stays va
 		ok: boolean
 		user: { login: string }
 		tools: Array<string>
+		protocolVersions: Array<string>
 	}
 	expect(mcpBody.ok).toBe(true)
 	expect(mcpBody.user.login).toBe(owner.user.login)
 	expect(mcpBody.tools).toContain('list_threads')
+	expect(mcpBody.protocolVersions).toContain('2026-07-28')
+	expect(mcpBody.protocolVersions).toContain('2025-03-26')
 
 	const refreshResources = [undefined, origin, `${origin}/api`, `${origin}/mcp`]
 	let refreshToken = issued.body.refresh_token ?? ''
