@@ -10,6 +10,8 @@ import {
 	mcpServerCard,
 	mcpServerCardPath,
 	robotsTxt,
+	securityTxt,
+	securityTxtPath,
 	sitemapXml,
 	textResponse,
 } from '#src/discover.ts'
@@ -85,6 +87,12 @@ export async function handleRequest(
 
 	if (url.pathname === '/robots.txt') {
 		return textResponse(robotsTxt(origin), 'text/plain; charset=utf-8')
+	}
+	if (url.pathname === '/security.txt') {
+		return Response.redirect(new URL(securityTxtPath, origin).toString(), 301)
+	}
+	if (url.pathname === securityTxtPath) {
+		return textResponse(securityTxt(origin), 'text/plain; charset=utf-8')
 	}
 	if (url.pathname === '/sitemap.xml') {
 		return textResponse(sitemapXml(origin), 'application/xml; charset=utf-8')

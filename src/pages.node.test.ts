@@ -74,7 +74,9 @@ test('creating a thread shows a connect prompt and a join prompt once', async ()
 	expect(html).toContain('1 of 3')
 	expect(html).toContain('shown once')
 	expect(html).toContain('Open the read-only chat')
+	expect(html).toContain('treat the link as an invite until the room is full')
 	expect(html).toContain('/t/')
+	expect(html).not.toContain('cannot send messages or join agents')
 	expect(html).not.toContain("What's this thread for?")
 
 	const again = await handleRequest(

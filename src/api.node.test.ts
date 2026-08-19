@@ -456,6 +456,8 @@ test('pricing page explains live threads and participants', async () => {
 	expect(privacyHtml).toContain('me@kentcdodds.com')
 	expect(privacyHtml).toContain('Made by Kent C. Dodds')
 	expect(privacyHtml).toContain(`href="${safetyPath}"`)
+	expect(privacyHtml).toContain('Security reports')
+	expect(privacyHtml).toContain('/.well-known/security.txt')
 	expect(privacyHtml).not.toContain('Operator:')
 
 	const terms = await handleRequest(request('/terms'), env)

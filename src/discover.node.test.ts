@@ -10,6 +10,8 @@ import {
 	mcpServerCardPath,
 	prefersMarkdown,
 	robotsTxt,
+	securityTxt,
+	securityTxtPath,
 	sitemapXml,
 } from '#src/discover.ts'
 import { handleRequest } from '#src/index.ts'
@@ -133,7 +135,36 @@ test('public pages negotiate Markdown and expose discovery documents', async () 
 	const env = createTestEnv()
 	const llms = await handleRequest(request(llmsTxtPath), env)
 	expect(llms.status).toBe(200)
-	expect(await llms.text()).toContain('## API')
+	const llmsBody = await llms.text()
+	expect(llmsBody).toContain('## API')
+	expect(llmsBody).toContain(securityTxtPath)
+
+	const frozen = 1_777_000_000_000
+	expect(securityTxt(origin, frozen))
+		.toBe(`Contact: mailto:support@kody.exchange
+Contact: https://github.com/kentcdodds/kody-exchange/security/advisories/new
+Expires: ${new Date(frozen + 365 * 24 * 60 * 60 * 1000).toISOString()}
+Preferred-Languages: en
+Canonical: ${origin}${securityTxtPath}
+Policy: ${origin}/safety
+`)
+
+	const security = await handleRequest(request(securityTxtPath), env)
+	expect(security.status).toBe(200)
+	expect(security.headers.get('content-type')).toMatch(/text\/plain/)
+	const securityBody = await security.text()
+	expect(securityBody).toContain('Contact: mailto:support@kody.exchange')
+	expect(securityBody).toContain(
+		'Contact: https://github.com/kentcdodds/kody-exchange/security/advisories/new',
+	)
+	expect(securityBody).toContain(`Canonical: ${origin}${securityTxtPath}`)
+	expect(securityBody).toContain(`Policy: ${origin}/safety`)
+	const expires = securityBody.match(/^Expires: (\S+)/m)?.[1]
+	expect(Date.parse(expires ?? '')).toBeGreaterThan(Date.now())
+
+	const alias = await handleRequest(request('/security.txt'), env)
+	expect(alias.status).toBe(301)
+	expect(alias.headers.get('location')).toBe(`${origin}${securityTxtPath}`)
 
 	const auth = await handleRequest(request(authMdPath), env)
 	expect(auth.status).toBe(200)

@@ -14,6 +14,7 @@ export const mcpServerCardPath = '/.well-known/mcp/server-card.json'
 export const apiCatalogPath = '/.well-known/api-catalog'
 export const llmsTxtPath = '/llms.txt'
 export const authMdPath = '/auth.md'
+export const securityTxtPath = '/.well-known/security.txt'
 
 export function prefersMarkdown(request: Request) {
 	const accept = request.headers.get('accept')
@@ -158,6 +159,7 @@ Guest create needs no account. MCP and \`/api/\` need a free GitHub sign-in.
 - [Auth](${loc}${authMdPath}): OAuth 2.1 and MCP
 - [Privacy](${loc}/privacy)
 - [Terms](${loc}/terms)
+- [security.txt](${loc}${securityTxtPath})
 
 ## API
 
@@ -273,7 +275,7 @@ export function pageMarkdown(pathname: string, origin: string) {
 		case '/safety':
 			return safetyMarkdown(loc)
 		case '/privacy':
-			return privacyMarkdown()
+			return privacyMarkdown(loc)
 		case '/terms':
 			return termsMarkdown()
 		case examplePath:
@@ -318,7 +320,7 @@ Content-Type: application/json
 {"purpose":"<from the human>","name":"<from the human>"}
 \`\`\`
 
-Follow \`connect_prompt\` yourself. Give the other person the exact \`join_prompt\`. Give \`view_url\` only to humans who should watch.
+Follow \`connect_prompt\` yourself. Give the other person the exact \`join_prompt\`. Give \`view_url\` only to humans who should watch. That page cannot send. It shows the guest join prompt, so treat the link as an invite until the room is full.
 
 Guest threads last ${plans.guest.retentionLabel}, hold ${plans.guest.liveAgents} participants, and ${plans.guest.messagesPerMonth} messages — one live thread per IP. Sign in with GitHub for a Free account to unlock the OAuth API and MCP.
 `
@@ -413,7 +415,7 @@ HTML version: ${origin}/safety
 `
 }
 
-function privacyMarkdown() {
+function privacyMarkdown(origin: string) {
 	return `---
 title: Privacy · kody.exchange
 description: ${siteDescription}
@@ -423,7 +425,7 @@ description: ${siteDescription}
 
 kody.exchange is operated by Kent C. Dodds. Guest threads store purpose, agent names, message bodies, and the create IP for rate limits. Signed-in accounts store GitHub profile fields and Stripe identifiers if you subscribe.
 
-We do not read message bodies to train models. We do not sell your data. Guest threads delete after 24 hours. Contact support@kody.exchange.
+We do not read message bodies to train models. We do not sell your data. Guest threads delete after 24 hours. Contact support@kody.exchange. Security reports: support@kody.exchange, [${origin}${securityTxtPath}](${origin}${securityTxtPath}), or [GitHub private vulnerability reporting](https://github.com/kentcdodds/kody-exchange/security/advisories/new).
 `
 }
 
@@ -452,6 +454,18 @@ description: Canned example: Harbor Ledger and Relay Webhooks agents pair on inv
 ${examplePurpose}
 
 This is a canned example. The room is full and has infinite retention. This page cannot send, and there is no join prompt — open your own thread from [the home page](${origin}/).
+`
+}
+
+export function securityTxt(origin: string, now = Date.now()) {
+	const loc = origin.replace(/\/$/, '')
+	const expires = new Date(now + 365 * 24 * 60 * 60 * 1000).toISOString()
+	return `Contact: mailto:support@kody.exchange
+Contact: https://github.com/kentcdodds/kody-exchange/security/advisories/new
+Expires: ${expires}
+Preferred-Languages: en
+Canonical: ${loc}${securityTxtPath}
+Policy: ${loc}/safety
 `
 }
 

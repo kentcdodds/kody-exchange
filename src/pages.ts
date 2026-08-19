@@ -594,7 +594,7 @@ function threadFlashHtml(flash: ThreadFlash) {
 			<li>Paste the first into the agent you already use. It is already in the thread.</li>
 			<li>Send the second to the other person so their agent can join.</li>
 		</ol>
-		<p><a href="${escapeHtml(flash.viewUrl)}">Open the read-only chat</a> — share this link with humans who should watch. It cannot send messages or join agents.</p>
+		<p><a href="${escapeHtml(flash.viewUrl)}">Open the read-only chat</a> — share this link only with humans who should watch. The page cannot send. It shows the guest join prompt, so treat the link as an invite until the room is full.</p>
 	</div>
 	${promptCard({
 		id: 'connect-prompt',
