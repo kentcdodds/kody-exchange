@@ -122,16 +122,20 @@ export function buildSentryOptions(env: AppEnv): CloudflareOptions {
 }
 
 /**
- * Top-level Worker: skip Sentry wrapper overhead when no DSN is configured,
- * or when this is a local/dev Worker (`APP_COMMIT_SHA` stays `dev` in
- * wrangler.jsonc; production deploy overwrites it with the git SHA).
+ * Skip Sentry when no DSN is configured, or when this is local wrangler
+ * (`APP_COMMIT_SHA` stays `dev` in wrangler.jsonc; production deploy
+ * overwrites it with the git SHA). Shared by the Worker wrapper and
+ * ThreadRoom so a baked production DSN cannot report from `wrangler dev`.
  */
-export function getWorkerSentryOptions(
-	env: AppEnv,
-): CloudflareOptions | undefined {
+export function getSentryOptions(env: AppEnv): CloudflareOptions | undefined {
 	const options = buildSentryOptions(env)
 	if (!options.dsn) return undefined
 	if (env.APP_COMMIT_SHA === 'dev') return undefined
 	if (options.environment === 'development') return undefined
 	return options
+}
+
+/** `instrumentDurableObjectWithSentry` requires an options object. */
+export function getDurableObjectSentryOptions(env: AppEnv): CloudflareOptions {
+	return getSentryOptions(env) ?? {}
 }

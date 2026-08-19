@@ -5,7 +5,8 @@ import {
 	durableObjectCodeUpdatedResetMessage,
 	durableObjectIsolateMemoryResetMessage,
 	filterSentryEvent,
-	getWorkerSentryOptions,
+	getDurableObjectSentryOptions,
+	getSentryOptions,
 } from '#src/sentry-options.ts'
 import { createTestEnv } from '#src/test-support.ts'
 
@@ -21,25 +22,24 @@ function errorEvent(message: string, extra?: string): ErrorEvent {
 	} as ErrorEvent
 }
 
-test('skips the Worker wrapper when SENTRY_DSN is unset', () => {
-	expect(getWorkerSentryOptions(createTestEnv())).toBeUndefined()
-	expect(
-		getWorkerSentryOptions(createTestEnv({ SENTRY_DSN: '   ' })),
-	).toBeUndefined()
+test('skips Sentry when SENTRY_DSN is unset', () => {
+	expect(getSentryOptions(createTestEnv())).toBeUndefined()
+	expect(getSentryOptions(createTestEnv({ SENTRY_DSN: '   ' }))).toBeUndefined()
+	expect(getDurableObjectSentryOptions(createTestEnv()).dsn).toBeUndefined()
 })
 
-test('skips the Worker wrapper for local wrangler (dev commit or environment)', () => {
+test('skips Sentry for local wrangler (dev commit or environment)', () => {
+	const localWithProductionDsn = createTestEnv({
+		SENTRY_DSN: 'https://public@o1.ingest.sentry.io/1',
+		APP_COMMIT_SHA: 'dev',
+		SENTRY_ENVIRONMENT: 'production',
+	})
+	expect(getSentryOptions(localWithProductionDsn)).toBeUndefined()
 	expect(
-		getWorkerSentryOptions(
-			createTestEnv({
-				SENTRY_DSN: 'https://public@o1.ingest.sentry.io/1',
-				APP_COMMIT_SHA: 'dev',
-				SENTRY_ENVIRONMENT: 'production',
-			}),
-		),
+		getDurableObjectSentryOptions(localWithProductionDsn).dsn,
 	).toBeUndefined()
 	expect(
-		getWorkerSentryOptions(
+		getSentryOptions(
 			createTestEnv({
 				SENTRY_DSN: 'https://public@o1.ingest.sentry.io/1',
 				APP_COMMIT_SHA: 'abc123',
@@ -55,7 +55,7 @@ test('builds options from the DSN, environment, and commit sha', () => {
 		SENTRY_ENVIRONMENT: 'production',
 		APP_COMMIT_SHA: 'abc123',
 	})
-	const options = getWorkerSentryOptions(env)
+	const options = getSentryOptions(env)
 	expect(options).toMatchObject({
 		dsn: 'https://public@o1.ingest.sentry.io/1',
 		environment: 'production',
@@ -63,11 +63,16 @@ test('builds options from the DSN, environment, and commit sha', () => {
 		tracesSampleRate: 1,
 		sendDefaultPii: false,
 	})
+	expect(getDurableObjectSentryOptions(env)).toMatchObject({
+		dsn: 'https://public@o1.ingest.sentry.io/1',
+		environment: 'production',
+		release: 'abc123',
+	})
 	expect(buildSentryOptions(createTestEnv()).environment).toBe('development')
 })
 
 test('honors a numeric traces sample rate var', () => {
-	const options = getWorkerSentryOptions(
+	const options = getSentryOptions(
 		createTestEnv({
 			SENTRY_DSN: 'https://public@o1.ingest.sentry.io/1',
 			SENTRY_ENVIRONMENT: 'production',

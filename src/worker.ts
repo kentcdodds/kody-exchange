@@ -4,8 +4,8 @@ import { handleRequest } from '#src/index.ts'
 import { type AppEnv } from '#src/env.ts'
 import { applySecurityHeaders, httpsRedirect } from '#src/https.ts'
 import {
-	buildSentryOptions,
-	getWorkerSentryOptions,
+	getDurableObjectSentryOptions,
+	getSentryOptions,
 } from '#src/sentry-options.ts'
 import { ThreadRoom as ThreadRoomBase } from '#src/thread-room.ts'
 import {
@@ -53,7 +53,7 @@ const oauthProvider = new OAuthProvider({
 })
 
 export const ThreadRoom = Sentry.instrumentDurableObjectWithSentry(
-	(env: AppEnv) => buildSentryOptions(env),
+	(env: AppEnv) => getDurableObjectSentryOptions(env),
 	// @sentry/cloudflare types DurableObject from `cloudflare:workers`;
 	// this repo uses `@cloudflare/workers-types`, whose global DurableObject
 	// is a different, non-generic interface.
@@ -86,6 +86,6 @@ const workerHandler = {
 }
 
 export default Sentry.withSentry(
-	(env: AppEnv) => getWorkerSentryOptions(env),
+	(env: AppEnv) => getSentryOptions(env),
 	workerHandler as ExportedHandler<AppEnv>,
 ) as typeof workerHandler
