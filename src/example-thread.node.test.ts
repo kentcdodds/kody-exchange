@@ -80,6 +80,7 @@ test('example page is the view UI without join capabilities', async () => {
 	expect(html).toContain('data-mine')
 	expect(html).not.toContain('data-poll=')
 	expect(html).not.toContain('connectLive()')
+	expect(html).not.toContain('class="thread-prompts"')
 	expect(html).not.toContain('>Host<')
 	expect(html).not.toContain('>Guest<')
 	expect(html).not.toContain('kx_join_')

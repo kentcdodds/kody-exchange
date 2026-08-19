@@ -232,6 +232,10 @@ form.card ol { margin: .4rem 0 1rem; }
 .card li { margin: .25rem 0; }
 main.thread-page { width: min(720px, calc(100% - 2rem)); }
 .thread-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
+.thread-prompts { margin: 1.2rem 0; }
+.thread-prompts > summary { cursor: pointer; font-family: "IBM Plex Mono", monospace; font-size: .85rem; color: var(--muted); }
+.thread-prompts[open] > summary { margin-bottom: .4rem; color: var(--ink); }
+.thread-prompts .card { margin: .75rem 0 0; }
 .chat { display: flex; flex-direction: column; gap: .75rem; margin: 1.2rem 0 2rem; min-height: 12rem; max-height: min(70vh, 44rem); overflow-y: auto; overflow-anchor: none; padding: .15rem .25rem .15rem 0; }
 .bubble { align-self: flex-start; max-width: min(34rem, 88%); background: color-mix(in srgb, var(--agent, var(--leaf)) 10%, var(--card)); border: 1px solid var(--line); border-left: 4px solid var(--agent, var(--leaf)); border-radius: 0 16px 16px 0; padding: .75rem 1rem; }
 .bubble[data-mine] { align-self: flex-end; border-left: 1px solid var(--line); border-right: 4px solid var(--agent, var(--leaf)); border-radius: 16px 0 0 16px; }
@@ -557,6 +561,35 @@ export function threadViewPage(input: {
 					)
 					.join('')
 	const livePath = input.pollPath.replace(/\/messages$/, '/live')
+	const promptCards = archived
+		? []
+		: [
+				input.hostPrompt
+					? promptCard({
+							id: 'host-prompt',
+							title: 'Host',
+							hint: 'Already in the thread. Paste this into that agent — it must not join again or share the bearer.',
+							prompt: input.hostPrompt,
+						})
+					: '',
+				input.guestPrompt
+					? promptCard({
+							id: 'guest-prompt',
+							title: 'Guest',
+							hint: 'Paste this into an agent that still needs to join. It should ask for a display name, then use the token from the join response — not the join_token — as the bearer.',
+							prompt: input.guestPrompt,
+						})
+					: '',
+			].filter(Boolean)
+	const prompts =
+		promptCards.length > 0
+			? `<details class="thread-prompts">
+		<summary>${escapeHtml(
+			input.hostPrompt ? 'Copy host or guest prompts' : 'Copy guest prompt',
+		)}</summary>
+		${promptCards.join('')}
+	</details>`
+			: ''
 	return `
 	<div class="thread-head">
 		<div>
@@ -583,30 +616,7 @@ export function threadViewPage(input: {
 		<button type="button" data-copy-url>Copy watch link</button>
 		<span class="tiny" data-copied hidden>Copied.</span>
 	</div>
-	${
-		archived
-			? ''
-			: `${
-					input.hostPrompt
-						? promptCard({
-								id: 'host-prompt',
-								title: 'Host',
-								hint: 'Already in the thread. Paste this into that agent — it must not join again or share the bearer.',
-								prompt: input.hostPrompt,
-							})
-						: ''
-				}
-	${
-		input.guestPrompt
-			? promptCard({
-					id: 'guest-prompt',
-					title: 'Guest',
-					hint: 'Paste this into an agent that still needs to join. It should ask for a display name, then use the token from the join response — not the join_token — as the bearer.',
-					prompt: input.guestPrompt,
-				})
-			: ''
-	}`
-	}
+	${prompts}
 	<div class="chat" data-chat${live ? ` data-poll="${escapeHtml(input.pollPath)}" data-live="${escapeHtml(livePath)}"` : ''} data-after="${escapeHtml(lastId)}" data-viewer="${escapeHtml(input.viewer)}" data-host-agent="${escapeHtml(input.hostAgentId ?? '')}">${chat}</div>
 	${live ? threadViewLiveScript() : ''}
 	${copyPromptScript()}
