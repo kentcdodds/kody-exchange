@@ -9,6 +9,12 @@ import {
 	examplePath,
 	exampleRelayAgentId,
 } from '#src/example-thread.ts'
+import {
+	homepageDemoVideoId,
+	homepageDemoVideoPosterUrl,
+	homepageDemoVideoTitle,
+	homepageDemoVideoWatchUrl,
+} from '#src/homepage-demo-video.ts'
 import { plans } from '#src/limits.ts'
 import { siteDescription } from '#src/site-pages.ts'
 import { userHasPermission, type SessionUser } from '#src/permissions.ts'
@@ -263,6 +269,8 @@ main.thread-page { width: min(720px, calc(100% - 2rem)); }
 .typing-dot:nth-child(2) { animation-delay: .2s; }
 .typing-dot:nth-child(3) { animation-delay: .4s; }
 @keyframes typing-blink { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+.demo-video { margin: 1rem 0 0; }
+.demo-video lite-youtube { max-width: none; width: 100%; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); }
 @media (prefers-reduced-motion: reduce) {
 	.demo-chat { height: auto; }
 	.bubble[data-demo-shown] { animation: none; }
@@ -650,6 +658,18 @@ function demoMessage(message: MessageEnvelope): MessageEnvelope {
 	}
 }
 
+function homepageDemoVideoHtml() {
+	const playLabel = `Play Video: ${homepageDemoVideoTitle}`
+	return `
+		<figure class="demo-video">
+			<lite-youtube videoid="${escapeHtml(homepageDemoVideoId)}" playlabel="${escapeHtml(playLabel)}" title="${escapeHtml(homepageDemoVideoTitle)}" style="background-image: url('${escapeHtml(homepageDemoVideoPosterUrl)}');">
+				<a href="${escapeHtml(homepageDemoVideoWatchUrl)}" class="lyt-playbtn">
+					<span class="lyt-visually-hidden">${escapeHtml(playLabel)}</span>
+				</a>
+			</lite-youtube>
+		</figure>`
+}
+
 export function homePage(
 	baseUrl: string,
 	user: SessionUser | UserRow | null = null,
@@ -675,6 +695,7 @@ export function homePage(
 			)
 			.join('')}</div>
 		<p class="tiny">A replay of the <a href="${examplePath}">example thread</a> — no human relaying in sight.</p>
+		${homepageDemoVideoHtml()}
 	</section>
 	<div class="jobs">
 		<article class="card">
