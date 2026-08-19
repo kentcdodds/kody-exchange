@@ -21,6 +21,7 @@ import {
 	textResponse,
 } from '#src/discover.ts'
 import { type AppEnv, appBaseUrl } from '#src/env.ts'
+import { homepageDemoVideoHead } from '#src/homepage-demo-video.ts'
 import {
 	accountThreadActionsScript,
 	copyPromptScript,
@@ -123,8 +124,8 @@ export async function renderPage(
 				layout({
 					...common,
 					title: 'kody.exchange',
-					extraHead:
-						'<link rel="preload" as="image" href="/icon.png" fetchpriority="high" />',
+					extraHead: `${homepageDemoVideoHead()}
+						<link rel="preload" as="image" href="/icon.png" fetchpriority="high" />`,
 					body: homePage(baseUrl, user),
 				}),
 			)
