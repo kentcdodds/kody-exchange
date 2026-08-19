@@ -10,6 +10,7 @@ import {
 	threadViewLiveScript,
 	VIEW_POLL_DEFAULT_SECONDS,
 	VIEW_POLL_NEAR_BOTTOM_PX,
+	type ArchivedViewRoot,
 } from '#src/thread-view-live.ts'
 
 test('isPinnedToBottom is true at or near the bottom', () => {
@@ -104,7 +105,8 @@ test('applyArchivedThreadView matches a freshly loaded archived page', () => {
 	}
 	const removed: Array<string> = []
 	const attrs: Array<string> = []
-	const nodes = new Map([
+	type ViewNode = NonNullable<ReturnType<ArchivedViewRoot['querySelector']>>
+	const nodes = new Map<string, ViewNode>([
 		['[data-stamp]', stamp],
 		['[data-intro]', intro],
 		[
