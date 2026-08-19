@@ -22,9 +22,12 @@
 	},
 	"dependencies": {
 		"@cloudflare/workers-oauth-provider": "^0.10.3",
+		"@modelcontextprotocol/server": "^2.0.0",
 		"@resvg/resvg-wasm": "^2.6.2",
 		"@sentry/cloudflare": "^10.70.0",
-		"satori": "^0.29.0"
+		"agents": "^0.21.0",
+		"satori": "^0.29.0",
+		"zod": "^4.4.3"
 	},
 	"devDependencies": {
 		"@cloudflare/workers-types": "^5.20260801.1",

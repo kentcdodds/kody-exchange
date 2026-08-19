@@ -3,6 +3,7 @@ import * as Sentry from '@sentry/cloudflare'
 import { handleRequest } from '#src/index.ts'
 import { type AppEnv } from '#src/env.ts'
 import { applySecurityHeaders, httpsRedirect } from '#src/https.ts'
+import { handleMcp, isMcpBrowserNavigation } from '#src/mcp.ts'
 import {
 	getDurableObjectSentryOptions,
 	getSentryOptions,
@@ -15,22 +16,41 @@ import {
 } from '#src/oauth-paths.ts'
 import {
 	handleProtectedResourceMetadata,
+	type OAuthGrantProps,
 	userFromGrantProps,
 } from '#src/oauth-user.ts'
 import { purgeExpired } from '#src/threads.ts'
 import { handleUserApi } from '#src/user-api.ts'
 
+async function userFromApiContext(env: AppEnv, ctx: ExecutionContext) {
+	if (env.OAUTH_USER) return env.OAUTH_USER
+	return userFromGrantProps(env, ctx.props as OAuthGrantProps | undefined)
+}
+
+function unknownUserResponse() {
+	return Response.json(
+		{ ok: false, error: 'Unknown user.', code: 'invalid_token' },
+		{ status: 401 },
+	)
+}
+
 const apiHandler = {
 	async fetch(request: Request, env: AppEnv, ctx: ExecutionContext) {
-		const props = ctx.props as { userId?: string } | undefined
-		const user = await userFromGrantProps(env, props)
-		if (!user) {
-			return Response.json(
-				{ ok: false, error: 'Unknown user.', code: 'invalid_token' },
-				{ status: 401 },
-			)
-		}
+		const user = await userFromApiContext(env, ctx)
+		if (!user) return unknownUserResponse()
 		return handleUserApi(request, env, user, ctx)
+	},
+}
+
+const mcpHandler = {
+	async fetch(request: Request, env: AppEnv, ctx: ExecutionContext) {
+		const user = await userFromApiContext(env, ctx)
+		if (!user) return unknownUserResponse()
+		const response = await handleMcp(request, env, user, ctx)
+		return (
+			response ??
+			Response.json({ ok: false, error: 'Not found.' }, { status: 404 })
+		)
 	},
 }
 
@@ -41,8 +61,10 @@ const defaultHandler = {
 }
 
 const oauthProvider = new OAuthProvider({
-	apiRoute: oauthPaths.apiPrefix,
-	apiHandler,
+	apiHandlers: {
+		[oauthPaths.apiPrefix]: apiHandler,
+		[oauthPaths.mcp]: mcpHandler,
+	},
 	defaultHandler,
 	authorizeEndpoint: oauthPaths.authorize,
 	tokenEndpoint: oauthPaths.token,
@@ -69,11 +91,17 @@ const workerHandler = {
 		// must see `<origin>/mcp` on the root PRM. Authorize still mints a
 		// shared product audience (origin, /api, /mcp) when the client omits
 		// resource or sends the origin, so /api and /mcp both accept the token.
+		// Browser GET /mcp is HTML help, not the protected MCP transport.
 		const pathname = new URL(request.url).pathname
 		if (isProtectedResourceMetadataPath(pathname)) {
 			return applySecurityHeaders(
 				request,
 				handleProtectedResourceMetadata(request, env),
+			)
+		}
+		if (pathname === oauthPaths.mcp && isMcpBrowserNavigation(request)) {
+			return handleRequest(request, env, ctx).then((response) =>
+				applySecurityHeaders(request, response),
 			)
 		}
 		return oauthProvider

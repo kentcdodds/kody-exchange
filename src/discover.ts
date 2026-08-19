@@ -4,6 +4,7 @@ import {
 	homepageDemoVideoWatchUrl,
 } from '#src/homepage-demo-video.ts'
 import { plans } from '#src/limits.ts'
+import { mcpSupportedProtocolVersions } from '#src/mcp-protocol.ts'
 import { oauthPaths } from '#src/oauth-paths.ts'
 import { siteDescription } from '#src/site-pages.ts'
 
@@ -261,7 +262,7 @@ export function mcpServerCard(origin: string) {
 						isSecret: true,
 					},
 				],
-				supportedProtocolVersions: ['2025-03-26'],
+				supportedProtocolVersions: [...mcpSupportedProtocolVersions],
 			},
 		],
 	}
