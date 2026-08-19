@@ -3,7 +3,11 @@ import * as Sentry from '@sentry/cloudflare'
 import { handleRequest } from '#src/index.ts'
 import { type AppEnv } from '#src/env.ts'
 import { applySecurityHeaders, httpsRedirect } from '#src/https.ts'
-import { handleMcp, isMcpBrowserNavigation } from '#src/mcp.ts'
+import {
+	handleMcp,
+	isMcpBrowserNavigation,
+	mcpOriginRejection,
+} from '#src/mcp.ts'
 import {
 	getDurableObjectSentryOptions,
 	getSentryOptions,
@@ -103,6 +107,12 @@ const workerHandler = {
 			return handleRequest(request, env, ctx).then((response) =>
 				applySecurityHeaders(request, response),
 			)
+		}
+		if (pathname === oauthPaths.mcp) {
+			const originRejection = mcpOriginRejection(request)
+			if (originRejection) {
+				return applySecurityHeaders(request, originRejection)
+			}
 		}
 		return oauthProvider
 			.fetch(request, env, ctx)

@@ -142,6 +142,32 @@ export function isMcpBrowserNavigation(request: Request) {
 	)
 }
 
+// Browser MCP clients come from many hosts. Allow any well-formed http(s)
+// Origin, and reject opaque / malformed / non-HTTP values before the Agents
+// handler (which uses `allowedOriginHostnames: '*'` only after this gate).
+export function mcpOriginRejection(request: Request) {
+	const origin = request.headers.get('origin')
+	if (origin === null || origin === '') return null
+	if (origin === 'null') {
+		return json(
+			{ ok: false, error: 'Invalid Origin.', code: 'bad_origin' },
+			403,
+		)
+	}
+	try {
+		const parsed = new URL(origin)
+		if (
+			(parsed.protocol === 'http:' || parsed.protocol === 'https:') &&
+			parsed.hostname
+		) {
+			return null
+		}
+	} catch {
+		// malformed Origin
+	}
+	return json({ ok: false, error: 'Invalid Origin.', code: 'bad_origin' }, 403)
+}
+
 function prefersJsonRpcBody(request: Request) {
 	const accept = request.headers.get('accept') ?? ''
 	return !accept.includes('text/event-stream')
@@ -368,14 +394,17 @@ export async function handleMcp(
 		return json({ ok: false, error: 'Method not allowed.' }, 405)
 	}
 
+	const originRejection = mcpOriginRejection(request)
+	if (originRejection) return originRejection
+
 	const handler = createMcpHandler(
 		() => createExchangeMcpServer({ request, env, user, ctx }),
 		{
 			route: oauthPaths.mcp,
 			legacy: 'stateless',
 			responseMode: 'json',
-			// OAuthProvider already authenticated this request. Browser MCP
-			// clients send arbitrary Origins; Host is enforced by the zone route.
+			// Trusted middleware above already rejected opaque/malformed Origins.
+			// Remaining well-formed http(s) Origins come from arbitrary MCP clients.
 			allowedOriginHostnames: '*',
 		},
 	)
