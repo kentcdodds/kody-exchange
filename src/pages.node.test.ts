@@ -274,7 +274,9 @@ test('thread view shows host prompt only to the signed-in owner', async () => {
 			env,
 		)
 	).text()
-	expect(ownerView).toContain('<details class="thread-prompts">')
+	expect(ownerView).toContain('data-stamp')
+	expect(ownerView).toContain('data-intro')
+	expect(ownerView).toContain('class="thread-prompts" data-thread-prompts')
 	expect(ownerView).toContain('<summary>Copy host or guest prompts</summary>')
 	expect(ownerView).not.toMatch(/<details class="thread-prompts"[^>]*\bopen\b/)
 	expect(ownerView).toContain('>Host<')
@@ -288,7 +290,7 @@ test('thread view shows host prompt only to the signed-in owner', async () => {
 	const publicView = await (
 		await handleRequest(request(viewPath ?? '/'), env)
 	).text()
-	expect(publicView).toContain('<details class="thread-prompts">')
+	expect(publicView).toContain('class="thread-prompts" data-thread-prompts')
 	expect(publicView).toContain('<summary>Copy guest prompt</summary>')
 	expect(publicView).not.toMatch(/<details class="thread-prompts"[^>]*\bopen\b/)
 	expect(publicView).toContain('>Guest<')

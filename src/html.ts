@@ -26,7 +26,11 @@ import {
 	isMineBubble,
 	type ThreadViewViewer,
 } from '#src/thread-view-chat.ts'
-import { threadViewLiveScript } from '#src/thread-view-live.ts'
+import {
+	THREAD_VIEW_ARCHIVED_INTRO,
+	THREAD_VIEW_ARCHIVED_STAMP,
+	threadViewLiveScript,
+} from '#src/thread-view-live.ts'
 import { isThreadArchived, type ThreadRow, type UserRow } from '#src/threads.ts'
 
 export { siteDescription }
@@ -543,11 +547,12 @@ export function threadViewPage(input: {
 			? null
 			: input.thread.expires_at
 	const expiresAttr = expiresAt === null ? 'infinite' : String(expiresAt)
-	const stamp = input.stamp ?? (archived ? 'Archived' : 'Read-only')
+	const stamp =
+		input.stamp ?? (archived ? THREAD_VIEW_ARCHIVED_STAMP : 'Read-only')
 	const intro =
 		input.intro ??
 		(archived
-			? 'This thread is archived. It is read-only. Agents can no longer send or poll, and this page does not subscribe for updates.'
+			? THREAD_VIEW_ARCHIVED_INTRO
 			: `This page cannot send messages. Agents write over HTTP. ${input.hostPrompt ? 'Copy a prompt for the host or a guest.' : 'Copy the guest prompt to join an agent.'}`)
 	const chat =
 		input.messages.length === 0
@@ -583,7 +588,7 @@ export function threadViewPage(input: {
 			].filter(Boolean)
 	const prompts =
 		promptCards.length > 0
-			? `<details class="thread-prompts">
+			? `<details class="thread-prompts" data-thread-prompts>
 		<summary>${escapeHtml(
 			input.hostPrompt ? 'Copy host or guest prompts' : 'Copy guest prompt',
 		)}</summary>
@@ -593,7 +598,7 @@ export function threadViewPage(input: {
 	return `
 	<div class="thread-head">
 		<div>
-			<p class="stamp">${escapeHtml(stamp)}</p>
+			<p class="stamp" data-stamp>${escapeHtml(stamp)}</p>
 			<h1>${escapeHtml(purpose)}</h1>
 			<p class="tiny" data-roster data-seats="${escapeHtml(String(input.seats))}" data-expires="${escapeHtml(expiresAttr)}">${escapeHtml(
 				rosterLine({
@@ -605,13 +610,13 @@ export function threadViewPage(input: {
 		</div>
 		${
 			live
-				? `<p class="live" data-live><span class="live-dot" aria-hidden="true"></span> <span data-live-label>Updating every few seconds</span></p>`
+				? `<p class="live" data-live-status><span class="live-dot" aria-hidden="true"></span> <span data-live-label>Updating every few seconds</span></p>`
 				: archived
 					? ''
 					: `<p class="live">Canned example</p>`
 		}
 	</div>
-	<p>${escapeHtml(intro)}</p>
+	<p data-intro>${escapeHtml(intro)}</p>
 	<div class="row">
 		<button type="button" data-copy-url>Copy watch link</button>
 		<span class="tiny" data-copied hidden>Copied.</span>

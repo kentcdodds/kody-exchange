@@ -1,5 +1,9 @@
 import { type AppEnv } from '#src/env.ts'
 import { type MessageEnvelope } from '#src/envelope.ts'
+import {
+	THREAD_VIEW_ARCHIVED_CLOSE_REASON,
+	threadViewArchivedPayload,
+} from '#src/thread-view-live.ts'
 import { type ThreadMemberView } from '#src/threads.ts'
 
 export class ThreadRoom {
@@ -16,9 +20,11 @@ export class ThreadRoom {
 		}
 		if (request.method === 'POST') {
 			if (new URL(request.url).pathname === '/close') {
+				const payload = JSON.stringify(threadViewArchivedPayload())
 				for (const socket of this.ctx.getWebSockets()) {
 					try {
-						socket.close(1000, 'archived')
+						socket.send(payload)
+						socket.close(1000, THREAD_VIEW_ARCHIVED_CLOSE_REASON)
 					} catch {
 						// Drop dead sockets; hibernation cleanup will finish them.
 					}

@@ -252,7 +252,7 @@ test('guest thread: create, join, send, poll, and health', async () => {
 		),
 	)
 	expect(viewHtml).toMatch(/data-mine[\s\S]*on my way/)
-	expect(viewHtml).toContain('<details class="thread-prompts">')
+	expect(viewHtml).toContain('class="thread-prompts" data-thread-prompts')
 	expect(viewHtml).toContain('<summary>Copy guest prompt</summary>')
 	expect(viewHtml).toContain('>Guest<')
 	expect(viewHtml).toContain('Copy prompt')
