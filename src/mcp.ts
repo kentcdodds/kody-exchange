@@ -142,11 +142,58 @@ export function isMcpBrowserNavigation(request: Request) {
 	)
 }
 
-function mcpAllowedHostnames(env: AppEnv, request: Request) {
-	const hosts = new Set(['localhost', '127.0.0.1'])
-	hosts.add(new URL(appBaseUrl(env, request)).hostname)
-	hosts.add(new URL(request.url).hostname)
-	return [...hosts]
+function prefersJsonRpcBody(request: Request) {
+	const accept = request.headers.get('accept') ?? ''
+	return !accept.includes('text/event-stream')
+}
+
+function withMcpAccept(request: Request) {
+	const accept = request.headers.get('accept') ?? ''
+	if (
+		accept.includes('application/json') ||
+		accept.includes('text/event-stream')
+	) {
+		return request
+	}
+	const headers = new Headers(request.headers)
+	headers.set('accept', 'application/json, text/event-stream')
+	return new Request(request, { headers })
+}
+
+function sseJsonPayload(text: string) {
+	for (const block of text.split(/\n\n/)) {
+		const data = block
+			.split('\n')
+			.filter((line) => line.startsWith('data:'))
+			.map((line) => line.slice(5).trimStart())
+			.join('\n')
+		if (!data) continue
+		try {
+			return JSON.parse(data) as unknown
+		} catch {
+			continue
+		}
+	}
+	return null
+}
+
+async function jsonPreferringResponse(
+	response: Response,
+	prefersJson: boolean,
+) {
+	if (!prefersJson) return response
+	const type = response.headers.get('content-type') ?? ''
+	if (!type.includes('text/event-stream')) return response
+	const text = await response.text()
+	const payload = sseJsonPayload(text)
+	if (payload === null) {
+		return new Response(text, {
+			status: response.status,
+			statusText: response.statusText,
+			headers: response.headers,
+		})
+	}
+	return json(payload, response.status)
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -265,8 +312,8 @@ async function callTool(
 				ctx,
 			)
 		default: {
-			const _exhaustive: never = name
-			return _exhaustive
+			const impossible: never = name
+			return impossible
 		}
 	}
 }
@@ -327,11 +374,18 @@ export async function handleMcp(
 			route: oauthPaths.mcp,
 			legacy: 'stateless',
 			responseMode: 'json',
-			allowedHostnames: mcpAllowedHostnames(env, request),
+			// OAuthProvider already authenticated this request. Browser MCP
+			// clients send arbitrary Origins; Host is enforced by the zone route.
 			allowedOriginHostnames: '*',
 		},
 	)
-	return handler(request, env, ctx ?? emptyExecutionContext())
+	const prefersJson = prefersJsonRpcBody(request)
+	const response = await handler(
+		withMcpAccept(request),
+		env,
+		ctx ?? emptyExecutionContext(),
+	)
+	return jsonPreferringResponse(response, prefersJson)
 }
 
 function emptyExecutionContext(): ExecutionContext {

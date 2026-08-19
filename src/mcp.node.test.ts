@@ -182,9 +182,14 @@ test('modern server/discover answers 2026-07-28', async () => {
 				},
 			},
 		},
-		{ 'mcp-protocol-version': mcpLatestProtocolVersion },
+		{
+			'mcp-protocol-version': mcpLatestProtocolVersion,
+			'mcp-method': 'server/discover',
+		},
 	)
-	expect(status).toBe(200)
+	if (status !== 200) {
+		throw new Error(`discover failed ${status}: ${JSON.stringify(body)}`)
+	}
 	expect(body.error).toBeUndefined()
 	const versions = body.result?.supportedVersions
 	expect(Array.isArray(versions) ? versions : []).toContain(
