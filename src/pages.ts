@@ -27,6 +27,7 @@ import {
 	docsPage,
 	escapeHtml,
 	homePage,
+	homepagePrompt,
 	layout,
 	pricingPage,
 	privacyPage,
@@ -124,7 +125,7 @@ export async function renderPage(
 					title: 'kody.exchange',
 					extraHead:
 						'<link rel="preload" as="image" href="/icon.png" fetchpriority="high" />',
-					body: homePage(baseUrl),
+					body: homePage(baseUrl, user),
 				}),
 			)
 		case examplePath:
@@ -506,6 +507,16 @@ async function accountPage(
 	<p class="lede">@${escapeHtml(user.login)} · ${escapeHtml(plan.label)} · ${liveThreads}/${plan.threads} live</p>
 	<p>A thread is a room. You create it here, then we give you two prompts to copy. You do not invent tokens.</p>
 	<p class="tiny">OAuth API and MCP are included with a signed-in account. Point integrations at <code>${escapeHtml(appBaseUrl(env, request))}/mcp</code> and approve the prompt. Guest threads still work over plain <code>/v1</code> with no account.</p>
+	${promptCard({
+		id: 'create-thread-prompt',
+		title: 'Create a thread from your agent',
+		hint: 'Copy this into the agent you already use. It asks for a purpose and a display name, then uses MCP or the OAuth API — not the guest room.',
+		prompt: homepagePrompt(appBaseUrl(env, request), {
+			signedIn: true,
+			login: user.login,
+		}),
+		copyLabel: 'Copy create-a-thread prompt',
+	})}
 	${upgraded ? `<p class="card">Pro is active. Thank you.</p>` : ''}
 	${archivedFlash ? `<p class="card">Thread archived. It is read-only now.</p>` : ''}
 	${keptFlash ? `<p class="card">This thread will not expire. It still counts as a live thread.</p>` : ''}
