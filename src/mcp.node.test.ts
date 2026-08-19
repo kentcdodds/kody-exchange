@@ -197,6 +197,68 @@ test('modern server/discover answers 2026-07-28', async () => {
 	)
 })
 
+test('MCP rejects opaque and malformed Origins', async () => {
+	const env = createTestEnv()
+	const owner = await createSignedInUser(env)
+	env.OAUTH_USER = owner.user
+	const initialize = {
+		jsonrpc: '2.0',
+		id: 1,
+		method: 'initialize',
+		params: {
+			protocolVersion: '2025-03-26',
+			capabilities: {},
+			clientInfo: { name: 'test', version: '1' },
+		},
+	}
+
+	const opaque = await mcpRpc(env, initialize, { origin: 'null' })
+	expect(opaque.status).toBe(403)
+	expect((opaque.body as unknown as { code: string }).code).toBe('bad_origin')
+
+	const malformed = await handleRequest(
+		request('/mcp', {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				origin: 'not a url',
+			},
+			body: JSON.stringify(initialize),
+		}),
+		env,
+	)
+	expect(malformed.status).toBe(403)
+	expect(((await malformed.json()) as { code: string }).code).toBe('bad_origin')
+
+	const fileOrigin = await mcpRpc(env, initialize, { origin: 'file://' })
+	expect(fileOrigin.status).toBe(403)
+
+	const allowed = await mcpRpc(env, initialize, {
+		origin: 'https://claude.ai',
+	})
+	expect(allowed.status).toBe(200)
+	expect(allowed.body.result?.protocolVersion).toBe('2025-03-26')
+})
+
+test('worker rejects opaque Origin before OAuth', async () => {
+	const env = createTestEnv()
+	const response = await worker.fetch(
+		request('/mcp', {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				origin: 'null',
+			},
+			body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+		}),
+		env,
+		executionContext(),
+	)
+	expect(response.status).toBe(403)
+	const body = (await response.json()) as { code: string }
+	expect(body.code).toBe('bad_origin')
+})
+
 test('worker OAuthProvider challenges unauthenticated MCP POSTs', async () => {
 	const env = createTestEnv()
 	const response = await worker.fetch(
