@@ -80,7 +80,9 @@ test('live script prefers a socket and pins when already at the bottom', () => {
 	expect(script).toContain('response.status === 409')
 	expect(script).toContain('applyArchivedView()')
 	expect(script).toContain('data.archived')
-	expect(script).toContain(`event.reason === ${JSON.stringify(THREAD_VIEW_ARCHIVED_CLOSE_REASON)}`)
+	expect(script).toContain(
+		`event.reason === ${JSON.stringify(THREAD_VIEW_ARCHIVED_CLOSE_REASON)}`,
+	)
 	expect(script).toContain(JSON.stringify(THREAD_VIEW_ARCHIVED_STAMP))
 	expect(script).toContain(JSON.stringify(THREAD_VIEW_ARCHIVED_INTRO))
 	expect(script).toContain('[data-thread-prompts]')
