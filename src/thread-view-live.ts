@@ -2,6 +2,38 @@ import { AGENT_ACCENT_COUNT } from '#src/thread-view-chat.ts'
 
 export const VIEW_POLL_NEAR_BOTTOM_PX = 48
 export const VIEW_POLL_DEFAULT_SECONDS = 5
+export const THREAD_VIEW_ARCHIVED_STAMP = 'Archived'
+export const THREAD_VIEW_ARCHIVED_INTRO =
+	'This thread is archived. It is read-only. Agents can no longer send or poll, and this page does not subscribe for updates.'
+export const THREAD_VIEW_ARCHIVED_CLOSE_REASON = 'archived'
+
+export type ArchivedViewRoot = {
+	querySelector(selectors: string): {
+		textContent: string | null
+		remove(): void
+		removeAttribute(name: string): void
+	} | null
+}
+
+export function applyArchivedThreadView(root: ArchivedViewRoot) {
+	const stamp = root.querySelector('[data-stamp]')
+	if (stamp) stamp.textContent = THREAD_VIEW_ARCHIVED_STAMP
+	const intro = root.querySelector('[data-intro]')
+	if (intro) intro.textContent = THREAD_VIEW_ARCHIVED_INTRO
+	root.querySelector('[data-thread-prompts]')?.remove()
+	root.querySelector('[data-live-status]')?.remove()
+	const chat = root.querySelector('[data-chat]')
+	chat?.removeAttribute('data-poll')
+	chat?.removeAttribute('data-live')
+}
+
+export function threadViewArchivedPayload() {
+	return {
+		ok: true,
+		archived: true,
+		messages: [] as Array<never>,
+	}
+}
 
 export type ScrollMetrics = {
 	scrollTop: number
@@ -146,14 +178,24 @@ export function threadViewLiveScript() {
 			}
 			if (pinned) pinToBottom()
 		}
-		function stopLive(label) {
+		function stopLive() {
 			stopped = true
 			socketOpen = false
 			window.clearTimeout(pollTimer)
 			pollGeneration += 1
 			try { liveSocket?.close() } catch {}
 			liveSocket = null
-			setLiveLabel(label)
+		}
+		function applyArchivedView() {
+			stopLive()
+			const stamp = document.querySelector('[data-stamp]')
+			if (stamp) stamp.textContent = ${JSON.stringify(THREAD_VIEW_ARCHIVED_STAMP)}
+			const intro = document.querySelector('[data-intro]')
+			if (intro) intro.textContent = ${JSON.stringify(THREAD_VIEW_ARCHIVED_INTRO)}
+			document.querySelector('[data-thread-prompts]')?.remove()
+			document.querySelector('[data-live-status]')?.remove()
+			chat?.removeAttribute('data-poll')
+			chat?.removeAttribute('data-live')
 		}
 		async function tick() {
 			if (stopped || !pollPath) return
@@ -164,7 +206,7 @@ export function threadViewLiveScript() {
 				const retryAfterHeader = response.headers.get('retry-after')
 				if (generation !== pollGeneration) return
 				if (response.status === 409) {
-					stopLive('Archived')
+					applyArchivedView()
 					return
 				}
 				if (response.ok) {
@@ -211,13 +253,21 @@ export function threadViewLiveScript() {
 				if (stopped) return
 				try {
 					const data = JSON.parse(String(event.data))
+					if (data.archived) {
+						applyArchivedView()
+						return
+					}
 					appendMessages(data.messages ?? [])
 					if (data.members) updateRoster(data.members)
 				} catch {}
 			})
-			liveSocket.addEventListener('close', () => {
+			liveSocket.addEventListener('close', (event) => {
 				socketOpen = false
 				if (stopped) return
+				if (event.reason === ${JSON.stringify(THREAD_VIEW_ARCHIVED_CLOSE_REASON)}) {
+					applyArchivedView()
+					return
+				}
 				setLiveLabel('Updating every few seconds')
 				void tick()
 			})

@@ -252,6 +252,8 @@ test('guest thread: create, join, send, poll, and health', async () => {
 		),
 	)
 	expect(viewHtml).toMatch(/data-mine[\s\S]*on my way/)
+	expect(viewHtml).toContain('class="thread-prompts" data-thread-prompts')
+	expect(viewHtml).toContain('<summary>Copy guest prompt</summary>')
 	expect(viewHtml).toContain('>Guest<')
 	expect(viewHtml).toContain('Copy prompt')
 	expect(viewHtml).toContain('Join this kody.exchange thread')

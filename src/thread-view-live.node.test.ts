@@ -1,10 +1,16 @@
 import { expect, test } from 'vitest'
 import {
+	applyArchivedThreadView,
 	isPinnedToBottom,
 	nextPollDelayMs,
+	THREAD_VIEW_ARCHIVED_CLOSE_REASON,
+	THREAD_VIEW_ARCHIVED_INTRO,
+	THREAD_VIEW_ARCHIVED_STAMP,
+	threadViewArchivedPayload,
 	threadViewLiveScript,
 	VIEW_POLL_DEFAULT_SECONDS,
 	VIEW_POLL_NEAR_BOTTOM_PX,
+	type ArchivedViewRoot,
 } from '#src/thread-view-live.ts'
 
 test('isPinnedToBottom is true at or near the bottom', () => {
@@ -73,9 +79,82 @@ test('live script prefers a socket and pins when already at the bottom', () => {
 	expect(script).not.toContain('if (socketOpen) return')
 	expect(script).not.toContain('window.setTimeout(tick, 5000)')
 	expect(script).toContain('response.status === 409')
-	expect(script).toContain("stopLive('Archived')")
+	expect(script).toContain('applyArchivedView()')
+	expect(script).toContain('data.archived')
+	expect(script).toContain(
+		`event.reason === ${JSON.stringify(THREAD_VIEW_ARCHIVED_CLOSE_REASON)}`,
+	)
+	expect(script).toContain(JSON.stringify(THREAD_VIEW_ARCHIVED_STAMP))
+	expect(script).toContain(JSON.stringify(THREAD_VIEW_ARCHIVED_INTRO))
+	expect(script).toContain('[data-thread-prompts]')
+	expect(script).toContain('[data-live-status]')
+	expect(script).toContain("removeAttribute('data-poll')")
+	expect(script).toContain("removeAttribute('data-live')")
 	expect(script).toContain('stopped = true')
 	expect(script).toContain('if (stopped) return')
 	expect(script).toContain('liveSocket?.close()')
 	expect(script).toContain('if (stopped || (!pollPath && !livePath)) return')
+})
+
+test('applyArchivedThreadView matches a freshly loaded archived page', () => {
+	const stamp = { textContent: 'Read-only', remove() {}, removeAttribute() {} }
+	const intro = {
+		textContent: 'Copy the guest prompt to join an agent.',
+		remove() {},
+		removeAttribute() {},
+	}
+	const removed: Array<string> = []
+	const attrs: Array<string> = []
+	type ViewNode = NonNullable<ReturnType<ArchivedViewRoot['querySelector']>>
+	const nodes = new Map<string, ViewNode>([
+		['[data-stamp]', stamp],
+		['[data-intro]', intro],
+		[
+			'[data-thread-prompts]',
+			{
+				textContent: null,
+				remove() {
+					removed.push('prompts')
+				},
+				removeAttribute() {},
+			},
+		],
+		[
+			'[data-live-status]',
+			{
+				textContent: 'Live',
+				remove() {
+					removed.push('live')
+				},
+				removeAttribute() {},
+			},
+		],
+		[
+			'[data-chat]',
+			{
+				textContent: null,
+				remove() {},
+				removeAttribute(name: string) {
+					attrs.push(name)
+				},
+			},
+		],
+	])
+	applyArchivedThreadView({
+		querySelector(selector: string) {
+			return nodes.get(selector) ?? null
+		},
+	})
+	expect(stamp.textContent).toBe(THREAD_VIEW_ARCHIVED_STAMP)
+	expect(intro.textContent).toBe(THREAD_VIEW_ARCHIVED_INTRO)
+	expect(removed).toEqual(['prompts', 'live'])
+	expect(attrs).toEqual(['data-poll', 'data-live'])
+})
+
+test('threadViewArchivedPayload tells the watch page to freeze', () => {
+	expect(threadViewArchivedPayload()).toEqual({
+		ok: true,
+		archived: true,
+		messages: [],
+	})
 })

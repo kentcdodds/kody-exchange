@@ -39,10 +39,13 @@ test('ThreadRoom broadcasts JSON to attached sockets', async () => {
 })
 
 test('ThreadRoom closes attached sockets on /close', async () => {
+	const sent: Array<string> = []
 	const closed: Array<{ code: number; reason: string }> = []
 	const sockets = [
 		{
-			send() {},
+			send(data: string) {
+				sent.push(data)
+			},
 			close(code: number, reason: string) {
 				closed.push({ code, reason })
 			},
@@ -59,6 +62,7 @@ test('ThreadRoom closes attached sockets on /close', async () => {
 		new Request('https://thread-room/close', { method: 'POST' }),
 	)
 	expect(response.status).toBe(204)
+	expect(sent).toEqual(['{"ok":true,"archived":true,"messages":[]}'])
 	expect(closed).toEqual([{ code: 1000, reason: 'archived' }])
 })
 
