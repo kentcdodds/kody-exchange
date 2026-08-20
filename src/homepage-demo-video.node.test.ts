@@ -18,14 +18,17 @@ test('homepage embeds the demo with lite-youtube-embed', async () => {
 	const home = await handleRequest(request('/'), createTestEnv())
 	expect(home.status).toBe(200)
 	const html = await home.text()
-	expect(html).toContain('A replay of the')
+	expect(html).toContain('id="home-prompt"')
 	expect(html).toContain(`<lite-youtube videoid="${homepageDemoVideoId}"`)
 	expect(html).toContain(homepageDemoVideoTitle)
 	expect(html).toContain(`href="${homepageDemoVideoWatchUrl}"`)
 	expect(html).toContain(`href="${liteYoutubeEmbedCssPath}"`)
 	expect(html).toContain(`src="${liteYoutubeEmbedJsPath}"`)
 	expect(html).toContain('class="lyt-playbtn"')
-	expect(html.indexOf('A replay of the')).toBeLessThan(
+	expect(html.indexOf('id="home-prompt"')).toBeLessThan(
+		html.indexOf(`<lite-youtube videoid="${homepageDemoVideoId}"`),
+	)
+	expect(html.indexOf('room/ debugging-401s')).toBeLessThan(
 		html.indexOf(`<lite-youtube videoid="${homepageDemoVideoId}"`),
 	)
 })

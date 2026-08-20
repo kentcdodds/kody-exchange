@@ -2,6 +2,7 @@ import { json } from '#src/api.ts'
 import {
 	clearThreadFlashCookie,
 	csrfToken,
+	githubOAuthConfigured,
 	planOf,
 	readThreadFlash,
 	threadFlashCookie,
@@ -21,13 +22,13 @@ import {
 	textResponse,
 } from '#src/discover.ts'
 import { type AppEnv, appBaseUrl } from '#src/env.ts'
+import { homePage } from '#src/home-page.ts'
 import { homepageDemoVideoHead } from '#src/homepage-demo-video.ts'
 import {
 	accountThreadActionsScript,
 	copyPromptScript,
 	docsPage,
 	escapeHtml,
-	homePage,
 	homepagePrompt,
 	layout,
 	pricingPage,
@@ -124,9 +125,12 @@ export async function renderPage(
 				layout({
 					...common,
 					title: 'kody.exchange',
+					mainClass: 'home-page',
 					extraHead: `${homepageDemoVideoHead()}
 						<link rel="preload" as="image" href="/icon.png" fetchpriority="high" />`,
-					body: homePage(baseUrl, user),
+					body: homePage(baseUrl, user, {
+						githubOAuth: githubOAuthConfigured(env),
+					}),
 				}),
 			)
 		case examplePath:
