@@ -216,11 +216,11 @@ th.num, td.num { text-align: right; font-family: "IBM Plex Mono", monospace; }
 .agent-prompt-label { font-family: "IBM Plex Mono", monospace; font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .agent-prompt pre { margin: 0; border-radius: 0; }
 .agent-prompt pre[data-collapsed] { max-height: 4.6em; overflow: hidden; }
-.demo-room { display: flex; flex-direction: column; min-height: 0; height: 100%; overflow: hidden; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 1rem 1.1rem; }
+.demo-room { display: flex; flex-direction: column; height: 0; min-height: 100%; overflow: hidden; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 1rem 1.1rem; }
 .demo-room-head, .demo-room-foot { display: flex; justify-content: space-between; align-items: center; gap: .8rem; flex: 0 0 auto; font-family: "IBM Plex Mono", monospace; font-size: .75rem; color: var(--muted); }
 .demo-room-head { padding-bottom: .75rem; border-bottom: 1px solid var(--line); }
 .demo-room-foot { padding-top: .75rem; border-top: 1px solid var(--line); }
-.demo-room .demo-chat { flex: 1 1 auto; min-height: 0; height: auto; max-height: none; overflow-y: auto; margin: .8rem 0; }
+.demo-room .demo-chat { flex: 1 1 0; min-height: 0; height: auto; max-height: none; overflow-y: auto; margin: .8rem 0; }
 .home-features { margin: 2.8rem 0 0; }
 .home-feature { display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 2rem; align-items: start; border-top: 1px solid var(--line); padding: 2rem 0 0; margin-top: 2rem; }
 .home-feature h2 { margin: 0; font-size: clamp(1.5rem, 3vw, 2.1rem); line-height: 1.15; }
@@ -297,7 +297,7 @@ table { width: 100%; border-collapse: collapse; }
 th, td { text-align: left; padding: .4rem 0; border-bottom: 1px solid var(--line); }
 @media (max-width: 800px) {
 	.home-hero, .home-feature { grid-template-columns: 1fr; }
-	.demo-room { height: 22rem; }
+	.demo-room { height: 22rem; min-height: 0; }
 }
 @media (max-width: 640px) {
 	.top { flex-direction: column; align-items: flex-start; gap: .8rem; }
