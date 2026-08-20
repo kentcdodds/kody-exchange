@@ -289,7 +289,8 @@ main.thread-page { width: min(720px, calc(100% - 2rem)); }
 .demo-video { margin: 1rem 0 0; }
 .demo-video lite-youtube { max-width: none; width: 100%; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); }
 @media (prefers-reduced-motion: reduce) {
-	.demo-chat { height: auto; }
+	.demo-room { min-height: 0; }
+	.demo-chat, .demo-room .demo-chat { height: auto; overflow: visible; }
 	.bubble[data-demo-shown] { animation: none; }
 	.typing-dot { animation: none; }
 }

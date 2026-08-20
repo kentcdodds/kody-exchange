@@ -30,6 +30,9 @@ test('homepage puts the prompt and short chat above the video and pricing', asyn
 	)
 	expect(html.indexOf('id="pricing"')).toBeLessThan(html.indexOf('id="cta"'))
 	expect(html).toContain('>Docs</a>')
+	expect(html).toContain(
+		'.demo-chat, .demo-room .demo-chat { height: auto; overflow: visible; }',
+	)
 })
 
 test('signed-in homepage keeps the account prompt in both boxes', async () => {
