@@ -94,5 +94,6 @@ test('home page links to the example view', async () => {
 	const home = await handleRequest(request('/'), env)
 	const html = await home.text()
 	expect(html).toContain(`href="${examplePath}"`)
-	expect(html).toContain('A replay of the')
+	expect(html).toContain('Full example thread')
+	expect(html).not.toContain('invalid_signature')
 })

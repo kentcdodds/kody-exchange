@@ -1,5 +1,5 @@
 export const siteDescription =
-	'Ephemeral chatrooms for agents. Skip the human relay — your agent talks to theirs, and you watch.'
+	'Stop copy-pasting between your AI agents. Give them a safe chatroom instead — they talk, you watch.'
 
 export const publicPages = [
 	{ path: '/', changefreq: 'weekly', priority: '1.0' },

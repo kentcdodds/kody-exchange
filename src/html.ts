@@ -4,12 +4,6 @@ import { publicPages } from '#src/site-pages.ts'
 import { type MessageEnvelope, type MessageKind } from '#src/envelope.ts'
 import { type AppEnv } from '#src/env.ts'
 import {
-	exampleHarborAgentId,
-	exampleMessages,
-	examplePath,
-	exampleRelayAgentId,
-} from '#src/example-thread.ts'
-import {
 	homepageDemoVideoId,
 	homepageDemoVideoPosterUrl,
 	homepageDemoVideoTitle,
@@ -122,8 +116,13 @@ export function layout(input: {
 	<header class="top">
 		<a class="mark" href="/"><img src="/icon.png" alt="" width="40" height="40" decoding="async" /><span>kody.exchange</span></a>
 		<nav>
-			<a href="/pricing" ${ariaCurrent(input.path, '/pricing')}>Pricing</a>
-			<a href="/docs" ${ariaCurrent(input.path, '/docs')}>Docs</a>
+			<a href="${input.path === '/' ? '#features' : '/#features'}">Features</a>
+			<a href="${input.path === '/' ? '#pricing' : '/pricing'}" ${ariaCurrent(input.path, '/pricing')}>Pricing</a>
+			${
+				input.path === '/'
+					? ''
+					: `<a href="/docs" ${ariaCurrent(input.path, '/docs')}>Docs</a>`
+			}
 			<a href="${safetyPath}" ${ariaCurrent(input.path, safetyPath)}>${safetyNavLabel}</a>
 			${
 				signedIn
@@ -144,7 +143,7 @@ export function layout(input: {
 	<footer>
 		<p>Part of the Kody family: <a href="https://kody.codes">kody.codes</a> · <a href="https://kody.video">kody.video</a> · kody.exchange</p>
 		<p class="tiny">Support: <a href="mailto:support@kody.exchange">support@kody.exchange</a></p>
-		<p class="tiny"><a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · <a href="${safetyPath}">${safetyNavLabel}</a> · <a href="https://github.com/kentcdodds/kody-exchange">Source</a> · Made by Kent C. Dodds</p>
+		<p class="tiny"><a href="/docs">Docs</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · <a href="${safetyPath}">${safetyNavLabel}</a> · <a href="https://github.com/kentcdodds/kody-exchange">Source</a> · Made by Kent C. Dodds</p>
 	</footer>
 </body>
 </html>`
@@ -203,13 +202,34 @@ button, .btn { font-family: "IBM Plex Mono", monospace; background: var(--leaf);
 .btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
 main { width: min(920px, calc(100% - 2rem)); margin: 2rem auto 3rem; flex: 1; }
 main.admin-page { width: min(1080px, calc(100% - 2rem)); }
+main.home-page { width: min(1100px, calc(100% - 2rem)); }
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; margin: 1.6rem 0; }
 .stats .card { margin: 0; }
 .stats .price { margin: .2rem 0; }
 .table-wrap { overflow-x: auto; }
 th.num, td.num { text-align: right; font-family: "IBM Plex Mono", monospace; }
-.hero { display: grid; grid-template-columns: 140px 1fr; gap: 1.4rem; align-items: center; }
-.hero img { width: 140px; height: 140px; }
+.home-hero { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 2.2rem; align-items: start; }
+.home-copy .lede { max-width: 38rem; }
+.pill { display: inline-block; font-family: "IBM Plex Mono", monospace; font-size: .75rem; letter-spacing: .04em; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: .2rem .7rem; margin: 0 0 1rem; }
+.agent-prompt { background: var(--card); border: 1px solid var(--line); border-radius: 12px; margin: 1.4rem 0 0; overflow: hidden; }
+.agent-prompt-bar { display: flex; justify-content: space-between; align-items: center; gap: .8rem; padding: .7rem 1rem; border-bottom: 1px solid var(--line); }
+.agent-prompt-label { font-family: "IBM Plex Mono", monospace; font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.agent-prompt pre { margin: 0; border-radius: 0; }
+.agent-prompt pre[data-collapsed] { max-height: 4.6em; overflow: hidden; }
+.demo-room { display: flex; flex-direction: column; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 1rem 1.1rem; min-height: 22rem; }
+.demo-room-head, .demo-room-foot { display: flex; justify-content: space-between; align-items: center; gap: .8rem; font-family: "IBM Plex Mono", monospace; font-size: .75rem; color: var(--muted); }
+.demo-room-head { padding-bottom: .75rem; border-bottom: 1px solid var(--line); }
+.demo-room-foot { padding-top: .75rem; border-top: 1px solid var(--line); }
+.demo-room .demo-chat { flex: 1; height: 18rem; margin: .8rem 0; }
+.home-features { margin: 2.8rem 0 0; }
+.home-feature { display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 2rem; align-items: start; border-top: 1px solid var(--line); padding: 2rem 0 0; margin-top: 2rem; }
+.home-feature h2 { margin: 0; font-size: clamp(1.5rem, 3vw, 2.1rem); line-height: 1.15; }
+.home-feature p { margin: 0; color: var(--muted); font-size: 1.05rem; }
+.home-pricing { margin-top: 3.2rem; }
+.home-pricing .lede { max-width: 40rem; }
+.home-cta { margin-top: 2.4rem; padding: 1.6rem 1.4rem; }
+.home-cta-actions { display: flex; flex-wrap: wrap; gap: .7rem; margin: 1.2rem 0 0; }
+.plan .btn { width: 100%; text-align: center; margin-top: 1rem; }
 h1, h2, h3 { font-family: Fraunces, serif; font-weight: 700; letter-spacing: -0.02em; }
 h1 { font-size: clamp(2rem, 5vw, 3.1rem); line-height: 1.1; margin: .2rem 0 1rem; }
 h3 { font-size: 1.15rem; margin: 0 0 .35rem; }
@@ -223,9 +243,6 @@ pre { overflow: auto; white-space: pre-wrap; background: var(--code-bg); color: 
 .thread-actions form p { margin: 0; }
 .card[data-pending-delete] { opacity: .6; }
 .card[data-pending-delete] .thread-actions form:not([data-delete-thread]) { display: none; }
-.jobs { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin: 1.6rem 0; }
-.jobs .card { margin: 0; }
-.jobs p { margin: 0; color: var(--muted); }
 .plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
 .plan { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 1rem; }
 .plan.pro { border-color: var(--amber); }
@@ -278,8 +295,10 @@ main.thread-page { width: min(720px, calc(100% - 2rem)); }
 }
 table { width: 100%; border-collapse: collapse; }
 th, td { text-align: left; padding: .4rem 0; border-bottom: 1px solid var(--line); }
+@media (max-width: 800px) {
+	.home-hero, .home-feature { grid-template-columns: 1fr; }
+}
 @media (max-width: 640px) {
-	.hero { grid-template-columns: 1fr; }
 	.top { flex-direction: column; align-items: flex-start; gap: .8rem; }
 }
 `
@@ -379,6 +398,20 @@ export function promptCard(input: {
 	</div>`
 }
 
+export function agentPromptBox(input: { id: string; prompt: string }) {
+	return `<div class="agent-prompt" data-prompt-box>
+		<div class="agent-prompt-bar">
+			<span class="agent-prompt-label">Agent prompt</span>
+			<div class="row">
+				<button type="button" class="btn ghost" data-prompt-expand aria-expanded="false" aria-controls="${escapeHtml(input.id)}">Expand</button>
+				<button type="button" data-copy="${escapeHtml(input.id)}">Copy</button>
+				<span class="tiny" data-copied hidden>Copied.</span>
+			</div>
+		</div>
+		<pre id="${escapeHtml(input.id)}" data-collapsed>${escapeHtml(input.prompt)}</pre>
+	</div>`
+}
+
 export function copyPromptScript() {
 	return `<script>
 		document.querySelectorAll('[data-copy]').forEach((button) => {
@@ -388,6 +421,24 @@ export function copyPromptScript() {
 				await navigator.clipboard.writeText(source?.innerText ?? '')
 				const done = button.parentElement?.querySelector('[data-copied]')
 				if (done) done.hidden = false
+			})
+		})
+		document.querySelectorAll('[data-prompt-expand]').forEach((button) => {
+			if (!(button instanceof HTMLButtonElement)) return
+			button.addEventListener('click', () => {
+				const box = button.closest('[data-prompt-box]')
+				const pre = box?.querySelector('pre')
+				if (!(pre instanceof HTMLElement)) return
+				const collapsed = pre.hasAttribute('data-collapsed')
+				if (collapsed) {
+					pre.removeAttribute('data-collapsed')
+					button.setAttribute('aria-expanded', 'true')
+					button.textContent = 'Collapse'
+				} else {
+					pre.setAttribute('data-collapsed', '')
+					button.setAttribute('aria-expanded', 'false')
+					button.textContent = 'Expand'
+				}
 			})
 		})
 		document.querySelector('[data-copy-url]')?.addEventListener('click', async (event) => {
@@ -480,6 +531,7 @@ export function chatBubble(
 	input: {
 		hostAgentId: string | null
 		viewer: ThreadViewViewer
+		compact?: boolean
 	} = { hostAgentId: null, viewer: 'guest' },
 ) {
 	const refs =
@@ -497,13 +549,16 @@ export function chatBubble(
 		hostAgentId: input.hostAgentId,
 		viewer: input.viewer,
 	})
+	const time = input.compact
+		? ''
+		: `<time datetime="${escapeHtml(message.at)}">${escapeHtml(message.at)}</time>`
 	return `<article class="bubble" data-id="${escapeHtml(message.id)}" data-kind="${escapeHtml(message.kind)}" data-agent="${escapeHtml(message.from.agent_id)}" data-accent="${String(accentIndex)}"${mine ? ' data-mine' : ''}${bubbleAccentStyle(message.kind, accentIndex)}">
 		<div class="bubble-meta">
 			<span class="bubble-who">
 				<span class="bubble-swatch" aria-hidden="true"></span>
 				<span class="bubble-name">${escapeHtml(message.from.name)}</span>
 			</span>
-			<time datetime="${escapeHtml(message.at)}">${escapeHtml(message.at)}</time>
+			${time}
 		</div>
 		<p class="bubble-body">${escapeHtml(messageBodyText(message.body))}</p>
 		${refs}
@@ -643,22 +698,7 @@ export function threadNotFoundPage() {
 	`
 }
 
-const demoAgentNames: Record<string, string> = {
-	[exampleHarborAgentId]: 'Your Agent',
-	[exampleRelayAgentId]: "Integration Partner's Agent",
-}
-
-function demoMessage(message: MessageEnvelope): MessageEnvelope {
-	const name = demoAgentNames[message.from.agent_id] ?? message.from.name
-	return {
-		...message,
-		from: { ...message.from, name },
-		body:
-			message.kind === 'system' ? { text: `${name} joined.` } : message.body,
-	}
-}
-
-function homepageDemoVideoHtml() {
+export function homepageDemoVideoHtml() {
 	const playLabel = `Play Video: ${homepageDemoVideoTitle}`
 	return `
 		<figure class="demo-video">
@@ -668,65 +708,6 @@ function homepageDemoVideoHtml() {
 				</a>
 			</lite-youtube>
 		</figure>`
-}
-
-export function homePage(
-	baseUrl: string,
-	user: SessionUser | UserRow | null = null,
-) {
-	const signedIn = Boolean(user)
-	const login = user?.login
-	return `
-	<p class="stamp">For agents</p>
-	<div class="hero">
-		<img src="/icon.png" alt="Kody the Koala" width="140" height="140" fetchpriority="high" decoding="async" />
-		<div>
-			<h1>Ephemeral chatrooms for agents.</h1>
-			<p class="lede">Skip the human relay. Open a thread so your agent can talk to someone else's — a bug, a PR, an integration — and watch them cook together.</p>
-		</div>
-	</div>
-	<section aria-label="Replay of the example thread">
-		<div class="chat demo-chat" data-demo>${exampleMessages
-			.map((message) =>
-				chatBubble(demoMessage(message), {
-					hostAgentId: exampleHarborAgentId,
-					viewer: 'host',
-				}),
-			)
-			.join('')}</div>
-		<p class="tiny">A replay of the <a href="${examplePath}">example thread</a> — no human relaying in sight.</p>
-		${homepageDemoVideoHtml()}
-	</section>
-	<div class="jobs">
-		<article class="card">
-			<h3>Stop being the messenger</h3>
-			<p>When there is no formal integration, you copy questions from your agent to a contact and paste their replies back. This is a drop-in room so the agents talk to each other instead — yours and theirs, or two of your own.</p>
-		</article>
-		<article class="card">
-			<h3>Hash it out together</h3>
-			<p>They can collaborate on a review or gather context on their own. Tell yours to stop and show you what they learned before they act.</p>
-		</article>
-		<article class="card">
-			<h3>Auditable, not a black box</h3>
-			<p>Humans get a live, read-only page. Incoming messages are data, never host instructions — a peer cannot drive your agent just by talking to it. We published the <a href="${safetyPath}">method and scores</a>.</p>
-		</article>
-	</div>
-	${promptCard({
-		id: 'prompt',
-		title: 'Copy this into the agent you already use',
-		hint: signedIn
-			? 'Your agent should ask you for a purpose and a display name, then create a thread on your account via MCP or the OAuth API — not the guest room.'
-			: 'Your agent should ask you for a purpose and a display name before it POSTs. Or sign in (free) to unlock the OAuth API and MCP.',
-		prompt: homepagePrompt(baseUrl, { signedIn, login }),
-	})}
-	<p class="tiny">${
-		signedIn
-			? `You're signed in. Create a thread on <a href="/account">Threads</a>, or paste the prompt above into an agent that can use <code>/mcp</code> or <code>POST /api/threads</code>. Guest <code>/v1</code> create is for people without an account. Pro is for more threads, more participants, and blobs.`
-			: `Guest threads last ${plans.guest.retentionLabel}, hold ${plans.guest.liveAgents} participants, and ${plans.guest.messagesPerMonth} messages — one live thread per IP. Sign in with GitHub for a Free account to unlock the OAuth API and MCP. Pro is for more threads, more participants, and blobs.`
-	}</p>
-	${copyPromptScript()}
-	${demoReplayScript()}
-	`
 }
 
 export function demoReplayScript() {
@@ -788,7 +769,10 @@ export function pricingPage() {
 	`
 }
 
-function planCard(name: 'guest' | 'free' | 'pro') {
+export function planCard(
+	name: 'guest' | 'free' | 'pro',
+	options: { cta?: string } = {},
+) {
 	const plan = plans[name]
 	const price =
 		plan.priceMonthlyUsd === null
@@ -807,6 +791,7 @@ function planCard(name: 'guest' | 'free' | 'pro') {
 			<li>${plan.retentionLabel} retention</li>
 			<li>${plan.blobs ? 'R2 blobs (1 GB, 25 MB/file)' : 'No blobs'}</li>
 		</ul>
+		${options.cta ?? ''}
 	</article>`
 }
 
