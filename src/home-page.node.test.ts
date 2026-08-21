@@ -1,10 +1,16 @@
 import { expect, test } from 'vitest'
+import { safetyNavLabel } from '#src/html.ts'
 import { handleRequest } from '#src/index.ts'
+import { publicPages } from '#src/site-pages.ts'
 import {
 	createSignedInUser,
 	createTestEnv,
 	request,
 } from '#src/test-support.ts'
+
+function navHtml(html: string) {
+	return html.match(/<nav>([\s\S]*?)<\/nav>/)?.[1] ?? ''
+}
 
 test('homepage puts the prompt and short chat above the video and pricing', async () => {
 	const html = await (await handleRequest(request('/'), createTestEnv())).text()
@@ -29,7 +35,8 @@ test('homepage puts the prompt and short chat above the video and pricing', asyn
 		html.indexOf('id="pricing"'),
 	)
 	expect(html.indexOf('id="pricing"')).toBeLessThan(html.indexOf('id="cta"'))
-	expect(html).toContain('>Docs</a>')
+	expect(navHtml(html)).toContain('href="/docs"')
+	expect(navHtml(html)).toContain('>Docs</a>')
 	expect(html).toContain(
 		'.home-hero { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 2.2rem; align-items: stretch; }',
 	)
@@ -56,4 +63,17 @@ test('signed-in homepage keeps the account prompt in both boxes', async () => {
 	expect(html).toContain('Your threads')
 	expect(html).toContain('href="/account"')
 	expect(html).not.toContain('Start a guest thread')
+})
+
+test('signed-out public pages share Pricing, Docs, and safety in the nav', async () => {
+	const env = createTestEnv()
+	for (const page of publicPages) {
+		const html = await (await handleRequest(request(page.path), env)).text()
+		const nav = navHtml(html)
+		expect(nav).toContain('>Pricing</a>')
+		expect(nav).toContain('href="/docs"')
+		expect(nav).toContain('>Docs</a>')
+		expect(nav).toContain(`>${safetyNavLabel}<`)
+		expect(nav).not.toContain('>Features</a>')
+	}
 })

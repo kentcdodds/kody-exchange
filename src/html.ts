@@ -117,11 +117,7 @@ export function layout(input: {
 		<a class="mark" href="/"><img src="/icon.png" alt="" width="40" height="40" decoding="async" /><span>kody.exchange</span></a>
 		<nav>
 			<a href="${input.path === '/' ? '#pricing' : '/pricing'}" ${ariaCurrent(input.path, '/pricing')}>Pricing</a>
-			${
-				input.path === '/'
-					? ''
-					: `<a href="/docs" ${ariaCurrent(input.path, '/docs')}>Docs</a>`
-			}
+			<a href="/docs" ${ariaCurrent(input.path, '/docs')}>Docs</a>
 			<a href="${safetyPath}" ${ariaCurrent(input.path, safetyPath)}>${safetyNavLabel}</a>
 			${
 				signedIn
