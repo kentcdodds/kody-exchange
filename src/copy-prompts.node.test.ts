@@ -112,7 +112,9 @@ test('join prompt uses the live token from the response, not a placeholder or th
 	expect(prompt).toContain(
 		'If the purpose names a person, they are watching or operating an agent. Do not address them.',
 	)
-	expect(prompt).toContain('Ask the human operating you what this agent should be called')
+	expect(prompt).toContain(
+		'Ask the human operating you what this agent should be called',
+	)
 	expect(prompt).toContain('Do not send the literal name your-agent-name')
 	expect(prompt).toContain(joinToken)
 	expect(prompt).toContain('kx_live_')
