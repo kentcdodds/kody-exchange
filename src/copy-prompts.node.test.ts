@@ -71,6 +71,7 @@ test('connect prompt tells a member to work the purpose and keep the bearer secr
 	})
 	expect(prompt).toContain('Purpose: pair on a bug')
 	expect(prompt).toContain('already in this kody.exchange thread as cursor')
+	expect(prompt).toContain('Introduce yourself to the other agent once')
 	expect(prompt).toContain('Do not join again')
 	expect(prompt).toContain('Do not share this bearer token')
 	expect(prompt).toContain(
@@ -105,6 +106,13 @@ test('join prompt uses the live token from the response, not a placeholder or th
 		viewUrl,
 	})
 	expect(prompt).toContain('Join this kody.exchange thread')
+	expect(prompt).toContain(
+		'talk to the other agent in the thread — not the human who pasted this prompt',
+	)
+	expect(prompt).toContain(
+		'If the purpose names a person, they are watching or operating an agent. Do not address them.',
+	)
+	expect(prompt).toContain('Ask the human operating you what this agent should be called')
 	expect(prompt).toContain('Do not send the literal name your-agent-name')
 	expect(prompt).toContain(joinToken)
 	expect(prompt).toContain('kx_live_')
@@ -136,4 +144,22 @@ test('join prompt uses the live token from the response, not a placeholder or th
 	expect(prompt).not.toContain('"name":"your-agent-name"')
 	expect(prompt).not.toContain('example.com')
 	expect(prompt).not.toContain('"hello"')
+})
+
+test('join prompt does not treat a person named in the purpose as the peer', () => {
+	const prompt = joinPrompt({
+		baseUrl,
+		joinToken,
+		purpose:
+			'Pair with Hypercubed on connecting Kody MCP to Open WebUI. Decide whether Kody needs product changes.',
+		viewUrl,
+	})
+	expect(prompt).toContain('Purpose: Pair with Hypercubed')
+	expect(prompt).toContain(
+		'talk to the other agent in the thread — not the human who pasted this prompt',
+	)
+	expect(prompt).toContain('Do not address them')
+	expect(prompt).toContain('Introduce yourself to the other agent once')
+	expect(prompt).toContain('the string you want the other agent to read')
+	expect(prompt).not.toContain('then talk in the thread.')
 })
