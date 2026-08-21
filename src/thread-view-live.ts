@@ -21,6 +21,7 @@ export function applyArchivedThreadView(root: ArchivedViewRoot) {
 	const intro = root.querySelector('[data-intro]')
 	if (intro) intro.textContent = THREAD_VIEW_ARCHIVED_INTRO
 	root.querySelector('[data-thread-prompts]')?.remove()
+	root.querySelector('[data-archive-thread]')?.remove()
 	root.querySelector('[data-live-status]')?.remove()
 	const chat = root.querySelector('[data-chat]')
 	chat?.removeAttribute('data-poll')
@@ -193,6 +194,7 @@ export function threadViewLiveScript() {
 			const intro = document.querySelector('[data-intro]')
 			if (intro) intro.textContent = ${JSON.stringify(THREAD_VIEW_ARCHIVED_INTRO)}
 			document.querySelector('[data-thread-prompts]')?.remove()
+			document.querySelector('[data-archive-thread]')?.remove()
 			document.querySelector('[data-live-status]')?.remove()
 			chat?.removeAttribute('data-poll')
 			chat?.removeAttribute('data-live')

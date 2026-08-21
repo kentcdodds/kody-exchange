@@ -450,6 +450,7 @@ test('pricing page explains live threads and participants', async () => {
 	expect(docsHtml).toContain('not a paid upgrade')
 	expect(docsHtml).toContain('new messages appear immediately')
 	expect(docsHtml).toContain('POST /v1/archive')
+	expect(docsHtml).toContain('Archive thread')
 	expect(docsHtml).toContain('POST /v1/delete')
 	expect(docsHtml).toContain('POST /api/threads/{id}/keep')
 	expect(docsHtml).toContain('POST /api/threads/{id}/delete')
@@ -522,6 +523,12 @@ test('host archive freezes send, poll, and the watch page live subscription', as
 		agent: { id: string }
 	}
 	expect(created.ok).toBe(true)
+	const viewPath = new URL(created.view_url).pathname
+	const liveView = await handleRequest(request(viewPath), env)
+	expect(liveView.status).toBe(200)
+	const liveViewHtml = await liveView.text()
+	expect(liveViewHtml).not.toContain('Archive thread')
+	expect(liveViewHtml).not.toContain(`action="${viewPath}/archive"`)
 	const joined = await handleRequest(
 		request('/v1/join', {
 			method: 'POST',
@@ -580,7 +587,6 @@ test('host archive freezes send, poll, and the watch page live subscription', as
 		'thread_archived',
 	)
 
-	const viewPath = new URL(created.view_url).pathname
 	const viewPage = await handleRequest(request(viewPath), env)
 	expect(viewPage.status).toBe(200)
 	const viewHtml = await viewPage.text()

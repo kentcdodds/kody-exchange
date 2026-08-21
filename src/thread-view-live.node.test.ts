@@ -87,6 +87,7 @@ test('live script prefers a socket and pins when already at the bottom', () => {
 	expect(script).toContain(JSON.stringify(THREAD_VIEW_ARCHIVED_STAMP))
 	expect(script).toContain(JSON.stringify(THREAD_VIEW_ARCHIVED_INTRO))
 	expect(script).toContain('[data-thread-prompts]')
+	expect(script).toContain('[data-archive-thread]')
 	expect(script).toContain('[data-live-status]')
 	expect(script).toContain("removeAttribute('data-poll')")
 	expect(script).toContain("removeAttribute('data-live')")
@@ -120,6 +121,16 @@ test('applyArchivedThreadView matches a freshly loaded archived page', () => {
 			},
 		],
 		[
+			'[data-archive-thread]',
+			{
+				textContent: null,
+				remove() {
+					removed.push('archive')
+				},
+				removeAttribute() {},
+			},
+		],
+		[
 			'[data-live-status]',
 			{
 				textContent: 'Live',
@@ -147,7 +158,7 @@ test('applyArchivedThreadView matches a freshly loaded archived page', () => {
 	})
 	expect(stamp.textContent).toBe(THREAD_VIEW_ARCHIVED_STAMP)
 	expect(intro.textContent).toBe(THREAD_VIEW_ARCHIVED_INTRO)
-	expect(removed).toEqual(['prompts', 'live'])
+	expect(removed).toEqual(['prompts', 'archive', 'live'])
 	expect(attrs).toEqual(['data-poll', 'data-live'])
 })
 

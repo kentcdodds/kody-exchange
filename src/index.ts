@@ -41,7 +41,11 @@ import {
 	unauthorizedOAuthResponse,
 } from '#src/oauth-user.ts'
 import { pageOgForImagePath, viewTokenForOgPath } from '#src/og-pages.ts'
-import { handleAccountAction, renderPage } from '#src/pages.ts'
+import {
+	handleAccountAction,
+	handleThreadViewArchive,
+	renderPage,
+} from '#src/pages.ts'
 import { handleUserApi } from '#src/user-api.ts'
 import { getThreadViewCard, purgeExpired } from '#src/threads.ts'
 
@@ -221,6 +225,12 @@ export async function handleRequest(
 	}
 
 	const user = await readSessionUser(request, env)
+	if (request.method === 'POST') {
+		const viewArchive = url.pathname.match(/^\/t\/([^/]+)\/archive$/)
+		if (viewArchive?.[1]) {
+			return handleThreadViewArchive(request, env, user, viewArchive[1])
+		}
+	}
 	if (request.method === 'POST' && url.pathname.startsWith('/account')) {
 		if (!user)
 			return Response.redirect(
