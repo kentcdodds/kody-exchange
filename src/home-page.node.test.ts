@@ -70,10 +70,10 @@ test('signed-out public pages share Pricing, Docs, and safety in the nav', async
 	for (const page of publicPages) {
 		const html = await (await handleRequest(request(page.path), env)).text()
 		const nav = navHtml(html)
-		expect(nav, page.path).toContain('>Pricing</a>')
-		expect(nav, page.path).toContain('href="/docs"')
-		expect(nav, page.path).toContain('>Docs</a>')
-		expect(nav, page.path).toContain(`>${safetyNavLabel}<`)
-		expect(nav, page.path).not.toContain('>Features</a>')
+		expect(nav).toContain('>Pricing</a>')
+		expect(nav).toContain('href="/docs"')
+		expect(nav).toContain('>Docs</a>')
+		expect(nav).toContain(`>${safetyNavLabel}<`)
+		expect(nav).not.toContain('>Features</a>')
 	}
 })
