@@ -208,7 +208,7 @@ main.home-page { width: min(1100px, calc(100% - 2rem)); }
 .stats .price { margin: .2rem 0; }
 .table-wrap { overflow-x: auto; }
 th.num, td.num { text-align: right; font-family: "IBM Plex Mono", monospace; }
-.home-hero { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 2.2rem; align-items: start; }
+.home-hero { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 2.2rem; align-items: stretch; }
 .home-copy .lede { max-width: 38rem; }
 .pill { display: inline-block; font-family: "IBM Plex Mono", monospace; font-size: .75rem; letter-spacing: .04em; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: .2rem .7rem; margin: 0 0 1rem; }
 .agent-prompt { background: var(--card); border: 1px solid var(--line); border-radius: 12px; margin: 1.4rem 0 0; overflow: hidden; }
@@ -216,11 +216,11 @@ th.num, td.num { text-align: right; font-family: "IBM Plex Mono", monospace; }
 .agent-prompt-label { font-family: "IBM Plex Mono", monospace; font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .agent-prompt pre { margin: 0; border-radius: 0; }
 .agent-prompt pre[data-collapsed] { max-height: 4.6em; overflow: hidden; }
-.demo-room { display: flex; flex-direction: column; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 1rem 1.1rem; min-height: 22rem; }
-.demo-room-head, .demo-room-foot { display: flex; justify-content: space-between; align-items: center; gap: .8rem; font-family: "IBM Plex Mono", monospace; font-size: .75rem; color: var(--muted); }
+.demo-room { display: flex; flex-direction: column; height: 0; min-height: 100%; overflow: hidden; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 1rem 1.1rem; }
+.demo-room-head, .demo-room-foot { display: flex; justify-content: space-between; align-items: center; gap: .8rem; flex: 0 0 auto; font-family: "IBM Plex Mono", monospace; font-size: .75rem; color: var(--muted); }
 .demo-room-head { padding-bottom: .75rem; border-bottom: 1px solid var(--line); }
 .demo-room-foot { padding-top: .75rem; border-top: 1px solid var(--line); }
-.demo-room .demo-chat { flex: 1; height: 18rem; margin: .8rem 0; }
+.demo-room .demo-chat { flex: 1 1 0; min-height: 0; height: auto; max-height: none; overflow-y: auto; margin: .8rem 0; }
 .home-features { margin: 2.8rem 0 0; }
 .home-feature { display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 2rem; align-items: start; border-top: 1px solid var(--line); padding: 2rem 0 0; margin-top: 2rem; }
 .home-feature h2 { margin: 0; font-size: clamp(1.5rem, 3vw, 2.1rem); line-height: 1.15; }
@@ -277,7 +277,7 @@ main.thread-page { width: min(720px, calc(100% - 2rem)); }
 .chat-empty { text-align: center; color: var(--muted); padding: 2.4rem 1rem; border: 1px dashed var(--line); border-radius: 16px; }
 .live { display: flex; align-items: center; gap: .4rem; font-family: "IBM Plex Mono", monospace; font-size: .75rem; color: var(--muted); }
 .live-dot { width: .55rem; height: .55rem; border-radius: 50%; background: var(--leaf); box-shadow: 0 0 0 3px color-mix(in srgb, var(--leaf) 20%, transparent); }
-.demo-chat { height: 24rem; overflow: hidden; }
+.demo-chat { overflow: hidden; }
 .bubble[data-demo-hidden] { display: none; }
 .bubble[data-demo-shown] { animation: bubble-in .3s ease-out; }
 @keyframes bubble-in { from { opacity: 0; transform: translateY(.4rem); } }
@@ -289,8 +289,7 @@ main.thread-page { width: min(720px, calc(100% - 2rem)); }
 .demo-video { margin: 1rem 0 0; }
 .demo-video lite-youtube { max-width: none; width: 100%; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); }
 @media (prefers-reduced-motion: reduce) {
-	.demo-room { min-height: 0; }
-	.demo-chat, .demo-room .demo-chat { height: auto; overflow: visible; }
+	.demo-chat, .demo-room .demo-chat { overflow-y: auto; }
 	.bubble[data-demo-shown] { animation: none; }
 	.typing-dot { animation: none; }
 }
@@ -298,6 +297,7 @@ table { width: 100%; border-collapse: collapse; }
 th, td { text-align: left; padding: .4rem 0; border-bottom: 1px solid var(--line); }
 @media (max-width: 800px) {
 	.home-hero, .home-feature { grid-template-columns: 1fr; }
+	.demo-room { height: 22rem; min-height: 0; }
 }
 @media (max-width: 640px) {
 	.top { flex-direction: column; align-items: flex-start; gap: .8rem; }

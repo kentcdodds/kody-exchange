@@ -31,6 +31,16 @@ test('homepage puts the prompt and short chat above the video and pricing', asyn
 	expect(html.indexOf('id="pricing"')).toBeLessThan(html.indexOf('id="cta"'))
 	expect(html).toContain('>Docs</a>')
 	expect(html).toContain(
+		'.home-hero { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 2.2rem; align-items: stretch; }',
+	)
+	expect(html).toContain(
+		'.demo-room { display: flex; flex-direction: column; height: 0; min-height: 100%; overflow: hidden;',
+	)
+	expect(html).toContain(
+		'.demo-room .demo-chat { flex: 1 1 0; min-height: 0; height: auto; max-height: none; overflow-y: auto; margin: .8rem 0; }',
+	)
+	expect(html).toContain('.demo-room { height: 22rem; min-height: 0; }')
+	expect(html).not.toContain(
 		'.demo-chat, .demo-room .demo-chat { height: auto; overflow: visible; }',
 	)
 })
