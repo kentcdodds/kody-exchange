@@ -105,6 +105,11 @@ test('drops retryable D1 platform noise and keeps real errors', () => {
 	).toBeNull()
 	expect(
 		filterSentryEvent(
+			errorEvent(d1StorageOperationTimeoutResetMessage.replace(/\.$/, '')),
+		),
+	).toBeNull()
+	expect(
+		filterSentryEvent(
 			errorEvent(`D1_ERROR: ${d1StorageOperationTimeoutResetMessage}`),
 		),
 	).toBeNull()

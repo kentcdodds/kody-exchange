@@ -32,8 +32,12 @@ export function isRetryableD1PlatformMessage(message: string) {
 		return true
 	}
 	if (normalized === 'Network connection lost') return true
-	// Cloudflare may wrap this as `D1_ERROR: …`.
-	if (normalized.includes(d1StorageOperationTimeoutResetMessage)) return true
+	// Cloudflare may wrap this as `D1_ERROR: …`, with or without a trailing `.`.
+	const d1StorageTimeoutStem = d1StorageOperationTimeoutResetMessage.replace(
+		/\.$/,
+		'',
+	)
+	if (normalized.includes(d1StorageTimeoutStem)) return true
 	return /^internal error in D1 DB storage caused object to be reset;\s*reference\s*=\s*[A-Za-z0-9]+$/i.test(
 		normalized,
 	)
