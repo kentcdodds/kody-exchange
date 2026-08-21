@@ -2,6 +2,7 @@ import { type ErrorEvent } from '@sentry/cloudflare'
 import { expect, test } from 'vitest'
 import {
 	buildSentryOptions,
+	d1StorageOperationTimeoutResetMessage,
 	durableObjectCodeUpdatedResetMessage,
 	durableObjectIsolateMemoryResetMessage,
 	filterSentryEvent,
@@ -99,6 +100,19 @@ test('drops retryable D1 platform noise and keeps real errors', () => {
 		),
 	).toBeNull()
 	expect(filterSentryEvent(errorEvent('Network connection lost'))).toBeNull()
+	expect(
+		filterSentryEvent(errorEvent(d1StorageOperationTimeoutResetMessage)),
+	).toBeNull()
+	expect(
+		filterSentryEvent(
+			errorEvent(`D1_ERROR: ${d1StorageOperationTimeoutResetMessage}`),
+		),
+	).toBeNull()
+	expect(
+		filterSentryEvent(
+			errorEvent(`Error: D1_ERROR: ${d1StorageOperationTimeoutResetMessage}`),
+		),
+	).toBeNull()
 	const kept = errorEvent('thread create failed')
 	expect(filterSentryEvent(kept)).toBe(kept)
 })
