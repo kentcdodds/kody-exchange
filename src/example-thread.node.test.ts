@@ -87,6 +87,8 @@ test('example page is the view UI without join capabilities', async () => {
 	expect(html).not.toContain('kx_live_')
 	expect(html).not.toContain('kx_view_')
 	expect(html).not.toMatch(/<textarea/)
+	expect(html).not.toContain('Archive thread')
+	expect(html).not.toContain('data-archive-thread')
 })
 
 test('home page links to the example view', async () => {

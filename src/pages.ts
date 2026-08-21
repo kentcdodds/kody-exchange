@@ -255,6 +255,14 @@ async function renderThreadView(
 		host: ownsThread ? host : null,
 		viewUrl,
 	})
+	const secret = env.COOKIE_SECRET?.trim()
+	const archive =
+		ownsThread && !isThreadArchived(listed.thread) && user && secret
+			? {
+					action: `${new URL(request.url).pathname}/archive`,
+					csrf: await csrfToken(secret, user.id),
+				}
+			: null
 	return html(
 		layout({
 			user,
@@ -285,6 +293,7 @@ async function renderThreadView(
 				guestPrompt: prompts.guestPrompt,
 				hostAgentId: host?.id ?? null,
 				viewer: ownsThread ? 'host' : 'guest',
+				archive,
 				neverExpires: isThreadNeverExpiring(listed.thread),
 			}),
 		}),
@@ -731,6 +740,59 @@ function accountError(code: string | null) {
 		default:
 			return null
 	}
+}
+
+export async function handleThreadViewArchive(
+	request: Request,
+	env: AppEnv,
+	user: SessionUser | UserRow | null,
+	viewToken: string,
+) {
+	if (!user) {
+		return Response.redirect(
+			new URL('/auth/github', request.url).toString(),
+			302,
+		)
+	}
+	const secret = env.COOKIE_SECRET?.trim()
+	if (!secret) return new Response('COOKIE_SECRET missing', { status: 503 })
+	const form = await request.formData()
+	const csrf = String(form.get('csrf') ?? '')
+	if (csrf !== (await csrfToken(secret, user.id))) {
+		return new Response('Bad CSRF token', { status: 403 })
+	}
+	const listed = await listMessagesForView({
+		db: env.DB,
+		viewToken,
+		limit: 1,
+	})
+	if (!listed.ok) {
+		return html(
+			layout({
+				user,
+				env,
+				path: new URL(request.url).pathname,
+				title: 'Thread not found',
+				body: threadNotFoundPage(),
+			}),
+			404,
+		)
+	}
+	if (!listed.thread.owner_user_id || listed.thread.owner_user_id !== user.id) {
+		return new Response('Forbidden', { status: 403 })
+	}
+	const archived = await archiveThread({
+		db: env.DB,
+		threadId: listed.thread.id,
+	})
+	if (!archived.ok) {
+		return new Response(archived.error, { status: archived.status })
+	}
+	await maybeCloseThreadView(env, archived.thread.id)
+	return Response.redirect(
+		new URL(`/t/${viewToken}`, appBaseUrl(env, request)).toString(),
+		303,
+	)
 }
 
 export async function handleAccountAction(

@@ -287,6 +287,10 @@ test('thread view shows host prompt only to the signed-in owner', async () => {
 	)
 	expect(ownerView).toContain('kx_live_')
 	expect(ownerView).toContain('kx_join_')
+	expect(ownerView).toContain('>Archive thread<')
+	expect(ownerView).toContain('data-archive-thread')
+	expect(ownerView).toContain(`action="${viewPath}/archive"`)
+	expect(ownerView).toContain(`name="csrf" value="${owner.csrf}"`)
 
 	const publicView = await (
 		await handleRequest(request(viewPath ?? '/'), env)
@@ -299,6 +303,8 @@ test('thread view shows host prompt only to the signed-in owner', async () => {
 	expect(publicView).not.toContain('>Host<')
 	expect(publicView).toContain('kx_live_…')
 	expect(publicView).not.toMatch(/kx_live_[a-f0-9]{16,}/)
+	expect(publicView).not.toContain('Archive thread')
+	expect(publicView).not.toContain(`action="${viewPath}/archive"`)
 
 	const strangerView = await (
 		await handleRequest(
@@ -310,6 +316,156 @@ test('thread view shows host prompt only to the signed-in owner', async () => {
 	expect(strangerView).not.toContain('>Host<')
 	expect(strangerView).toContain('kx_live_…')
 	expect(strangerView).not.toMatch(/kx_live_[a-f0-9]{16,}/)
+	expect(strangerView).not.toContain('Archive thread')
+	expect(strangerView).not.toContain(`action="${viewPath}/archive"`)
+})
+
+test('signed-in owner can archive from the watch page', async () => {
+	const env = createTestEnv()
+	const owner = await createSignedInUser(env, {
+		id: 'usr_view_archive',
+		github_id: '41',
+		login: 'archiver',
+	})
+	const stranger = await createSignedInUser(env, {
+		id: 'usr_view_archive_stranger',
+		github_id: '42',
+		login: 'onlooker',
+	})
+	const created = await handleRequest(
+		request('/account/threads', {
+			method: 'POST',
+			headers: {
+				cookie: owner.cookie,
+				'content-type': 'application/x-www-form-urlencoded',
+			},
+			body: new URLSearchParams({
+				csrf: owner.csrf,
+				purpose: 'archive from the watch page',
+				name: 'host-agent',
+			}),
+		}),
+		env,
+	)
+	expect(created.status).toBe(303)
+	const flash = firstSetCookie(created)
+	const accountHtml = await (
+		await handleRequest(
+			request('/account', {
+				headers: { cookie: `${owner.cookie}; ${flash}` },
+			}),
+			env,
+		)
+	).text()
+	const viewPath = /\/t\/kx_view_[a-f0-9]+/.exec(accountHtml)?.[0]
+	const hostToken = /kx_live_[a-f0-9]+/.exec(accountHtml)?.[0]
+	expect(viewPath && hostToken).toBeTruthy()
+	const archivePath = `${viewPath}/archive`
+
+	const unsigned = await handleRequest(
+		request(archivePath, {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/x-www-form-urlencoded',
+			},
+			body: new URLSearchParams({ csrf: owner.csrf }),
+		}),
+		env,
+	)
+	expect(unsigned.status).toBe(302)
+	expect(unsigned.headers.get('location')).toBe(
+		'https://kody.exchange/auth/github',
+	)
+
+	const strangerPost = await handleRequest(
+		request(archivePath, {
+			method: 'POST',
+			headers: {
+				cookie: stranger.cookie,
+				'content-type': 'application/x-www-form-urlencoded',
+			},
+			body: new URLSearchParams({ csrf: stranger.csrf }),
+		}),
+		env,
+	)
+	expect(strangerPost.status).toBe(403)
+
+	const badCsrf = await handleRequest(
+		request(archivePath, {
+			method: 'POST',
+			headers: {
+				cookie: owner.cookie,
+				'content-type': 'application/x-www-form-urlencoded',
+			},
+			body: new URLSearchParams({ csrf: 'nope' }),
+		}),
+		env,
+	)
+	expect(badCsrf.status).toBe(403)
+
+	const missing = await handleRequest(
+		request('/t/kx_view_missing/archive', {
+			method: 'POST',
+			headers: {
+				cookie: owner.cookie,
+				'content-type': 'application/x-www-form-urlencoded',
+			},
+			body: new URLSearchParams({ csrf: owner.csrf }),
+		}),
+		env,
+	)
+	expect(missing.status).toBe(404)
+
+	const getArchive = await handleRequest(
+		request(archivePath, { headers: { cookie: owner.cookie } }),
+		env,
+	)
+	expect(getArchive.status).toBe(404)
+
+	const archived = await handleRequest(
+		request(archivePath, {
+			method: 'POST',
+			headers: {
+				cookie: owner.cookie,
+				'content-type': 'application/x-www-form-urlencoded',
+			},
+			body: new URLSearchParams({ csrf: owner.csrf }),
+		}),
+		env,
+	)
+	expect(archived.status).toBe(303)
+	expect(archived.headers.get('location')).toBe(
+		`https://kody.exchange${viewPath}`,
+	)
+
+	const later = await handleRequest(
+		request(viewPath ?? '/', { headers: { cookie: owner.cookie } }),
+		env,
+	)
+	expect(later.status).toBe(200)
+	const laterHtml = await later.text()
+	expect(laterHtml).toContain('Archived')
+	expect(laterHtml).toContain('does not subscribe for updates')
+	expect(laterHtml).toContain('archive from the watch page')
+	expect(laterHtml).not.toContain('Archive thread')
+	expect(laterHtml).not.toContain('data-archive-thread')
+	expect(laterHtml).not.toContain('data-poll=')
+	expect(laterHtml).not.toContain('data-live=')
+	expect(laterHtml).not.toContain('connectLive()')
+
+	const sent = await handleRequest(
+		request('/v1/messages', {
+			method: 'POST',
+			headers: {
+				authorization: `Bearer ${hostToken}`,
+				'content-type': 'application/json',
+			},
+			body: JSON.stringify({ body: { text: 'too late' } }),
+		}),
+		env,
+	)
+	expect(sent.status).toBe(409)
+	expect(((await sent.json()) as { code: string }).code).toBe('thread_archived')
 })
 
 test('thread view aligns host messages right for the owner and guest messages right for everyone else', async () => {
