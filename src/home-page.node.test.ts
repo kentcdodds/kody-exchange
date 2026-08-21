@@ -9,7 +9,7 @@ import {
 test('homepage puts the prompt and short chat above the video and pricing', async () => {
 	const html = await (await handleRequest(request('/'), createTestEnv())).text()
 	expect(html).toContain('class="home-page"')
-	expect(html).toContain('href="#features"')
+	expect(html).not.toContain('>Features</a>')
 	expect(html).toContain('href="#pricing"')
 	expect(html).toContain('id="home-prompt"')
 	expect(html).toContain('id="cta-prompt"')

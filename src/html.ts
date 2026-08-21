@@ -116,7 +116,6 @@ export function layout(input: {
 	<header class="top">
 		<a class="mark" href="/"><img src="/icon.png" alt="" width="40" height="40" decoding="async" /><span>kody.exchange</span></a>
 		<nav>
-			<a href="${input.path === '/' ? '#features' : '/#features'}">Features</a>
 			<a href="${input.path === '/' ? '#pricing' : '/pricing'}" ${ariaCurrent(input.path, '/pricing')}>Pricing</a>
 			${
 				input.path === '/'
@@ -126,12 +125,7 @@ export function layout(input: {
 			<a href="${safetyPath}" ${ariaCurrent(input.path, safetyPath)}>${safetyNavLabel}</a>
 			${
 				signedIn
-					? `${
-							userHasPermission(input.user, 'read:user:any')
-								? `<a href="/admin" ${ariaCurrent(input.path, '/admin')}>Admin</a>
-						`
-								: ''
-						}<a href="/account" ${ariaCurrent(input.path, '/account')}>Threads</a>
+					? `<a href="/account" ${ariaCurrent(input.path, '/account')}>Threads</a>
 						<form method="post" action="/auth/logout"><button type="submit">Sign out</button></form>`
 					: githubOAuthConfigured(input.env)
 						? `<a class="btn ghost" href="/auth/github">Sign in with GitHub</a>`
@@ -144,6 +138,11 @@ export function layout(input: {
 		<p>Part of the Kody family: <a href="https://kody.codes">kody.codes</a> · <a href="https://kody.video">kody.video</a> · kody.exchange</p>
 		<p class="tiny">Support: <a href="mailto:support@kody.exchange">support@kody.exchange</a></p>
 		<p class="tiny"><a href="/docs">Docs</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · <a href="${safetyPath}">${safetyNavLabel}</a> · <a href="https://github.com/kentcdodds/kody-exchange">Source</a> · Made by Kent C. Dodds</p>
+		${
+			userHasPermission(input.user, 'read:user:any')
+				? `<p class="tiny"><a href="/admin" ${ariaCurrent(input.path, '/admin')}>Admin</a></p>`
+				: ''
+		}
 	</footer>
 </body>
 </html>`

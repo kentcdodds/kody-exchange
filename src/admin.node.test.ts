@@ -207,7 +207,9 @@ test('admin nav follows read:user:any, not the GitHub login', async () => {
 			env,
 		)
 	).text()
-	expect(operatorHtml).toContain('href="/admin"')
+	expect(operatorHtml).toMatch(/<footer>[\s\S]*href="\/admin"/)
+	expect(operatorHtml).not.toMatch(/<nav>[\s\S]*href="\/admin"[\s\S]*<\/nav>/)
+	expect(operatorHtml).not.toContain('>Features</a>')
 
 	const strangerHtml = await (
 		await handleRequest(
