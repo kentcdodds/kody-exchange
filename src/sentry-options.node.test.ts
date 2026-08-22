@@ -23,22 +23,44 @@ function errorEvent(message: string, extra?: string): ErrorEvent {
 	} as ErrorEvent
 }
 
-test('skips Sentry when SENTRY_DSN is unset', () => {
-	expect(getSentryOptions(createTestEnv())).toBeUndefined()
-	expect(getSentryOptions(createTestEnv({ SENTRY_DSN: '   ' }))).toBeUndefined()
-	expect(getDurableObjectSentryOptions(createTestEnv()).dsn).toBeUndefined()
+test('disables Sentry when SENTRY_DSN is unset', () => {
+	expect(getSentryOptions(createTestEnv())).toMatchObject({
+		enabled: false,
+		dsn: '',
+	})
+	expect(getSentryOptions(createTestEnv({ SENTRY_DSN: '   ' }))).toMatchObject({
+		enabled: false,
+		dsn: '',
+	})
+	expect(getDurableObjectSentryOptions(createTestEnv())).toMatchObject({
+		enabled: false,
+		dsn: '',
+	})
 })
 
-test('skips Sentry for local wrangler (dev commit or environment)', () => {
+test('disables Sentry for local wrangler (dev, empty commit, or environment)', () => {
 	const localWithProductionDsn = createTestEnv({
 		SENTRY_DSN: 'https://public@o1.ingest.sentry.io/1',
 		APP_COMMIT_SHA: 'dev',
 		SENTRY_ENVIRONMENT: 'production',
 	})
-	expect(getSentryOptions(localWithProductionDsn)).toBeUndefined()
+	expect(getSentryOptions(localWithProductionDsn)).toMatchObject({
+		enabled: false,
+		dsn: '',
+	})
+	expect(getDurableObjectSentryOptions(localWithProductionDsn)).toMatchObject({
+		enabled: false,
+		dsn: '',
+	})
 	expect(
-		getDurableObjectSentryOptions(localWithProductionDsn).dsn,
-	).toBeUndefined()
+		getSentryOptions(
+			createTestEnv({
+				SENTRY_DSN: 'https://public@o1.ingest.sentry.io/1',
+				APP_COMMIT_SHA: '',
+				SENTRY_ENVIRONMENT: 'production',
+			}),
+		),
+	).toMatchObject({ enabled: false, dsn: '' })
 	expect(
 		getSentryOptions(
 			createTestEnv({
@@ -47,7 +69,7 @@ test('skips Sentry for local wrangler (dev commit or environment)', () => {
 				SENTRY_ENVIRONMENT: 'development',
 			}),
 		),
-	).toBeUndefined()
+	).toMatchObject({ enabled: false, dsn: '' })
 })
 
 test('builds options from the DSN, environment, and commit sha', () => {
@@ -120,6 +142,26 @@ test('drops retryable D1 platform noise and keeps real errors', () => {
 	).toBeNull()
 	const kept = errorEvent('thread create failed')
 	expect(filterSentryEvent(kept)).toBe(kept)
+})
+
+test('drops localhost request URLs so wrangler cannot email production', () => {
+	const fromRequest = errorEvent(
+		'D1_ERROR: no such table: threads: SQLITE_ERROR',
+	)
+	fromRequest.request = { url: 'http://localhost/v1/threads' }
+	expect(filterSentryEvent(fromRequest)).toBeNull()
+
+	const fromTag = errorEvent('thread create failed')
+	fromTag.tags = { url: 'http://127.0.0.1:8787/v1/threads' }
+	expect(filterSentryEvent(fromTag)).toBeNull()
+
+	const ipv6 = errorEvent('thread create failed')
+	ipv6.request = { url: 'http://[::1]:8787/health' }
+	expect(filterSentryEvent(ipv6)).toBeNull()
+
+	const production = errorEvent('thread create failed')
+	production.request = { url: 'https://kody.exchange/v1/threads' }
+	expect(filterSentryEvent(production)).toBe(production)
 })
 
 test('drops bare Durable Object platform resets only', () => {
