@@ -34,7 +34,7 @@ Repo variables: `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_ZONE_ID` (`kody.exchange` z
 
 Wrangler vars (in `wrangler.jsonc` or `--var`): `APP_BASE_URL`, `APP_COMMIT_SHA`, `SENTRY_DSN`, `SENTRY_ENVIRONMENT`, `STRIPE_PRO_PRICE_ID`, `STRIPE_PAYMENT_LINK_URL`.
 
-Sentry project is `kody-exchange` in org `kent-c-dodds-tech-llc`. The DSN is a publishable client key (also overridable by the optional `SENTRY_DSN` Actions secret). The Worker skips the SDK when `SENTRY_DSN` is unset, `APP_COMMIT_SHA` is `dev` (local wrangler), or `SENTRY_ENVIRONMENT` is `development`. `SENTRY_TRACES_SAMPLE_RATE` is an optional JSON-number var (`0`–`1`; default `1.0`).
+Sentry project is `kody-exchange` in org `kent-c-dodds-tech-llc`. The DSN is a publishable client key (also overridable by the optional `SENTRY_DSN` Actions secret). The Worker disables the SDK when `SENTRY_DSN` is unset, `APP_COMMIT_SHA` is `dev` or empty (local wrangler), or `SENTRY_ENVIRONMENT` is `development`. Returning no options is not a skip — the SDK would then use the baked DSN and tag local wrangler as production. `beforeSend` also drops localhost request URLs. `SENTRY_TRACES_SAMPLE_RATE` is an optional JSON-number var (`0`–`1`; default `1.0`).
 
 Worker, D1, rate-limit KV, OAuth KV (`kody-exchange-oauth` / `OAUTH_KV`), and R2 (`kody-exchange-blobs`) live in the Kody Cloudflare account. Public hostname is `kody.exchange` only.
 

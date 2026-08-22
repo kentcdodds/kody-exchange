@@ -1,5 +1,31 @@
 import { type CloudflareOptions, type ErrorEvent } from '@sentry/cloudflare'
 import { type AppEnv } from '#src/env.ts'
+import { isLocalHostname } from '#src/https.ts'
+
+/** @sentry/cloudflare fills `dsn` from `env.SENTRY_DSN` when options omit it. */
+const disabledSentryOptions: CloudflareOptions = {
+	enabled: false,
+	dsn: '',
+	beforeSend: () => null,
+}
+
+function sentryEventUrl(event: ErrorEvent) {
+	const requestUrl = event.request?.url
+	if (typeof requestUrl === 'string' && requestUrl.trim()) return requestUrl
+	const urlTag = event.tags?.url
+	if (typeof urlTag === 'string' && urlTag.trim()) return urlTag
+	return undefined
+}
+
+export function isLocalSentryEvent(event: ErrorEvent) {
+	const url = sentryEventUrl(event)
+	if (!url) return false
+	try {
+		return isLocalHostname(new URL(url).hostname)
+	} catch {
+		return false
+	}
+}
 
 function sentryEventMessages(event: ErrorEvent) {
 	return [
@@ -107,6 +133,7 @@ export function filterDurableObjectIsolateResetSentryEvent(event: ErrorEvent) {
 }
 
 export function filterSentryEvent(event: ErrorEvent) {
+	if (isLocalSentryEvent(event)) return null
 	if (filterRetryableD1PlatformSentryEvent(event) === null) return null
 	if (filterDurableObjectIsolateResetSentryEvent(event) === null) return null
 	return event
@@ -131,21 +158,24 @@ export function buildSentryOptions(env: AppEnv): CloudflareOptions {
 	}
 }
 
+export function isLocalSentryRuntime(env: AppEnv) {
+	const sha = env.APP_COMMIT_SHA?.trim()
+	if (!sha || sha === 'dev') return true
+	return (env.SENTRY_ENVIRONMENT?.trim() || 'development') === 'development'
+}
+
 /**
- * Skip Sentry when no DSN is configured, or when this is local wrangler
- * (`APP_COMMIT_SHA` stays `dev` in wrangler.jsonc; production deploy
- * overwrites it with the git SHA). Shared by the Worker wrapper and
- * ThreadRoom so a baked production DSN cannot report from `wrangler dev`.
+ * Shared by the Worker wrapper and ThreadRoom. Returning `undefined` is not a
+ * skip: `@sentry/cloudflare` then reads the baked `SENTRY_DSN` and reports
+ * local wrangler as production (no release). Disable the SDK instead.
  */
-export function getSentryOptions(env: AppEnv): CloudflareOptions | undefined {
+export function getSentryOptions(env: AppEnv): CloudflareOptions {
 	const options = buildSentryOptions(env)
-	if (!options.dsn) return undefined
-	if (env.APP_COMMIT_SHA === 'dev') return undefined
-	if (options.environment === 'development') return undefined
+	if (!options.dsn || isLocalSentryRuntime(env)) return disabledSentryOptions
 	return options
 }
 
 /** `instrumentDurableObjectWithSentry` requires an options object. */
 export function getDurableObjectSentryOptions(env: AppEnv): CloudflareOptions {
-	return getSentryOptions(env) ?? {}
+	return getSentryOptions(env)
 }
