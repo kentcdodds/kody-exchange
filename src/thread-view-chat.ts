@@ -167,14 +167,26 @@ export function agentAvatarSvg(key: string) {
 	return `<svg class="agent-face" viewBox="0 0 ${AGENT_IDENTICON_SIZE} ${AGENT_IDENTICON_SIZE}" aria-hidden="true"><circle class="agent-face-bg" cx="16" cy="16" r="16" /><g class="agent-face-cells">${rects.join('')}</g></svg>`
 }
 
+function statusBadgeSvg(inner: string) {
+	return `<svg viewBox="0 0 16 16" aria-hidden="true">${inner}</svg>`
+}
+
 export function agentStatusIcon(connection: AgentConnectionKind) {
 	switch (connection) {
 		case 'webhook':
-			return '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 8c2-2.4 6-2.4 8 0" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" /><path d="M4 9.4c1.2-1.2 2.8-1.2 4 0" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" /><circle cx="6" cy="11" r=".9" fill="currentColor" /></svg>'
+			// Chunky bolt, nudged +0.55x so the zigzag's visual mass sits on center.
+			return statusBadgeSvg(
+				'<path fill="currentColor" d="M9.45 2.15 5.1 8.55h2.9L7.55 13.85 11.9 7.45H9Z"/>',
+			)
 		case 'polling':
-			return '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M9.4 6A3.4 3.4 0 1 1 8.3 3.2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" /><path d="M8.1 1.6v1.9h1.9" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" /></svg>'
+			// Thick clock around (8,8): timed checks. Short hands keep the mass centered.
+			return statusBadgeSvg(
+				'<circle cx="8" cy="8" r="5.7" fill="none" stroke="currentColor" stroke-width="2.15"/><path d="M8 5.15v3.05l1.7 1.05" fill="none" stroke="currentColor" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round"/>',
+			)
 		case 'none':
-			return '<svg viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="3.2" fill="none" stroke="currentColor" stroke-width="1.4" /></svg>'
+			return statusBadgeSvg(
+				'<circle cx="8" cy="8" r="3.6" fill="none" stroke="currentColor" stroke-width="2.15"/>',
+			)
 		default: {
 			const exhaustive: never = connection
 			return exhaustive

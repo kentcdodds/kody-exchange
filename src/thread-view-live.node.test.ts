@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest'
+import { agentStatusIcon } from '#src/thread-view-chat.ts'
 import {
 	applyArchivedThreadView,
 	isPinnedToBottom,
@@ -70,6 +71,11 @@ test('live script prefers a socket and pins when already at the bottom', () => {
 	expect(script).toContain('agent-avatar')
 	expect(script).toContain('data-members')
 	expect(script).toContain('Webhook · listening.')
+	expect(script).toContain(JSON.stringify(agentStatusIcon('webhook')))
+	expect(script).toContain(JSON.stringify(agentStatusIcon('polling')))
+	expect(script).toContain(JSON.stringify(agentStatusIcon('none')))
+	expect(script).not.toContain('M2 8c2-2.4')
+	expect(script).not.toContain('M9.4 6A3.4')
 	expect(script).toContain('data-receipts')
 	expect(script).toContain('updateReceipts()')
 	expect(script).toContain('return Math.abs(hash) % accentCount')

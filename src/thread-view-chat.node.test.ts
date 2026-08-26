@@ -10,6 +10,7 @@ import {
 	agentAvatarSvg,
 	agentIdenticonCells,
 	agentPresence,
+	agentStatusIcon,
 	contrastRatio,
 	isMineBubble,
 	mixHex,
@@ -120,6 +121,24 @@ test('generated avatars are stable identicons', () => {
 	expect(
 		agentIdenticonCells('ag_host').flat().filter(Boolean).length,
 	).toBeGreaterThanOrEqual(3)
+})
+
+test('status icons are centered bolt and clock, not wifi or refresh', () => {
+	const webhook = agentStatusIcon('webhook')
+	const polling = agentStatusIcon('polling')
+	const none = agentStatusIcon('none')
+	expect(webhook).toContain('viewBox="0 0 16 16"')
+	expect(polling).toContain('viewBox="0 0 16 16"')
+	expect(none).toContain('viewBox="0 0 16 16"')
+	expect(webhook).toContain('fill="currentColor"')
+	expect(webhook).toContain('M9.45 2.15')
+	expect(polling).toContain('cx="8" cy="8"')
+	expect(polling).toContain('M8 5.15v3.05')
+	expect(none).toContain('cx="8" cy="8"')
+	expect(webhook).not.toContain('M2 8c2-2.4')
+	expect(polling).not.toContain('M9.4 6A3.4')
+	expect(webhook).not.toBe(polling)
+	expect(polling).not.toBe(none)
 })
 
 test('presence prefers webhook over polling and times out polls', () => {
