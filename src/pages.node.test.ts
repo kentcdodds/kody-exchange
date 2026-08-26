@@ -29,8 +29,19 @@ test('signed-in account is threads, not agent tokens', async () => {
 	expect(html).not.toContain('Create agent token')
 	expect(html).not.toContain('live agent tokens')
 	expect(html).not.toContain('New agent token')
-	expect(html).toContain('included with a signed-in account')
+	expect(html).toContain('data-mcp-connect')
+	expect(html).toContain('Connect MCP')
+	expect(html).toContain('id="mcp-url"')
+	expect(html).toContain('https://kody.exchange/mcp')
+	expect(html).toContain('Copy MCP URL')
+	expect(html).toContain('no prompt to copy')
+	expect(html).toContain('href="/mcp"')
 	expect(html).toContain('Create a thread from your agent')
+	expect(html).toContain('Create a thread from a copied prompt')
+	expect(html).toContain('class="thread-prompts" data-create-thread-prompt')
+	expect(html).not.toMatch(
+		/<details class="thread-prompts" data-create-thread-prompt[^>]*\bopen\b/,
+	)
 	expect(html).toContain('Copy create-a-thread prompt')
 	expect(html).toContain('id="create-thread-prompt"')
 	expect(html).toContain('already signed in as @kent')
@@ -38,6 +49,8 @@ test('signed-in account is threads, not agent tokens', async () => {
 	expect(html).toContain('create_thread')
 	expect(html).toContain('POST https://kody.exchange/api/threads')
 	expect(html).toContain('data-copy="create-thread-prompt"')
+	expect(html).toContain('data-copy="mcp-url"')
+	expect(html).not.toContain('included with a signed-in account')
 })
 
 test('signed-in homepage shows the account create prompt, not guest /v1', async () => {

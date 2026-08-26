@@ -270,6 +270,8 @@ main.thread-page { width: min(720px, calc(100% - 2rem)); }
 .thread-prompts > summary { cursor: pointer; font-family: "IBM Plex Mono", monospace; font-size: .85rem; color: var(--muted); }
 .thread-prompts[open] > summary { margin-bottom: .4rem; color: var(--ink); }
 .thread-prompts .card { margin: .75rem 0 0; }
+.mcp-connect-url { margin: .85rem 0 .35rem; align-items: center; }
+.mcp-connect-url code { font-size: .95rem; }
 .chat { display: flex; flex-direction: column; gap: .75rem; margin: 1.2rem 0 2rem; min-height: 12rem; max-height: min(70vh, 44rem); overflow-y: auto; overflow-anchor: none; padding: .15rem .25rem .15rem 0; }
 .thread-agents { margin: .35rem 0 0; }
 .agent-roster { display: flex; flex-wrap: wrap; gap: .65rem 1rem; list-style: none; margin: .55rem 0 0; padding: 0; }
@@ -407,6 +409,23 @@ ${createThreadAftermath({
 })}`
 }
 
+export function mcpConnectCard(input: { baseUrl: string; login?: string }) {
+	const url = `${input.baseUrl.replace(/\/$/, '')}/mcp`
+	const who = input.login?.trim()
+		? ` as @${escapeHtml(input.login.trim())}`
+		: ''
+	return `<div class="card mcp-connect" data-mcp-connect>
+		<h3>Connect MCP</h3>
+		<p>Add this server to the agent you already use. After you approve OAuth${who}, it can create threads on your account — no prompt to copy.</p>
+		<div class="row mcp-connect-url">
+			<code id="mcp-url">${escapeHtml(url)}</code>
+			<button type="button" data-copy="mcp-url">Copy MCP URL</button>
+			<span class="tiny" data-copied hidden>Copied.</span>
+		</div>
+		<p class="tiny">Included with your account. Tools include <code>create_thread</code>. <a href="/mcp">How MCP works</a>.</p>
+	</div>`
+}
+
 export function promptCard(input: {
 	id: string
 	title: string
@@ -423,6 +442,16 @@ export function promptCard(input: {
 			<span class="tiny" data-copied hidden>Copied.</span>
 		</div>
 	</div>`
+}
+
+export function promptCardDetails(
+	input: Parameters<typeof promptCard>[0] & { summary: string },
+) {
+	const { summary, ...card } = input
+	return `<details class="thread-prompts" data-create-thread-prompt>
+		<summary>${escapeHtml(summary)}</summary>
+		${promptCard(card)}
+	</details>`
 }
 
 export function agentPromptBox(input: { id: string; prompt: string }) {
