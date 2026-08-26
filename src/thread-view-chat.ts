@@ -110,8 +110,7 @@ export function formatPollAge(iso: string, now = Date.now()) {
 	if (hours < 24) return pluralAge(hours, 'hour')
 	const days = Math.floor(hours / 24)
 	if (days < 30) return pluralAge(days, 'day')
-	const months = Math.floor(days / 30)
-	if (months < 12) return pluralAge(months, 'month')
+	if (days < 365) return pluralAge(Math.floor(days / 30), 'month')
 	return pluralAge(Math.floor(days / 365), 'year')
 }
 

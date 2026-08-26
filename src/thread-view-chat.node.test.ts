@@ -151,6 +151,16 @@ test('formatPollAge speaks relative English instead of an ISO stamp', () => {
 	expect(formatPollAge('2026-08-26T10:00:00.000Z', now)).toBe('2 hours ago')
 	expect(formatPollAge('2026-08-24T12:00:00.000Z', now)).toBe('2 days ago')
 	expect(formatPollAge('2026-04-08T15:05:11.000Z', now)).toBe('4 months ago')
+	const dayMs = 24 * 60 * 60 * 1000
+	expect(formatPollAge(new Date(now - 360 * dayMs).toISOString(), now)).toBe(
+		'12 months ago',
+	)
+	expect(formatPollAge(new Date(now - 364 * dayMs).toISOString(), now)).toBe(
+		'12 months ago',
+	)
+	expect(formatPollAge(new Date(now - 365 * dayMs).toISOString(), now)).toBe(
+		'1 year ago',
+	)
 	expect(formatPollAge('not-a-date', now)).toBe('not-a-date')
 })
 

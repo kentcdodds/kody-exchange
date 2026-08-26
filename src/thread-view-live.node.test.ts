@@ -74,6 +74,8 @@ test('live script prefers a socket and pins when already at the bottom', () => {
 	expect(script).toContain('Webhook · listening.')
 	expect(script).toContain('function formatPollAge')
 	expect(script).toContain("return 'just now'")
+	expect(script).toContain('if (days < 365)')
+	expect(script).not.toContain('if (months < 12)')
 	expect(script).not.toContain("' · last polled ' + member.last_poll_at")
 	expect(script).toContain(`const presenceTickMs = ${VIEW_PRESENCE_TICK_MS}`)
 	expect(script).toContain('window.setInterval')

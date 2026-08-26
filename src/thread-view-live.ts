@@ -179,8 +179,7 @@ export function threadViewLiveScript() {
 			if (hours < 24) return plural(hours, 'hour')
 			const days = Math.floor(hours / 24)
 			if (days < 30) return plural(days, 'day')
-			const months = Math.floor(days / 30)
-			if (months < 12) return plural(months, 'month')
+			if (days < 365) return plural(Math.floor(days / 30), 'month')
 			return plural(Math.floor(days / 365), 'year')
 		}
 		function presenceFor(member) {
