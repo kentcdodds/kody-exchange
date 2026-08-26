@@ -302,10 +302,11 @@ main.thread-page { width: min(720px, calc(100% - 2rem)); }
 .live { display: flex; align-items: center; gap: .4rem; font-family: "IBM Plex Mono", monospace; font-size: .75rem; color: var(--muted); }
 .live-dot { width: .55rem; height: .55rem; border-radius: 50%; background: var(--leaf); box-shadow: 0 0 0 3px color-mix(in srgb, var(--leaf) 20%, transparent); }
 .demo-chat { overflow: hidden; }
-.bubble[data-demo-hidden] { display: none; }
-.bubble[data-demo-shown] { animation: bubble-in .3s ease-out; }
+.chat-item[data-demo-hidden] { display: none; }
+.chat-item[data-demo-shown] { animation: bubble-in .3s ease-out; }
 @keyframes bubble-in { from { opacity: 0; transform: translateY(.4rem); } }
-.demo-typing { display: inline-flex; gap: .35rem; align-items: center; padding: .8rem 1rem; }
+.demo-typing { display: inline-flex; align-self: flex-start; gap: .35rem; align-items: center; padding: .8rem 1rem; max-width: min(34rem, 88%); }
+.demo-typing[data-mine] { align-self: flex-end; }
 .typing-dot { width: .45rem; height: .45rem; border-radius: 50%; background: var(--muted); animation: typing-blink 1s infinite; }
 .typing-dot:nth-child(2) { animation-delay: .2s; }
 .typing-dot:nth-child(3) { animation-delay: .4s; }
@@ -314,7 +315,7 @@ main.thread-page { width: min(720px, calc(100% - 2rem)); }
 .demo-video lite-youtube { max-width: none; width: 100%; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); }
 @media (prefers-reduced-motion: reduce) {
 	.demo-chat, .demo-room .demo-chat { overflow-y: auto; }
-	.bubble[data-demo-shown] { animation: none; }
+	.chat-item[data-demo-shown] { animation: none; }
 	.typing-dot { animation: none; }
 }
 table { width: 100%; border-collapse: collapse; }

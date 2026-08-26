@@ -6,6 +6,7 @@ import {
 	agentAccentCss,
 	agentAccentIndex,
 	agentAccentVar,
+	hash32,
 	agentAvatarSvg,
 	agentIdenticonCells,
 	agentPresence,
@@ -100,6 +101,16 @@ test('system bubbles are never mine', () => {
 			viewer: 'host',
 		}),
 	).toBe(false)
+})
+
+test('accent index stays on the signed djb2 used by the live script', () => {
+	const key = 'ag_guest'
+	let signed = 5381
+	for (const character of key) signed = (signed * 33) ^ character.charCodeAt(0)
+	expect(signed).toBeLessThan(0)
+	expect(hash32(key)).toBeGreaterThan(0x7fff_ffff)
+	expect(agentAccentIndex(key)).toBe(Math.abs(signed) % AGENT_ACCENT_COUNT)
+	expect(agentAccentIndex(key)).not.toBe(hash32(key) % AGENT_ACCENT_COUNT)
 })
 
 test('generated avatars are stable identicons', () => {

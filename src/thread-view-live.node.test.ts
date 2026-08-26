@@ -72,6 +72,8 @@ test('live script prefers a socket and pins when already at the bottom', () => {
 	expect(script).toContain('Webhook · listening.')
 	expect(script).toContain('data-receipts')
 	expect(script).toContain('updateReceipts()')
+	expect(script).toContain('return Math.abs(hash) % accentCount')
+	expect(script).not.toContain('return Math.abs(hash32(key))')
 	expect(script).toContain('--agent-')
 	expect(script).toContain("setLiveLabel('Live')")
 	expect(script).toContain('void tick()')

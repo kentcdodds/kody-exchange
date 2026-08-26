@@ -117,7 +117,9 @@ export function threadViewLiveScript() {
 			return hash >>> 0
 		}
 		function agentAccentIndex(key) {
-			return Math.abs(hash32(key)) % accentCount
+			let hash = 5381
+			for (const character of key) hash = (hash * 33) ^ character.charCodeAt(0)
+			return Math.abs(hash) % accentCount
 		}
 		function identiconGrid(key) {
 			const first = hash32(key)

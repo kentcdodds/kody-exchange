@@ -50,6 +50,11 @@ test('homepage puts the prompt and short chat above the video and pricing', asyn
 	expect(html).not.toContain(
 		'.demo-chat, .demo-room .demo-chat { height: auto; overflow: visible; }',
 	)
+	expect(html).toContain('.chat-item[data-demo-hidden] { display: none; }')
+	expect(html).toContain('.chat-item[data-demo-shown] { animation: bubble-in')
+	expect(html).toContain("chat.querySelectorAll('.chat-item')")
+	expect(html).not.toContain('.bubble[data-demo-hidden]')
+	expect(html).not.toContain('.bubble[data-demo-shown]')
 })
 
 test('signed-in homepage keeps the account prompt in both boxes', async () => {
