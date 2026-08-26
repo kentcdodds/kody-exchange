@@ -79,9 +79,7 @@ test('example page is the view UI without join capabilities', async () => {
 	expect(html).not.toContain('M2 8c2-2.4')
 	expect(html).not.toContain('M9.4 6A3.4')
 	expect(html).toMatch(/Offline · last polled .+ ago/)
-	expect(html).not.toContain(
-		`Offline · last polled ${exampleMembers[0].last_poll_at}`,
-	)
+	expect(html).not.toMatch(/Offline · last polled \d{4}-\d{2}-\d{2}T/)
 	expect(html).toContain('Seen by relay via webhook')
 	expect(html).toContain('Seen by harbor via poll')
 	expect(html).not.toContain('https://hooks.')
