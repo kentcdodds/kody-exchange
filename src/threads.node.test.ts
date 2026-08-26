@@ -312,6 +312,58 @@ test('polling a thread records last_poll_at', async () => {
 	expect(JSON.stringify(viewed.members[0])).not.toContain('webhook_url')
 })
 
+test('a later poll of an older page does not rewind last_seen', async () => {
+	const env = createTestEnv()
+	const now = Date.parse('2026-08-26T12:00:00.000Z')
+	const created = await createThread({
+		db: env.DB,
+		baseUrl: 'https://kody.exchange',
+		ownerUserId: null,
+		name: 'cursor',
+		now,
+	})
+	if (!created.ok) throw new Error(created.error)
+	const first = await sendMessage({
+		db: env.DB,
+		threadId: created.thread.id,
+		agent: created.agent,
+		body: { text: 'one' },
+		now: now + 1_000,
+	})
+	if (!first.ok) throw new Error(first.error)
+	const second = await sendMessage({
+		db: env.DB,
+		threadId: created.thread.id,
+		agent: created.agent,
+		body: { text: 'two' },
+		now: now + 2_000,
+	})
+	if (!second.ok) throw new Error(second.error)
+	const caughtUp = await listMessages({
+		db: env.DB,
+		threadId: created.thread.id,
+		agent: created.agent,
+		after: '0',
+		now: now + 3_000,
+	})
+	if (!caughtUp.ok) throw new Error(caughtUp.error)
+	expect(caughtUp.messages.at(-1)?.id).toBe(second.message.id)
+	const olderPage = await listMessages({
+		db: env.DB,
+		threadId: created.thread.id,
+		agent: created.agent,
+		after: '0',
+		limit: 1,
+		now: now + 4_000,
+	})
+	if (!olderPage.ok) throw new Error(olderPage.error)
+	expect(olderPage.messages).toHaveLength(1)
+	expect(olderPage.messages[0]?.id).not.toBe(second.message.id)
+	const members = await listThreadMembers(env.DB, created.thread.id)
+	expect(members[0]?.last_seen_message_id).toBe(second.message.id)
+	expect(members[0]?.last_seen_via).toBe('poll')
+})
+
 test('join still returns a token when the join notice cannot be posted', async () => {
 	const env = createTestEnv()
 	const now = Date.parse('2026-08-14T00:00:00Z')
@@ -621,6 +673,73 @@ test('a successful peer webhook records a read receipt', async () => {
 		last_seen_via: 'send',
 		last_seen_message_id: sent.message.id,
 	})
+})
+
+test('one webhook URL shared by two members receipts both', async () => {
+	const env = createTestEnv()
+	const now = Date.parse('2026-08-26T13:00:00.000Z')
+	const created = await createThread({
+		db: env.DB,
+		baseUrl: 'https://kody.exchange',
+		ownerUserId: null,
+		name: 'cursor',
+		webhookUrl: 'https://example.test/shared',
+		now,
+	})
+	if (!created.ok) throw new Error(created.error)
+	const joined = await joinThread({
+		db: env.DB,
+		joinToken: created.joinToken,
+		name: 'claude',
+		now: now + 1_000,
+	})
+	if (!joined.ok) throw new Error(joined.error)
+	const webhook = await setWebhook({
+		db: env.DB,
+		threadId: created.thread.id,
+		agent: joined.agent,
+		url: 'https://example.test/shared',
+	})
+	if (!webhook.ok) throw new Error(webhook.error)
+	const sent = await sendMessage({
+		db: env.DB,
+		threadId: created.thread.id,
+		agent: created.agent,
+		body: { text: 'hello both' },
+		now: now + 2_000,
+	})
+	if (!sent.ok) throw new Error(sent.error)
+	const webhookCalls: Array<string> = []
+	const originalFetch = globalThis.fetch
+	globalThis.fetch = (async (input: RequestInfo | URL) => {
+		webhookCalls.push(String(input))
+		return new Response('ok')
+	}) as typeof fetch
+	try {
+		await maybeDispatchWebhook(env.DB, created.thread.id, sent.message)
+	} finally {
+		globalThis.fetch = originalFetch
+	}
+	expect(webhookCalls).toEqual(['https://example.test/shared'])
+	const members = await listThreadMembers(env.DB, created.thread.id)
+	expect(
+		members.map((member) => ({
+			id: member.id,
+			via: member.last_seen_via,
+			seen: member.last_seen_message_id,
+		})),
+	).toEqual([
+		{
+			id: created.agent.id,
+			via: 'webhook',
+			seen: sent.message.id,
+		},
+		{
+			id: joined.agent.id,
+			via: 'webhook',
+			seen: sent.message.id,
+		},
+	])
 })
 
 test('a failed webhook does not count as a read receipt', async () => {

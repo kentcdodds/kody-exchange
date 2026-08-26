@@ -485,18 +485,6 @@ async function touchLastPoll(
 	)
 }
 
-function isNewerSeenMessage(
-	next: { id: string; createdAt: number },
-	current: { last_seen_message_id: string | null; last_seen_at: number | null },
-) {
-	if (current.last_seen_at == null || current.last_seen_message_id == null) {
-		return true
-	}
-	if (next.createdAt > current.last_seen_at) return true
-	if (next.createdAt < current.last_seen_at) return false
-	return next.id > current.last_seen_message_id
-}
-
 async function advanceLastSeen(
 	db: D1Database,
 	threadId: string,
@@ -504,40 +492,24 @@ async function advanceLastSeen(
 	message: { id: string; createdAt: number },
 	via: LastSeenVia,
 ) {
-	const current = await first<{
-		last_seen_message_id: string | null
-		last_seen_at: number | null
-	}>(
-		db,
-		`SELECT last_seen_message_id, last_seen_at
-		 FROM thread_members
-		 WHERE thread_id = ? AND agent_id = ?`,
-		threadId,
-		agentId,
-	)
-	if (current && !isNewerSeenMessage(message, current)) {
-		if (current.last_seen_message_id === message.id) {
-			await run(
-				db,
-				`UPDATE thread_members SET last_seen_via = ?
-				 WHERE thread_id = ? AND agent_id = ?`,
-				via,
-				threadId,
-				agentId,
-			)
-		}
-		return
-	}
 	await run(
 		db,
 		`UPDATE thread_members
 		 SET last_seen_message_id = ?, last_seen_at = ?, last_seen_via = ?
-		 WHERE thread_id = ? AND agent_id = ?`,
+		 WHERE thread_id = ? AND agent_id = ?
+		   AND (
+			 last_seen_at IS NULL
+			 OR last_seen_at < ?
+			 OR (last_seen_at = ? AND last_seen_message_id <= ?)
+		   )`,
 		message.id,
 		message.createdAt,
 		via,
 		threadId,
 		agentId,
+		message.createdAt,
+		message.createdAt,
+		message.id,
 	)
 }
 
@@ -1444,27 +1416,32 @@ export async function maybeDispatchWebhook(
 		'SELECT agent_id, webhook_url FROM thread_members WHERE thread_id = ? AND webhook_url IS NOT NULL',
 		threadId,
 	)
-	const targets = new Map<string, string | null>()
+	const targets = new Map<string, Array<string>>()
 	for (const member of members) {
-		if (member.webhook_url) targets.set(member.webhook_url, member.agent_id)
+		if (!member.webhook_url) continue
+		const agentIds = targets.get(member.webhook_url) ?? []
+		agentIds.push(member.agent_id)
+		targets.set(member.webhook_url, agentIds)
 	}
 	if (thread.webhook_url && !targets.has(thread.webhook_url)) {
-		targets.set(thread.webhook_url, null)
+		targets.set(thread.webhook_url, [])
 	}
 	if (targets.size === 0) return
 	const createdAt = Date.parse(message.at)
 	const pending = (async () => {
 		await Promise.all(
-			[...targets].map(async ([url, agentId]) => {
+			[...targets].map(async ([url, agentIds]) => {
 				const ok = await dispatchWebhook(url, message)
-				if (!ok || !agentId || !Number.isFinite(createdAt)) return
-				await advanceLastSeen(
-					db,
-					threadId,
-					agentId,
-					{ id: message.id, createdAt },
-					'webhook',
-				)
+				if (!ok || !Number.isFinite(createdAt)) return
+				for (const agentId of agentIds) {
+					await advanceLastSeen(
+						db,
+						threadId,
+						agentId,
+						{ id: message.id, createdAt },
+						'webhook',
+					)
+				}
 			}),
 		)
 		await onDelivered?.()
