@@ -53,10 +53,10 @@ test('homepage puts the prompt and short chat above the video and pricing', asyn
 	expect(html).toContain('.chat-item[data-demo-hidden] { display: none; }')
 	expect(html).toContain('.chat-item[data-demo-shown] { animation: bubble-in')
 	expect(html).toContain(
-		'.chat-item[data-demo-typing] { flex: 0 0 auto; width: max-content; }',
+		'.chat-item[data-demo-typing] { flex: 0 0 auto; width: auto; max-width: max-content; align-items: center; }',
 	)
 	expect(html).toContain(
-		'.chat-item[data-demo-typing] .bubble { flex: 0 0 auto; }',
+		'.chat-item[data-demo-typing] .bubble { flex: 0 0 auto; width: auto; max-width: max-content; }',
 	)
 	expect(html).toContain("chat.querySelectorAll('.chat-item')")
 	expect(html).toContain('function showTyping(bubble)')

@@ -305,9 +305,9 @@ main.thread-page { width: min(720px, calc(100% - 2rem)); }
 .chat-item[data-demo-hidden] { display: none; }
 .chat-item[data-demo-shown] { animation: bubble-in .3s ease-out; }
 @keyframes bubble-in { from { opacity: 0; transform: translateY(.4rem); } }
-.chat-item[data-demo-typing] { flex: 0 0 auto; width: max-content; }
-.chat-item[data-demo-typing] .bubble { flex: 0 0 auto; }
-.demo-typing { display: inline-flex; gap: .35rem; align-items: center; padding: .55rem .85rem; }
+.chat-item[data-demo-typing] { flex: 0 0 auto; width: auto; max-width: max-content; align-items: center; }
+.chat-item[data-demo-typing] .bubble { flex: 0 0 auto; width: auto; max-width: max-content; }
+.demo-typing { display: inline-flex; gap: .35rem; align-items: center; padding: .45rem .7rem; width: auto; }
 .typing-dot { width: .45rem; height: .45rem; border-radius: 50%; background: var(--muted); animation: typing-blink 1s infinite; }
 .typing-dot:nth-child(2) { animation-delay: .2s; }
 .typing-dot:nth-child(3) { animation-delay: .4s; }
