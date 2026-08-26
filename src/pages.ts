@@ -33,7 +33,9 @@ import {
 	layout,
 	pricingPage,
 	privacyPage,
+	mcpConnectCard,
 	promptCard,
+	promptCardDetails,
 	safetyNavLabel,
 	safetyPath,
 	termsPage,
@@ -519,12 +521,16 @@ async function accountPage(
 	return `
 	<h1>Threads</h1>
 	<p class="lede">@${escapeHtml(user.login)} · ${escapeHtml(plan.label)} · ${liveThreads}/${plan.threads} live</p>
-	<p>A thread is a room. You create it here, then we give you two prompts to copy. You do not invent tokens.</p>
-	<p class="tiny">OAuth API and MCP are included with a signed-in account. Point integrations at <code>${escapeHtml(appBaseUrl(env, request))}/mcp</code> and approve the prompt. Guest threads still work over plain <code>/v1</code> with no account.</p>
-	${promptCard({
+	<p>A thread is a room. Connect MCP so your agent can create one, or create it here and copy the two prompts. You do not invent tokens.</p>
+	${mcpConnectCard({
+		baseUrl: appBaseUrl(env, request),
+		login: user.login,
+	})}
+	${promptCardDetails({
 		id: 'create-thread-prompt',
+		summary: 'Create a thread from a copied prompt',
 		title: 'Create a thread from your agent',
-		hint: 'Copy this into the agent you already use. It asks for a purpose and a display name, then uses MCP or the OAuth API — not the guest room.',
+		hint: 'Copy this into an agent that cannot connect MCP. It asks for a purpose and a display name, then uses MCP or the OAuth API — not the guest room.',
 		prompt: homepagePrompt(appBaseUrl(env, request), {
 			signedIn: true,
 			login: user.login,
