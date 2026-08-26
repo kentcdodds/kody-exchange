@@ -11,6 +11,7 @@ import {
 	agentIdenticonCells,
 	agentPresence,
 	agentStatusIcon,
+	formatPollAge,
 	contrastRatio,
 	isMineBubble,
 	mixHex,
@@ -141,6 +142,28 @@ test('status icons are centered bolt and clock, not wifi or refresh', () => {
 	expect(polling).not.toBe(none)
 })
 
+test('formatPollAge speaks relative English instead of an ISO stamp', () => {
+	const now = Date.parse('2026-08-26T12:00:00.000Z')
+	expect(formatPollAge('2026-08-26T11:59:55.000Z', now)).toBe('just now')
+	expect(formatPollAge('2026-08-26T11:59:40.000Z', now)).toBe('20 seconds ago')
+	expect(formatPollAge('2026-08-26T11:59:00.000Z', now)).toBe('1 minute ago')
+	expect(formatPollAge('2026-08-26T11:57:00.000Z', now)).toBe('3 minutes ago')
+	expect(formatPollAge('2026-08-26T10:00:00.000Z', now)).toBe('2 hours ago')
+	expect(formatPollAge('2026-08-24T12:00:00.000Z', now)).toBe('2 days ago')
+	expect(formatPollAge('2026-04-08T15:05:11.000Z', now)).toBe('4 months ago')
+	const dayMs = 24 * 60 * 60 * 1000
+	expect(formatPollAge(new Date(now - 360 * dayMs).toISOString(), now)).toBe(
+		'12 months ago',
+	)
+	expect(formatPollAge(new Date(now - 364 * dayMs).toISOString(), now)).toBe(
+		'12 months ago',
+	)
+	expect(formatPollAge(new Date(now - 365 * dayMs).toISOString(), now)).toBe(
+		'1 year ago',
+	)
+	expect(formatPollAge('not-a-date', now)).toBe('not-a-date')
+})
+
 test('presence prefers webhook over polling and times out polls', () => {
 	const now = Date.parse('2026-08-26T12:00:00.000Z')
 	expect(agentPresence({ webhook: true, last_poll_at: null }, now)).toEqual({
@@ -153,19 +176,27 @@ test('presence prefers webhook over polling and times out polls', () => {
 			{ webhook: true, last_poll_at: '2026-08-26T11:59:50.000Z' },
 			now,
 		).label,
-	).toContain('Last polled 2026-08-26T11:59:50.000Z')
+	).toBe('Webhook · listening. Last polled 10 seconds ago.')
 	expect(
 		agentPresence(
 			{ webhook: false, last_poll_at: '2026-08-26T11:59:50.000Z' },
 			now,
 		),
-	).toMatchObject({ online: true, connection: 'polling' })
+	).toEqual({
+		online: true,
+		connection: 'polling',
+		label: 'Polling · last polled 10 seconds ago.',
+	})
 	expect(
 		agentPresence(
 			{ webhook: false, last_poll_at: '2026-08-26T11:58:00.000Z' },
 			now,
 		),
-	).toMatchObject({ online: false, connection: 'polling' })
+	).toEqual({
+		online: false,
+		connection: 'polling',
+		label: 'Offline · last polled 2 minutes ago.',
+	})
 	expect(agentPresence({ webhook: false, last_poll_at: null }, now)).toEqual({
 		online: false,
 		connection: 'none',
