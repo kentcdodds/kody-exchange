@@ -305,8 +305,9 @@ main.thread-page { width: min(720px, calc(100% - 2rem)); }
 .chat-item[data-demo-hidden] { display: none; }
 .chat-item[data-demo-shown] { animation: bubble-in .3s ease-out; }
 @keyframes bubble-in { from { opacity: 0; transform: translateY(.4rem); } }
-.demo-typing { display: inline-flex; align-self: flex-start; gap: .35rem; align-items: center; padding: .8rem 1rem; max-width: min(34rem, 88%); }
-.demo-typing[data-mine] { align-self: flex-end; }
+.chat-item[data-demo-typing] { flex: 0 0 auto; width: max-content; }
+.chat-item[data-demo-typing] .bubble { flex: 0 0 auto; }
+.demo-typing { display: inline-flex; gap: .35rem; align-items: center; padding: .55rem .85rem; }
 .typing-dot { width: .45rem; height: .45rem; border-radius: 50%; background: var(--muted); animation: typing-blink 1s infinite; }
 .typing-dot:nth-child(2) { animation-delay: .2s; }
 .typing-dot:nth-child(3) { animation-delay: .4s; }
@@ -830,10 +831,30 @@ export function demoReplayScript() {
 		if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
 		const bubbles = Array.from(chat.querySelectorAll('.chat-item'))
 		if (bubbles.length === 0) return
-		const typing = document.createElement('div')
-		typing.className = 'bubble demo-typing'
-		typing.setAttribute('aria-hidden', 'true')
-		typing.innerHTML = '<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>'
+		let typing = null
+		function hideTyping() {
+			typing?.remove()
+			typing = null
+		}
+		function showTyping(bubble) {
+			hideTyping()
+			const item = document.createElement('article')
+			item.className = 'chat-item'
+			item.setAttribute('aria-hidden', 'true')
+			item.dataset.demoTyping = ''
+			if (bubble.hasAttribute('data-mine')) item.dataset.mine = ''
+			const accent = bubble.getAttribute('data-accent')
+			if (accent) item.dataset.accent = accent
+			item.style.setProperty('--agent', getComputedStyle(bubble).getPropertyValue('--agent'))
+			const avatar = bubble.querySelector('.agent-avatar')
+			if (avatar) item.append(avatar.cloneNode(true))
+			const dots = document.createElement('div')
+			dots.className = 'bubble demo-typing'
+			dots.innerHTML = '<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>'
+			item.append(dots)
+			typing = item
+			chat.appendChild(item)
+		}
 		const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 		const settle = () => { chat.scrollTop = chat.scrollHeight }
 		async function play() {
@@ -843,13 +864,11 @@ export function demoReplayScript() {
 					bubble.removeAttribute('data-demo-shown')
 				}
 				for (const bubble of bubbles) {
-					typing.toggleAttribute('data-mine', bubble.hasAttribute('data-mine'))
-					typing.style.setProperty('--agent', getComputedStyle(bubble).getPropertyValue('--agent'))
-					chat.appendChild(typing)
+					showTyping(bubble)
 					settle()
 					const length = (bubble.textContent ?? '').length
 					await wait(Math.min(2200, 500 + length * 4))
-					typing.remove()
+					hideTyping()
 					bubble.removeAttribute('data-demo-hidden')
 					bubble.setAttribute('data-demo-shown', '')
 					settle()
