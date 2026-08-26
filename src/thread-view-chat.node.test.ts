@@ -6,9 +6,15 @@ import {
 	agentAccentCss,
 	agentAccentIndex,
 	agentAccentVar,
+	hash32,
+	agentAvatarSvg,
+	agentIdenticonCells,
+	agentPresence,
 	contrastRatio,
 	isMineBubble,
 	mixHex,
+	receiptLabel,
+	receiptMembers,
 } from '#src/thread-view-chat.ts'
 
 const lightCard = '#fffaf1'
@@ -95,4 +101,90 @@ test('system bubbles are never mine', () => {
 			viewer: 'host',
 		}),
 	).toBe(false)
+})
+
+test('accent index stays on the signed djb2 used by the live script', () => {
+	const key = 'ag_guest'
+	let signed = 5381
+	for (const character of key) signed = (signed * 33) ^ character.charCodeAt(0)
+	expect(signed).toBeLessThan(0)
+	expect(hash32(key)).toBeGreaterThan(0x7fff_ffff)
+	expect(agentAccentIndex(key)).toBe(Math.abs(signed) % AGENT_ACCENT_COUNT)
+	expect(agentAccentIndex(key)).not.toBe(hash32(key) % AGENT_ACCENT_COUNT)
+})
+
+test('generated avatars are stable identicons', () => {
+	expect(agentAvatarSvg('ag_host')).toBe(agentAvatarSvg('ag_host'))
+	expect(agentAvatarSvg('ag_host')).not.toBe(agentAvatarSvg('ag_guest'))
+	expect(agentAvatarSvg('ag_host')).toContain('class="agent-face"')
+	expect(
+		agentIdenticonCells('ag_host').flat().filter(Boolean).length,
+	).toBeGreaterThanOrEqual(3)
+})
+
+test('presence prefers webhook over polling and times out polls', () => {
+	const now = Date.parse('2026-08-26T12:00:00.000Z')
+	expect(agentPresence({ webhook: true, last_poll_at: null }, now)).toEqual({
+		online: true,
+		connection: 'webhook',
+		label: 'Webhook · listening.',
+	})
+	expect(
+		agentPresence(
+			{ webhook: true, last_poll_at: '2026-08-26T11:59:50.000Z' },
+			now,
+		).label,
+	).toContain('Last polled 2026-08-26T11:59:50.000Z')
+	expect(
+		agentPresence(
+			{ webhook: false, last_poll_at: '2026-08-26T11:59:50.000Z' },
+			now,
+		),
+	).toMatchObject({ online: true, connection: 'polling' })
+	expect(
+		agentPresence(
+			{ webhook: false, last_poll_at: '2026-08-26T11:58:00.000Z' },
+			now,
+		),
+	).toMatchObject({ online: false, connection: 'polling' })
+	expect(agentPresence({ webhook: false, last_poll_at: null }, now)).toEqual({
+		online: false,
+		connection: 'none',
+		label: 'Has not connected yet.',
+	})
+})
+
+test('read receipts skip the sender and unread peers', () => {
+	const message = {
+		id: 'msg_2',
+		at: '2026-08-26T12:00:10.000Z',
+		kind: 'message',
+		from: { agent_id: 'ag_host' },
+	}
+	const host = {
+		id: 'ag_host',
+		name: 'harbor',
+		last_seen_message_id: 'msg_2',
+		last_seen_at: '2026-08-26T12:00:10.000Z',
+		last_seen_via: 'send' as const,
+	}
+	const guest = {
+		id: 'ag_guest',
+		name: 'relay',
+		last_seen_message_id: 'msg_2',
+		last_seen_at: '2026-08-26T12:00:10.000Z',
+		last_seen_via: 'webhook' as const,
+	}
+	const unread = {
+		id: 'ag_late',
+		name: 'late',
+		last_seen_message_id: 'msg_1',
+		last_seen_at: '2026-08-26T12:00:00.000Z',
+		last_seen_via: 'poll' as const,
+	}
+	expect(receiptMembers(message, [host, guest, unread])).toEqual([guest])
+	expect(receiptLabel(guest)).toBe('Seen by relay via webhook')
+	expect(receiptMembers({ ...message, kind: 'system' }, [host, guest])).toEqual(
+		[],
+	)
 })

@@ -1,4 +1,10 @@
-import { AGENT_ACCENT_COUNT } from '#src/thread-view-chat.ts'
+import {
+	AGENT_ACCENT_COUNT,
+	AGENT_IDENTICON_CELLS,
+	AGENT_IDENTICON_SIZE,
+	AGENT_IDENTICON_UNIQUE_COLS,
+	AGENT_ONLINE_POLL_MS,
+} from '#src/thread-view-chat.ts'
 
 export const VIEW_POLL_NEAR_BOTTOM_PX = 48
 export const VIEW_POLL_DEFAULT_SECONDS = 5
@@ -78,9 +84,16 @@ export function threadViewLiveScript() {
 		const viewer = chat?.getAttribute('data-viewer') === 'host' ? 'host' : 'guest'
 		const empty = () => chat?.querySelector('[data-empty]')
 		const liveLabel = document.querySelector('[data-live-label]')
+		const agents = document.querySelector('[data-agents]')
 		const roster = document.querySelector('[data-roster]')
+		const rosterList = document.querySelector('[data-roster-list]')
 		const nearBottomPx = ${VIEW_POLL_NEAR_BOTTOM_PX}
 		const accentCount = ${AGENT_ACCENT_COUNT}
+		const identiconSize = ${AGENT_IDENTICON_SIZE}
+		const identiconCells = ${AGENT_IDENTICON_CELLS}
+		const identiconUniqueCols = ${AGENT_IDENTICON_UNIQUE_COLS}
+		const onlinePollMs = ${AGENT_ONLINE_POLL_MS}
+		let members = parseMembers(agents?.getAttribute('data-members'))
 		let socketOpen = false
 		let stopped = false
 		let liveSocket = null
@@ -89,10 +102,128 @@ export function threadViewLiveScript() {
 		function setLiveLabel(text) {
 			if (liveLabel) liveLabel.textContent = text
 		}
+		function parseMembers(raw) {
+			if (!raw) return []
+			try {
+				const parsed = JSON.parse(raw)
+				return Array.isArray(parsed) ? parsed : []
+			} catch {
+				return []
+			}
+		}
+		function hash32(key) {
+			let hash = 5381
+			for (const character of key) hash = (hash * 33) ^ character.charCodeAt(0)
+			return hash >>> 0
+		}
 		function agentAccentIndex(key) {
 			let hash = 5381
 			for (const character of key) hash = (hash * 33) ^ character.charCodeAt(0)
 			return Math.abs(hash) % accentCount
+		}
+		function identiconGrid(key) {
+			const first = hash32(key)
+			const second = hash32(key + '#')
+			const rows = []
+			for (let row = 0; row < identiconCells; row += 1) {
+				const cols = []
+				for (let col = 0; col < identiconUniqueCols; col += 1) {
+					const bit = row * identiconUniqueCols + col
+					const source = bit < 16 ? first : second
+					const shift = bit < 16 ? bit : bit - 16
+					cols.push(((source >>> shift) & 1) === 1)
+				}
+				rows.push(cols)
+			}
+			const filled = rows.flat().filter(Boolean).length
+			if (filled < 3) {
+				if (rows[2]) rows[2][1] = true
+				if (rows[1]) rows[1][0] = true
+				if (rows[3]) rows[3][0] = true
+			}
+			return rows
+		}
+		function avatarSvg(key) {
+			const cells = identiconGrid(key)
+			const cell = 4
+			const pad = 6
+			const rects = []
+			for (let row = 0; row < identiconCells; row += 1) {
+				for (let col = 0; col < identiconCells; col += 1) {
+					const sourceCol = col < identiconUniqueCols ? col : 4 - col
+					if (!cells[row]?.[sourceCol]) continue
+					rects.push('<rect x="' + (pad + col * cell) + '" y="' + (pad + row * cell) + '" width="' + cell + '" height="' + cell + '" />')
+				}
+			}
+			return '<svg class="agent-face" viewBox="0 0 ' + identiconSize + ' ' + identiconSize + '" aria-hidden="true"><circle class="agent-face-bg" cx="16" cy="16" r="16" /><g class="agent-face-cells">' + rects.join('') + '</g></svg>'
+		}
+		function statusIcon(connection) {
+			if (connection === 'webhook') {
+				return '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 8c2-2.4 6-2.4 8 0" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" /><path d="M4 9.4c1.2-1.2 2.8-1.2 4 0" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" /><circle cx="6" cy="11" r=".9" fill="currentColor" /></svg>'
+			}
+			if (connection === 'polling') {
+				return '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M9.4 6A3.4 3.4 0 1 1 8.3 3.2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" /><path d="M8.1 1.6v1.9h1.9" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" /></svg>'
+			}
+			return '<svg viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="3.2" fill="none" stroke="currentColor" stroke-width="1.4" /></svg>'
+		}
+		function presenceFor(member) {
+			if (member?.webhook) {
+				const poll = member.last_poll_at ? ' Last polled ' + member.last_poll_at + '.' : ''
+				return { online: true, connection: 'webhook', label: 'Webhook · listening.' + poll }
+			}
+			if (member?.last_poll_at) {
+				const last = Date.parse(member.last_poll_at)
+				const online = Number.isFinite(last) && Date.now() - last <= onlinePollMs
+				return {
+					online,
+					connection: 'polling',
+					label: (online ? 'Polling' : 'Offline') + ' · last polled ' + member.last_poll_at + '.',
+				}
+			}
+			return { online: false, connection: 'none', label: 'Has not connected yet.' }
+		}
+		function receiptLabel(member) {
+			if (member.last_seen_via === 'webhook') return 'Seen by ' + member.name + ' via webhook'
+			if (member.last_seen_via === 'poll') return 'Seen by ' + member.name + ' via poll'
+			return 'Seen by ' + member.name
+		}
+		function messageIsSeenBy(message, member) {
+			if (!member.last_seen_at || !member.last_seen_message_id) return false
+			if (message.at < member.last_seen_at) return true
+			if (message.at > member.last_seen_at) return false
+			return message.id <= member.last_seen_message_id
+		}
+		function receiptsFor(message) {
+			if (message.kind !== 'message') return []
+			return members.filter((member) => member.id !== message.from?.agent_id && messageIsSeenBy(message, member))
+		}
+		function avatarNode(memberOrId, name, presence, size, label) {
+			const id = typeof memberOrId === 'string' ? memberOrId : memberOrId?.id ?? ''
+			const displayName = name ?? memberOrId?.name ?? 'agent'
+			const key = id || displayName
+			const accentIndex = agentAccentIndex(key)
+			const wrap = document.createElement('span')
+			wrap.className = 'agent-avatar'
+			wrap.dataset.size = size ?? 'md'
+			wrap.dataset.agent = id
+			wrap.dataset.accent = String(accentIndex)
+			wrap.style.setProperty('--agent', 'var(--agent-' + accentIndex + ')')
+			if (label) {
+				wrap.title = label
+				wrap.setAttribute('aria-label', label)
+			}
+			wrap.innerHTML = avatarSvg(key)
+			if (presence) {
+				const status = document.createElement('span')
+				status.className = 'agent-status'
+				status.dataset.connection = presence.connection
+				if (presence.online) status.dataset.online = ''
+				status.title = presence.label
+				status.setAttribute('aria-label', presence.label)
+				status.innerHTML = statusIcon(presence.connection)
+				wrap.append(status)
+			}
+			return wrap
 		}
 		function isMineBubble(kind, agentId) {
 			if (kind === 'system' || !hostAgentId) return false
@@ -113,28 +244,36 @@ export function threadViewLiveScript() {
 			if (Number.isFinite(fromHeader) && fromHeader > 0) return Math.ceil(fromHeader) * 1000
 			return ${VIEW_POLL_DEFAULT_SECONDS} * 1000
 		}
+		function fillReceipts(node, message) {
+			node.replaceChildren()
+			for (const member of receiptsFor(message)) {
+				node.append(avatarNode(member, member.name, null, 'sm', receiptLabel(member)))
+			}
+		}
 		function bubble(message) {
 			const article = document.createElement('article')
-			article.className = 'bubble'
+			article.className = 'chat-item'
 			article.dataset.id = message.id
 			article.dataset.kind = message.kind
 			const agentId = message.from?.agent_id ?? ''
 			article.dataset.agent = agentId
+			article.dataset.at = message.at ?? ''
 			const accentIndex = agentAccentIndex(agentId || message.from?.name || 'agent')
 			article.dataset.accent = String(accentIndex)
 			article.style.setProperty('--agent', 'var(--agent-' + accentIndex + ')')
 			if (isMineBubble(message.kind, agentId)) article.dataset.mine = ''
+			const sender = members.find((member) => member.id === agentId)
+			article.append(avatarNode(agentId, message.from?.name ?? 'agent', sender ? presenceFor(sender) : null))
+			const card = document.createElement('div')
+			card.className = 'bubble'
 			const meta = document.createElement('div')
 			meta.className = 'bubble-meta'
 			const who = document.createElement('span')
 			who.className = 'bubble-who'
-			const swatch = document.createElement('span')
-			swatch.className = 'bubble-swatch'
-			swatch.setAttribute('aria-hidden', 'true')
 			const name = document.createElement('span')
 			name.className = 'bubble-name'
 			name.textContent = message.from?.name ?? 'agent'
-			who.append(swatch, name)
+			who.append(name)
 			const time = document.createElement('time')
 			time.dateTime = message.at
 			time.textContent = message.at
@@ -144,13 +283,19 @@ export function threadViewLiveScript() {
 			body.textContent = message.body && typeof message.body.text === 'string'
 				? message.body.text
 				: JSON.stringify(message.body, null, 2)
-			article.append(meta, body)
+			card.append(meta, body)
 			if (Array.isArray(message.refs) && message.refs.length) {
 				const refs = document.createElement('p')
 				refs.className = 'bubble-refs'
 				refs.textContent = message.refs.map((ref) => ref.type + ':' + ref.id).join(' · ')
-				article.append(refs)
+				card.append(refs)
 			}
+			const receipts = document.createElement('p')
+			receipts.className = 'bubble-receipts'
+			receipts.dataset.receipts = ''
+			fillReceipts(receipts, message)
+			card.append(receipts)
+			article.append(card)
 			return article
 		}
 		function rosterLine(members, seats, expiresAt) {
@@ -160,13 +305,70 @@ export function threadViewLiveScript() {
 			const retention = expiresAt === null ? 'infinite retention' : 'expires ' + new Date(expiresAt).toISOString()
 			return list.length + ' of ' + seats + ' · ' + names + waiting + ' · ' + retention
 		}
-		function updateRoster(members) {
-			if (!(roster instanceof HTMLElement)) return
-			const seats = Number(roster.getAttribute('data-seats'))
-			const expiresRaw = roster.getAttribute('data-expires')
-			const expiresAt = expiresRaw === 'infinite' ? null : Number(expiresRaw)
-			if (!Number.isFinite(seats) || (expiresAt !== null && !Number.isFinite(expiresAt))) return
-			roster.textContent = rosterLine(members, seats, expiresAt)
+		function updateAvatars() {
+			for (const node of document.querySelectorAll('.agent-avatar[data-agent]')) {
+				if (!(node instanceof HTMLElement)) continue
+				if (node.dataset.size === 'sm') continue
+				const member = members.find((item) => item.id === node.dataset.agent)
+				if (!member) continue
+				const presence = presenceFor(member)
+				let status = node.querySelector('.agent-status')
+				if (!(status instanceof HTMLElement)) {
+					status = document.createElement('span')
+					status.className = 'agent-status'
+					node.append(status)
+				}
+				status.dataset.connection = presence.connection
+				if (presence.online) status.dataset.online = ''
+				else status.removeAttribute('data-online')
+				status.title = presence.label
+				status.setAttribute('aria-label', presence.label)
+				status.innerHTML = statusIcon(presence.connection)
+			}
+		}
+		function updateReceipts() {
+			if (!chat) return
+			for (const item of chat.querySelectorAll('[data-id]')) {
+				if (!(item instanceof HTMLElement)) continue
+				const receipts = item.querySelector('[data-receipts]')
+				if (!(receipts instanceof HTMLElement)) continue
+				fillReceipts(receipts, {
+					id: item.dataset.id,
+					at: item.dataset.at,
+					kind: item.dataset.kind,
+					from: { agent_id: item.dataset.agent },
+				})
+			}
+		}
+		function updateRoster(nextMembers) {
+			members = Array.isArray(nextMembers) ? nextMembers : []
+			if (agents instanceof HTMLElement) {
+				agents.setAttribute('data-members', JSON.stringify(members))
+			}
+			if (rosterList) {
+				rosterList.replaceChildren()
+				for (const member of members) {
+					const item = document.createElement('li')
+					item.className = 'agent-chip'
+					item.dataset.agent = member.id
+					item.append(avatarNode(member, member.name, presenceFor(member)))
+					const name = document.createElement('span')
+					name.className = 'agent-chip-name'
+					name.textContent = member.name
+					item.append(name)
+					rosterList.append(item)
+				}
+			}
+			if (roster instanceof HTMLElement) {
+				const seats = Number(roster.getAttribute('data-seats'))
+				const expiresRaw = roster.getAttribute('data-expires')
+				const expiresAt = expiresRaw === 'infinite' ? null : Number(expiresRaw)
+				if (Number.isFinite(seats) && (expiresAt === null || Number.isFinite(expiresAt))) {
+					roster.textContent = rosterLine(members, seats, expiresAt)
+				}
+			}
+			updateAvatars()
+			updateReceipts()
 		}
 		function appendMessages(messages) {
 			if (!chat || !Array.isArray(messages) || messages.length === 0) return

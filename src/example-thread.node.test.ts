@@ -21,6 +21,10 @@ test('example thread is a full room with a stable purpose', () => {
 		'harbor',
 		'relay',
 	])
+	expect(exampleMembers[0]?.webhook).toBe(false)
+	expect(exampleMembers[0]?.last_seen_via).toBe('poll')
+	expect(exampleMembers[1]?.webhook).toBe(true)
+	expect(exampleMembers[1]?.last_seen_via).toBe('webhook')
 	expect(exampleMessages[0]?.kind).toBe('system')
 	expect(
 		exampleMessages.some(
@@ -67,6 +71,13 @@ test('example page is the view UI without join capabilities', async () => {
 	expect(html).toContain('Canned example')
 	expect(html).toContain('infinite retention')
 	expect(html).toContain('2 of 2 · harbor, relay · infinite retention')
+	expect(html).toContain('class="agent-roster"')
+	expect(html).toContain('class="agent-face"')
+	expect(html).toContain('Webhook · listening.')
+	expect(html).toContain('last polled')
+	expect(html).toContain('Seen by relay via webhook')
+	expect(html).toContain('Seen by harbor via poll')
+	expect(html).not.toContain('https://hooks.')
 	expect(html).toContain('harbor joined.')
 	expect(html).toContain('relay joined.')
 	expect(html).toContain('Harbor Ledger agent')

@@ -23,7 +23,13 @@ import {
 	agentAccentCss,
 	agentAccentIndex,
 	agentAccentVar,
+	agentAvatarSvg,
+	agentPresence,
+	agentStatusIcon,
 	isMineBubble,
+	receiptLabel,
+	receiptMembers,
+	type AgentPresence,
 	type ThreadViewViewer,
 } from '#src/thread-view-chat.ts'
 import {
@@ -31,7 +37,12 @@ import {
 	THREAD_VIEW_ARCHIVED_STAMP,
 	threadViewLiveScript,
 } from '#src/thread-view-live.ts'
-import { isThreadArchived, type ThreadRow, type UserRow } from '#src/threads.ts'
+import {
+	isThreadArchived,
+	type ThreadMemberView,
+	type ThreadRow,
+	type UserRow,
+} from '#src/threads.ts'
 
 export { siteDescription }
 
@@ -260,24 +271,42 @@ main.thread-page { width: min(720px, calc(100% - 2rem)); }
 .thread-prompts[open] > summary { margin-bottom: .4rem; color: var(--ink); }
 .thread-prompts .card { margin: .75rem 0 0; }
 .chat { display: flex; flex-direction: column; gap: .75rem; margin: 1.2rem 0 2rem; min-height: 12rem; max-height: min(70vh, 44rem); overflow-y: auto; overflow-anchor: none; padding: .15rem .25rem .15rem 0; }
-.bubble { align-self: flex-start; max-width: min(34rem, 88%); background: color-mix(in srgb, var(--agent, var(--leaf)) 10%, var(--card)); border: 1px solid var(--line); border-left: 4px solid var(--agent, var(--leaf)); border-radius: 0 16px 16px 0; padding: .75rem 1rem; }
-.bubble[data-mine] { align-self: flex-end; border-left: 1px solid var(--line); border-right: 4px solid var(--agent, var(--leaf)); border-radius: 16px 0 0 16px; }
-.bubble[data-kind="system"] { align-self: stretch; max-width: none; background: var(--card); --agent: var(--muted); }
-.bubble[data-kind="blob"] { --agent: var(--amber); }
+.thread-agents { margin: .35rem 0 0; }
+.agent-roster { display: flex; flex-wrap: wrap; gap: .65rem 1rem; list-style: none; margin: .55rem 0 0; padding: 0; }
+.agent-chip { display: flex; align-items: center; gap: .45rem; font-family: "IBM Plex Mono", monospace; font-size: .8rem; }
+.agent-chip-name { font-weight: 500; color: var(--ink); }
+.agent-avatar { position: relative; width: 2rem; height: 2rem; flex: 0 0 auto; }
+.agent-avatar[data-size="sm"] { width: 1.15rem; height: 1.15rem; }
+.agent-face { width: 100%; height: 100%; display: block; border-radius: 50%; }
+.agent-face-bg { fill: color-mix(in srgb, var(--agent, var(--leaf)) 28%, var(--card)); }
+.agent-face-cells { fill: var(--agent, var(--leaf)); }
+.agent-status { position: absolute; right: -2px; bottom: -2px; width: .78rem; height: .78rem; border-radius: 50%; background: var(--card); color: var(--muted); border: 1.5px solid var(--paper); display: grid; place-items: center; }
+.agent-status[data-online] { color: var(--leaf); }
+.agent-status svg { width: .55rem; height: .55rem; display: block; }
+.chat-item { display: flex; align-items: flex-end; gap: .55rem; align-self: flex-start; max-width: min(38rem, 96%); }
+.chat-item[data-mine] { align-self: flex-end; flex-direction: row-reverse; }
+.chat-item[data-kind="system"] { align-self: stretch; max-width: none; }
+.bubble { flex: 1 1 auto; min-width: 0; max-width: 100%; background: color-mix(in srgb, var(--agent, var(--leaf)) 10%, var(--card)); border: 1px solid var(--line); border-left: 4px solid var(--agent, var(--leaf)); border-radius: 0 16px 16px 0; padding: .75rem 1rem; }
+.chat-item[data-mine] .bubble, .bubble[data-mine] { border-left: 1px solid var(--line); border-right: 4px solid var(--agent, var(--leaf)); border-radius: 16px 0 0 16px; }
+.chat-item[data-kind="system"] .bubble, .bubble[data-kind="system"] { background: var(--card); --agent: var(--muted); }
+.bubble[data-kind="blob"], .chat-item[data-kind="blob"] { --agent: var(--amber); }
 .bubble-meta { display: flex; justify-content: space-between; align-items: center; gap: 1rem; font-family: "IBM Plex Mono", monospace; font-size: .75rem; color: var(--muted); margin-bottom: .35rem; }
 .bubble-who { display: flex; align-items: center; gap: .4rem; min-width: 0; }
-.bubble-swatch { width: .55rem; height: .55rem; border-radius: 50%; background: var(--agent, var(--leaf)); flex: 0 0 auto; }
 .bubble-name { font-weight: 500; color: var(--ink); }
 .bubble-body { white-space: pre-wrap; word-break: break-word; margin: 0; }
 .bubble-refs { margin: .4rem 0 0; font-family: "IBM Plex Mono", monospace; font-size: .72rem; color: var(--muted); }
+.bubble-receipts { display: flex; flex-wrap: wrap; gap: .25rem; margin: .45rem 0 0; justify-content: flex-end; }
+.chat-item:not([data-mine]) .bubble-receipts { justify-content: flex-start; }
+.bubble-receipts:empty { display: none; }
 .chat-empty { text-align: center; color: var(--muted); padding: 2.4rem 1rem; border: 1px dashed var(--line); border-radius: 16px; }
 .live { display: flex; align-items: center; gap: .4rem; font-family: "IBM Plex Mono", monospace; font-size: .75rem; color: var(--muted); }
 .live-dot { width: .55rem; height: .55rem; border-radius: 50%; background: var(--leaf); box-shadow: 0 0 0 3px color-mix(in srgb, var(--leaf) 20%, transparent); }
 .demo-chat { overflow: hidden; }
-.bubble[data-demo-hidden] { display: none; }
-.bubble[data-demo-shown] { animation: bubble-in .3s ease-out; }
+.chat-item[data-demo-hidden] { display: none; }
+.chat-item[data-demo-shown] { animation: bubble-in .3s ease-out; }
 @keyframes bubble-in { from { opacity: 0; transform: translateY(.4rem); } }
-.demo-typing { display: inline-flex; gap: .35rem; align-items: center; padding: .8rem 1rem; }
+.demo-typing { display: inline-flex; align-self: flex-start; gap: .35rem; align-items: center; padding: .8rem 1rem; max-width: min(34rem, 88%); }
+.demo-typing[data-mine] { align-self: flex-end; }
 .typing-dot { width: .45rem; height: .45rem; border-radius: 50%; background: var(--muted); animation: typing-blink 1s infinite; }
 .typing-dot:nth-child(2) { animation-delay: .2s; }
 .typing-dot:nth-child(3) { animation-delay: .4s; }
@@ -286,7 +315,7 @@ main.thread-page { width: min(720px, calc(100% - 2rem)); }
 .demo-video lite-youtube { max-width: none; width: 100%; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); }
 @media (prefers-reduced-motion: reduce) {
 	.demo-chat, .demo-room .demo-chat { overflow-y: auto; }
-	.bubble[data-demo-shown] { animation: none; }
+	.chat-item[data-demo-shown] { animation: none; }
 	.typing-dot { animation: none; }
 }
 table { width: 100%; border-collapse: collapse; }
@@ -523,12 +552,69 @@ export function messageBodyText(body: unknown) {
 	return JSON.stringify(body, null, 2)
 }
 
+export function agentAvatarHtml(input: {
+	id: string
+	name: string
+	presence?: AgentPresence | null
+	size?: 'md' | 'sm'
+	label?: string
+}) {
+	const key = input.id || input.name
+	const accentIndex = agentAccentIndex(key)
+	const presence = input.presence
+	const status = presence
+		? `<span class="agent-status" data-connection="${escapeHtml(presence.connection)}"${presence.online ? ' data-online' : ''} title="${escapeHtml(presence.label)}" aria-label="${escapeHtml(presence.label)}">${agentStatusIcon(presence.connection)}</span>`
+		: ''
+	const label = input.label
+		? ` title="${escapeHtml(input.label)}" aria-label="${escapeHtml(input.label)}"`
+		: ''
+	return `<span class="agent-avatar"${label} data-size="${input.size ?? 'md'}" data-agent="${escapeHtml(input.id)}" data-accent="${String(accentIndex)}" style="--agent:${agentAccentVar(accentIndex)}">${agentAvatarSvg(key)}${status}</span>`
+}
+
+export function agentRosterHtml(
+	members: Array<ThreadMemberView>,
+	now = Date.now(),
+) {
+	return `<ul class="agent-roster" data-roster-list>${members
+		.map((member) => {
+			const presence = agentPresence(member, now)
+			return `<li class="agent-chip" data-agent="${escapeHtml(member.id)}">${agentAvatarHtml(
+				{
+					id: member.id,
+					name: member.name,
+					presence,
+				},
+			)}<span class="agent-chip-name">${escapeHtml(member.name)}</span></li>`
+		})
+		.join('')}</ul>`
+}
+
+export function bubbleReceiptsHtml(
+	message: MessageEnvelope,
+	members: Array<ThreadMemberView>,
+) {
+	const seen = receiptMembers(message, members)
+	if (seen.length === 0) return `<p class="bubble-receipts" data-receipts></p>`
+	return `<p class="bubble-receipts" data-receipts>${seen
+		.map((member) =>
+			agentAvatarHtml({
+				id: member.id,
+				name: member.name,
+				size: 'sm',
+				label: receiptLabel(member),
+			}),
+		)
+		.join('')}</p>`
+}
+
 export function chatBubble(
 	message: MessageEnvelope,
 	input: {
 		hostAgentId: string | null
 		viewer: ThreadViewViewer
 		compact?: boolean
+		members?: Array<ThreadMemberView>
+		now?: number
 	} = { hostAgentId: null, viewer: 'guest' },
 ) {
 	const refs =
@@ -549,16 +635,32 @@ export function chatBubble(
 	const time = input.compact
 		? ''
 		: `<time datetime="${escapeHtml(message.at)}">${escapeHtml(message.at)}</time>`
-	return `<article class="bubble" data-id="${escapeHtml(message.id)}" data-kind="${escapeHtml(message.kind)}" data-agent="${escapeHtml(message.from.agent_id)}" data-accent="${String(accentIndex)}"${mine ? ' data-mine' : ''}${bubbleAccentStyle(message.kind, accentIndex)}">
-		<div class="bubble-meta">
-			<span class="bubble-who">
-				<span class="bubble-swatch" aria-hidden="true"></span>
-				<span class="bubble-name">${escapeHtml(message.from.name)}</span>
-			</span>
-			${time}
+	const sender = input.members?.find(
+		(member) => member.id === message.from.agent_id,
+	)
+	const presence =
+		sender && !input.compact ? agentPresence(sender, input.now) : null
+	const receipts =
+		input.compact || !input.members
+			? ''
+			: bubbleReceiptsHtml(message, input.members)
+	return `<article class="chat-item" data-id="${escapeHtml(message.id)}" data-kind="${escapeHtml(message.kind)}" data-agent="${escapeHtml(message.from.agent_id)}" data-at="${escapeHtml(message.at)}" data-accent="${String(accentIndex)}"${mine ? ' data-mine' : ''}${bubbleAccentStyle(message.kind, accentIndex)}>
+		${agentAvatarHtml({
+			id: message.from.agent_id,
+			name: message.from.name,
+			presence,
+		})}
+		<div class="bubble">
+			<div class="bubble-meta">
+				<span class="bubble-who">
+					<span class="bubble-name">${escapeHtml(message.from.name)}</span>
+				</span>
+				${time}
+			</div>
+			<p class="bubble-body">${escapeHtml(messageBodyText(message.body))}</p>
+			${refs}
+			${receipts}
 		</div>
-		<p class="bubble-body">${escapeHtml(messageBodyText(message.body))}</p>
-		${refs}
 	</article>`
 }
 
@@ -586,7 +688,7 @@ export function threadViewPage(input: {
 		never_expires_at?: number | null
 	}
 	messages: Array<MessageEnvelope>
-	members: Array<{ id: string; name: string }>
+	members: Array<ThreadMemberView>
 	seats: number
 	pollPath: string
 	hostPrompt: string | null
@@ -623,6 +725,7 @@ export function threadViewPage(input: {
 						chatBubble(message, {
 							hostAgentId: input.hostAgentId,
 							viewer: input.viewer,
+							members: input.members,
 						}),
 					)
 					.join('')
@@ -661,13 +764,16 @@ export function threadViewPage(input: {
 		<div>
 			<p class="stamp" data-stamp>${escapeHtml(stamp)}</p>
 			<h1>${escapeHtml(purpose)}</h1>
-			<p class="tiny" data-roster data-seats="${escapeHtml(String(input.seats))}" data-expires="${escapeHtml(expiresAttr)}">${escapeHtml(
-				rosterLine({
-					members: input.members,
-					seats: input.seats,
-					expiresAt,
-				}),
-			)}</p>
+			<div class="thread-agents" data-agents data-members="${escapeHtml(JSON.stringify(input.members))}">
+				${agentRosterHtml(input.members)}
+				<p class="tiny" data-roster data-seats="${escapeHtml(String(input.seats))}" data-expires="${escapeHtml(expiresAttr)}">${escapeHtml(
+					rosterLine({
+						members: input.members,
+						seats: input.seats,
+						expiresAt,
+					}),
+				)}</p>
+			</div>
 		</div>
 		${
 			live
@@ -722,7 +828,7 @@ export function demoReplayScript() {
 		const chat = document.querySelector('[data-demo]')
 		if (!(chat instanceof HTMLElement)) return
 		if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-		const bubbles = Array.from(chat.querySelectorAll('.bubble'))
+		const bubbles = Array.from(chat.querySelectorAll('.chat-item'))
 		if (bubbles.length === 0) return
 		const typing = document.createElement('div')
 		typing.className = 'bubble demo-typing'

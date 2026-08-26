@@ -406,11 +406,30 @@ export async function countMembers(db: D1Database, threadId: string) {
 	return row?.n ?? 0
 }
 
+export type LastSeenVia = 'poll' | 'webhook' | 'send'
+
 export type ThreadMemberView = {
 	id: string
 	name: string
 	joined_at: string
 	last_poll_at: string | null
+	webhook: boolean
+	last_seen_message_id: string | null
+	last_seen_at: string | null
+	last_seen_via: LastSeenVia | null
+}
+
+function parseLastSeenVia(value: string | null): LastSeenVia | null {
+	switch (value) {
+		case 'poll':
+		case 'webhook':
+		case 'send':
+			return value
+		case null:
+			return null
+		default:
+			return null
+	}
 }
 
 export async function listThreadMembers(db: D1Database, threadId: string) {
@@ -419,9 +438,14 @@ export async function listThreadMembers(db: D1Database, threadId: string) {
 		name: string
 		joined_at: number
 		last_poll_at: number | null
+		webhook_url: string | null
+		last_seen_message_id: string | null
+		last_seen_at: number | null
+		last_seen_via: string | null
 	}>(
 		db,
-		`SELECT a.id, a.name, m.joined_at, m.last_poll_at
+		`SELECT a.id, a.name, m.joined_at, m.last_poll_at, m.webhook_url,
+		        m.last_seen_message_id, m.last_seen_at, m.last_seen_via
 		 FROM thread_members m
 		 JOIN agents a ON a.id = m.agent_id
 		 WHERE m.thread_id = ?
@@ -436,6 +460,13 @@ export async function listThreadMembers(db: D1Database, threadId: string) {
 			row.last_poll_at == null
 				? null
 				: new Date(row.last_poll_at).toISOString(),
+		webhook: Boolean(row.webhook_url),
+		last_seen_message_id: row.last_seen_message_id,
+		last_seen_at:
+			row.last_seen_at == null
+				? null
+				: new Date(row.last_seen_at).toISOString(),
+		last_seen_via: parseLastSeenVia(row.last_seen_via),
 	})) satisfies Array<ThreadMemberView>
 }
 
@@ -451,6 +482,34 @@ async function touchLastPoll(
 		now,
 		threadId,
 		agentId,
+	)
+}
+
+async function advanceLastSeen(
+	db: D1Database,
+	threadId: string,
+	agentId: string,
+	message: { id: string; createdAt: number },
+	via: LastSeenVia,
+) {
+	await run(
+		db,
+		`UPDATE thread_members
+		 SET last_seen_message_id = ?, last_seen_at = ?, last_seen_via = ?
+		 WHERE thread_id = ? AND agent_id = ?
+		   AND (
+			 last_seen_at IS NULL
+			 OR last_seen_at < ?
+			 OR (last_seen_at = ? AND last_seen_message_id <= ?)
+		   )`,
+		message.id,
+		message.createdAt,
+		via,
+		threadId,
+		agentId,
+		message.createdAt,
+		message.createdAt,
+		message.id,
 	)
 }
 
@@ -599,10 +658,11 @@ export async function createThread(input: {
 	)
 	await run(
 		input.db,
-		'INSERT INTO thread_members (thread_id, agent_id, joined_at) VALUES (?, ?, ?)',
+		'INSERT INTO thread_members (thread_id, agent_id, joined_at, webhook_url) VALUES (?, ?, ?, ?)',
 		threadId,
 		agentId,
 		now,
+		webhook.url,
 	)
 
 	const thread = await first<ThreadRow>(
@@ -833,6 +893,13 @@ export async function sendMessage(input: {
 		now + plan.retentionMs,
 		membership.thread.id,
 	)
+	await advanceLastSeen(
+		input.db,
+		membership.thread.id,
+		input.agent.id,
+		{ id: messageId, createdAt: now },
+		'send',
+	)
 
 	return {
 		ok: true,
@@ -940,15 +1007,42 @@ export async function listMessages(input: {
 
 	const now = input.now ?? Date.now()
 	await touchLastPoll(input.db, membership.thread.id, input.agent.id, now)
+	const messages = await loadThreadMessages(
+		input.db,
+		membership.thread.id,
+		input.after,
+		input.limit ?? 50,
+	)
+	const latest = messages.at(-1)
+	if (latest) {
+		await advanceLastSeen(
+			input.db,
+			membership.thread.id,
+			input.agent.id,
+			{ id: latest.id, createdAt: Date.parse(latest.at) },
+			'poll',
+		)
+	} else if (input.after && input.after !== '0') {
+		const cursor = await first<{ id: string; created_at: number }>(
+			input.db,
+			'SELECT id, created_at FROM messages WHERE id = ? AND thread_id = ?',
+			input.after,
+			membership.thread.id,
+		)
+		if (cursor) {
+			await advanceLastSeen(
+				input.db,
+				membership.thread.id,
+				input.agent.id,
+				{ id: cursor.id, createdAt: cursor.created_at },
+				'poll',
+			)
+		}
+	}
 
 	return {
 		ok: true,
-		messages: await loadThreadMessages(
-			input.db,
-			membership.thread.id,
-			input.after,
-			input.limit ?? 50,
-		),
+		messages,
 		retryAfter: pollRetryAfterSecondsFor(membership.thread),
 	}
 }
@@ -1037,6 +1131,13 @@ export async function setWebhook(input: {
 	if (!parsed.ok) return parsed
 	await run(
 		input.db,
+		'UPDATE thread_members SET webhook_url = ? WHERE thread_id = ? AND agent_id = ?',
+		parsed.url,
+		membership.thread.id,
+		input.agent.id,
+	)
+	await run(
+		input.db,
 		'UPDATE threads SET webhook_url = ? WHERE id = ?',
 		parsed.url,
 		membership.thread.id,
@@ -1063,6 +1164,11 @@ export async function archiveThread(input: {
 		input.db,
 		'UPDATE threads SET archived_at = ?, webhook_url = NULL WHERE id = ? AND archived_at IS NULL',
 		now,
+		thread.id,
+	)
+	await run(
+		input.db,
+		'UPDATE thread_members SET webhook_url = NULL WHERE thread_id = ?',
 		thread.id,
 	)
 	const updated = await first<ThreadRow>(
@@ -1274,7 +1380,7 @@ export async function purgeExpired(db: D1Database, now = Date.now()) {
 export async function dispatchWebhook(
 	url: string,
 	message: MessageEnvelope,
-): Promise<void> {
+): Promise<boolean> {
 	const response = await fetch(url, {
 		method: 'POST',
 		headers: {
@@ -1285,7 +1391,9 @@ export async function dispatchWebhook(
 	})
 	if (!response.ok) {
 		console.warn('webhook_failed', url, response.status)
+		return false
 	}
+	return true
 }
 
 export async function maybeDispatchWebhook(
@@ -1293,13 +1401,51 @@ export async function maybeDispatchWebhook(
 	threadId: string,
 	message: MessageEnvelope,
 	ctx?: ExecutionContext,
+	onDelivered?: () => Promise<void> | void,
 ) {
 	const thread = await first<{
 		webhook_url: string | null
 		archived_at: number | null
 	}>(db, 'SELECT webhook_url, archived_at FROM threads WHERE id = ?', threadId)
-	if (!thread?.webhook_url || isThreadArchived(thread)) return
-	const pending = dispatchWebhook(thread.webhook_url, message)
+	if (!thread || isThreadArchived(thread)) return
+	const members = await all<{
+		agent_id: string
+		webhook_url: string | null
+	}>(
+		db,
+		'SELECT agent_id, webhook_url FROM thread_members WHERE thread_id = ? AND webhook_url IS NOT NULL',
+		threadId,
+	)
+	const targets = new Map<string, Array<string>>()
+	for (const member of members) {
+		if (!member.webhook_url) continue
+		const agentIds = targets.get(member.webhook_url) ?? []
+		agentIds.push(member.agent_id)
+		targets.set(member.webhook_url, agentIds)
+	}
+	if (thread.webhook_url && !targets.has(thread.webhook_url)) {
+		targets.set(thread.webhook_url, [])
+	}
+	if (targets.size === 0) return
+	const createdAt = Date.parse(message.at)
+	const pending = (async () => {
+		await Promise.all(
+			[...targets].map(async ([url, agentIds]) => {
+				const ok = await dispatchWebhook(url, message)
+				if (!ok || !Number.isFinite(createdAt)) return
+				for (const agentId of agentIds) {
+					await advanceLastSeen(
+						db,
+						threadId,
+						agentId,
+						{ id: message.id, createdAt },
+						'webhook',
+					)
+				}
+			}),
+		)
+		await onDelivered?.()
+	})()
 	if (ctx) ctx.waitUntil(pending)
-	else void pending
+	else await pending
 }

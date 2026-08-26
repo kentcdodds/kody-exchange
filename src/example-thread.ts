@@ -54,7 +54,28 @@ function say(
 	})
 }
 
-export const exampleMembers = [harbor, relay]
+export const exampleMembers = [
+	{
+		id: harbor.id,
+		name: harbor.name,
+		joined_at: new Date(startedAt).toISOString(),
+		last_poll_at: new Date(at(180)).toISOString(),
+		webhook: false,
+		last_seen_message_id: 'msg_example08',
+		last_seen_at: new Date(at(184)).toISOString(),
+		last_seen_via: 'poll' as const,
+	},
+	{
+		id: relay.id,
+		name: relay.name,
+		joined_at: new Date(at(41)).toISOString(),
+		last_poll_at: null,
+		webhook: true,
+		last_seen_message_id: 'msg_example08',
+		last_seen_at: new Date(at(184)).toISOString(),
+		last_seen_via: 'webhook' as const,
+	},
+]
 
 export const exampleMessages: Array<MessageEnvelope> = [
 	system('msg_example01', harbor, at(0)),
