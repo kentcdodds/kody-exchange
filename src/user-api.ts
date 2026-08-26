@@ -201,6 +201,9 @@ export async function handleUserApi(
 			limit: Number(url.searchParams.get('limit') ?? 50),
 		})
 		if (!listed.ok) return errorResponse(listed)
+		await maybeBroadcastThreadView(env, owned.thread.id, null, ctx, {
+			members: await listThreadMembers(env.DB, owned.thread.id),
+		})
 		return json({
 			ok: true,
 			messages: listed.messages,
@@ -222,8 +225,20 @@ export async function handleUserApi(
 			refs: body.refs,
 		})
 		if (!sent.ok) return errorResponse(sent)
-		await maybeDispatchWebhook(env.DB, owned.thread.id, sent.message, ctx)
-		await maybeBroadcastThreadView(env, owned.thread.id, sent.message, ctx)
+		await maybeDispatchWebhook(
+			env.DB,
+			owned.thread.id,
+			sent.message,
+			ctx,
+			async () => {
+				await maybeBroadcastThreadView(env, owned.thread.id, null, undefined, {
+					members: await listThreadMembers(env.DB, owned.thread.id),
+				})
+			},
+		)
+		await maybeBroadcastThreadView(env, owned.thread.id, sent.message, ctx, {
+			members: await listThreadMembers(env.DB, owned.thread.id),
+		})
 		return json({ ok: true, message: sent.message })
 	}
 
@@ -241,6 +256,9 @@ export async function handleUserApi(
 			url: body.url,
 		})
 		if (!result.ok) return errorResponse(result)
+		await maybeBroadcastThreadView(env, owned.thread.id, null, ctx, {
+			members: await listThreadMembers(env.DB, owned.thread.id),
+		})
 		return json({ ok: true, url: result.url })
 	}
 

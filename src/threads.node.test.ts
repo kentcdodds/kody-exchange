@@ -248,6 +248,9 @@ test('create can set a webhook; bad urls are rejected', async () => {
 	})
 	if (!created.ok) throw new Error(created.error)
 	expect(created.thread.webhook_url).toBe('https://hooks.example.test/room')
+	expect((await listThreadMembers(env.DB, created.thread.id))[0]?.webhook).toBe(
+		true,
+	)
 
 	const bad = await createThread({
 		db: env.DB,
@@ -301,6 +304,12 @@ test('polling a thread records last_poll_at', async () => {
 	expect(viewed.members[0]?.last_poll_at).toBe(
 		new Date(now + 8_000).toISOString(),
 	)
+	expect(viewed.members[0]?.webhook).toBe(false)
+	expect(viewed.members[0]?.last_seen_via).toBe('poll')
+	expect(viewed.members[0]?.last_seen_message_id).toBe(
+		listed.messages.at(-1)?.id,
+	)
+	expect(JSON.stringify(viewed.members[0])).not.toContain('webhook_url')
 })
 
 test('join still returns a token when the join notice cannot be posted', async () => {
@@ -407,6 +416,9 @@ test('host can archive a thread; send, poll, join, and webhook then fail', async
 	if (!archived.ok) throw new Error(archived.error)
 	expect(archived.thread.archived_at).toBe(now + 2000)
 	expect(archived.thread.webhook_url).toBeNull()
+	expect((await listThreadMembers(env.DB, created.thread.id))[0]?.webhook).toBe(
+		false,
+	)
 
 	const sent = await sendMessage({
 		db: env.DB,
@@ -546,9 +558,99 @@ test('webhook dispatch stays alive through waitUntil', async () => {
 		expect(waited).toHaveLength(1)
 		await waited[0]
 		expect(webhookCalls).toEqual(['https://example.test/hook'])
+		expect(
+			(await listThreadMembers(env.DB, created.thread.id))[0]?.webhook,
+		).toBe(true)
 	} finally {
 		globalThis.fetch = originalFetch
 	}
+})
+
+test('a successful peer webhook records a read receipt', async () => {
+	const env = createTestEnv()
+	const now = Date.parse('2026-08-26T12:00:00.000Z')
+	const created = await createThread({
+		db: env.DB,
+		baseUrl: 'https://kody.exchange',
+		ownerUserId: null,
+		name: 'cursor',
+		now,
+	})
+	if (!created.ok) throw new Error(created.error)
+	const joined = await joinThread({
+		db: env.DB,
+		joinToken: created.joinToken,
+		name: 'claude',
+		now: now + 1_000,
+	})
+	if (!joined.ok) throw new Error(joined.error)
+	const webhook = await setWebhook({
+		db: env.DB,
+		threadId: created.thread.id,
+		agent: joined.agent,
+		url: 'https://example.test/hook',
+	})
+	if (!webhook.ok) throw new Error(webhook.error)
+	const sent = await sendMessage({
+		db: env.DB,
+		threadId: created.thread.id,
+		agent: created.agent,
+		body: { text: 'hello claude' },
+		now: now + 2_000,
+	})
+	if (!sent.ok) throw new Error(sent.error)
+	const originalFetch = globalThis.fetch
+	globalThis.fetch = (async () => new Response('ok')) as typeof fetch
+	try {
+		await maybeDispatchWebhook(env.DB, created.thread.id, sent.message)
+	} finally {
+		globalThis.fetch = originalFetch
+	}
+	const members = await listThreadMembers(env.DB, created.thread.id)
+	expect(members.find((member) => member.id === joined.agent.id)).toMatchObject(
+		{
+			webhook: true,
+			last_seen_via: 'webhook',
+			last_seen_message_id: sent.message.id,
+		},
+	)
+	expect(
+		members.find((member) => member.id === created.agent.id),
+	).toMatchObject({
+		webhook: false,
+		last_seen_via: 'send',
+		last_seen_message_id: sent.message.id,
+	})
+})
+
+test('a failed webhook does not count as a read receipt', async () => {
+	const env = createTestEnv()
+	const created = await createThread({
+		db: env.DB,
+		baseUrl: 'https://kody.exchange',
+		ownerUserId: null,
+		name: 'cursor',
+		webhookUrl: 'https://example.test/hook',
+	})
+	if (!created.ok) throw new Error(created.error)
+	const sent = await sendMessage({
+		db: env.DB,
+		threadId: created.thread.id,
+		agent: created.agent,
+		body: { text: 'ping' },
+	})
+	if (!sent.ok) throw new Error(sent.error)
+	const originalFetch = globalThis.fetch
+	globalThis.fetch = (async () =>
+		new Response('no', { status: 500 })) as typeof fetch
+	try {
+		await maybeDispatchWebhook(env.DB, created.thread.id, sent.message)
+	} finally {
+		globalThis.fetch = originalFetch
+	}
+	const members = await listThreadMembers(env.DB, created.thread.id)
+	expect(members[0]?.last_seen_via).toBe('send')
+	expect(members[0]?.last_seen_message_id).toBe(sent.message.id)
 })
 
 test('owner can keep a thread forever; it still counts as live and survives purge', async () => {

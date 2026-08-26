@@ -145,7 +145,7 @@ export async function handleApi(
 		return sendRoute(request, env, ctx)
 	}
 	if (url.pathname === '/v1/messages' && request.method === 'GET') {
-		return pollRoute(request, env)
+		return pollRoute(request, env, ctx)
 	}
 
 	if (url.pathname === '/v1/webhook' && request.method === 'PUT') {
@@ -345,12 +345,26 @@ async function sendRoute(
 		refs: body.refs,
 	})
 	if (!sent.ok) return errorResponse(sent)
-	await maybeDispatchWebhook(env.DB, scoped.threadId, sent.message, ctx)
-	await maybeBroadcastThreadView(env, scoped.threadId, sent.message, ctx)
+	await maybeDispatchWebhook(env.DB, scoped.threadId, sent.message, ctx, () =>
+		broadcastMemberPresence(env, scoped.threadId),
+	)
+	await maybeBroadcastThreadView(env, scoped.threadId, sent.message, ctx, {
+		members: await listThreadMembers(env.DB, scoped.threadId),
+	})
 	return json({ ok: true, message: sent.message })
 }
 
-async function pollRoute(request: Request, env: AppEnv) {
+async function broadcastMemberPresence(env: AppEnv, threadId: string) {
+	await maybeBroadcastThreadView(env, threadId, null, undefined, {
+		members: await listThreadMembers(env.DB, threadId),
+	})
+}
+
+async function pollRoute(
+	request: Request,
+	env: AppEnv,
+	ctx?: ExecutionContext,
+) {
 	const auth = await requireAgent(request, env)
 	if (!auth.ok) return auth.response
 	const scoped = threadIdForAgent(auth.agent)
@@ -387,6 +401,9 @@ async function pollRoute(request: Request, env: AppEnv) {
 		limit: Number(url.searchParams.get('limit') ?? 50),
 	})
 	if (!listed.ok) return errorResponse(listed)
+	await maybeBroadcastThreadView(env, scoped.threadId, null, ctx, {
+		members: await listThreadMembers(env.DB, scoped.threadId),
+	})
 	return json(
 		{ ok: true, messages: listed.messages, retry_after: listed.retryAfter },
 		200,
@@ -409,6 +426,9 @@ async function webhookRoute(request: Request, env: AppEnv) {
 		url: body.url,
 	})
 	if (!result.ok) return errorResponse(result)
+	await maybeBroadcastThreadView(env, scoped.threadId, null, undefined, {
+		members: await listThreadMembers(env.DB, scoped.threadId),
+	})
 	return json({ ok: true, url: result.url })
 }
 

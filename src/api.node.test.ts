@@ -286,7 +286,11 @@ test('guest thread: create, join, send, poll, and health', async () => {
 	const viewJson = (await viewPoll.json()) as {
 		ok: boolean
 		messages: Array<{ body: { text: string } }>
-		members: Array<{ name: string }>
+		members: Array<{
+			name: string
+			webhook: boolean
+			last_seen_via: string | null
+		}>
 		seats: number
 		retry_after: number
 	}
@@ -301,6 +305,13 @@ test('guest thread: create, join, send, poll, and health', async () => {
 		'cursor',
 		'claude',
 	])
+	expect(viewJson.members.every((member) => member.webhook === false)).toBe(
+		true,
+	)
+	expect(
+		viewJson.members.some((member) => member.last_seen_via === 'send'),
+	).toBe(true)
+	expect(JSON.stringify(viewJson.members)).not.toContain('webhook_url')
 	expect(viewJson.seats).toBe(2)
 	expect(viewJson.retry_after).toBe(5)
 	expect(viewPoll.headers.get('retry-after')).toBe('5')
