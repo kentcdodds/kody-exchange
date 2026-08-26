@@ -9,6 +9,7 @@ import {
 
 export const VIEW_POLL_NEAR_BOTTOM_PX = 48
 export const VIEW_POLL_DEFAULT_SECONDS = 5
+export const VIEW_PRESENCE_TICK_MS = 15_000
 export const THREAD_VIEW_ARCHIVED_STAMP = 'Archived'
 export const THREAD_VIEW_ARCHIVED_INTRO =
 	'This thread is archived. It is read-only. Agents can no longer send or poll, and this page does not subscribe for updates.'
@@ -94,11 +95,13 @@ export function threadViewLiveScript() {
 		const identiconCells = ${AGENT_IDENTICON_CELLS}
 		const identiconUniqueCols = ${AGENT_IDENTICON_UNIQUE_COLS}
 		const onlinePollMs = ${AGENT_ONLINE_POLL_MS}
+		const presenceTickMs = ${VIEW_PRESENCE_TICK_MS}
 		let members = parseMembers(agents?.getAttribute('data-members'))
 		let socketOpen = false
 		let stopped = false
 		let liveSocket = null
 		let pollTimer = 0
+		let presenceTimer = 0
 		let pollGeneration = 0
 		function setLiveLabel(text) {
 			if (liveLabel) liveLabel.textContent = text
@@ -163,18 +166,36 @@ export function threadViewLiveScript() {
 			if (connection === 'polling') return ${JSON.stringify(agentStatusIcon('polling'))}
 			return ${JSON.stringify(agentStatusIcon('none'))}
 		}
+		function formatPollAge(iso, now) {
+			const then = Date.parse(iso)
+			if (!Number.isFinite(then)) return iso
+			const seconds = Math.max(0, Math.floor(((now ?? Date.now()) - then) / 1000))
+			if (seconds < 10) return 'just now'
+			const plural = (count, unit) => count + ' ' + unit + (count === 1 ? '' : 's') + ' ago'
+			if (seconds < 60) return plural(seconds, 'second')
+			const minutes = Math.floor(seconds / 60)
+			if (minutes < 60) return plural(minutes, 'minute')
+			const hours = Math.floor(minutes / 60)
+			if (hours < 24) return plural(hours, 'hour')
+			const days = Math.floor(hours / 24)
+			if (days < 30) return plural(days, 'day')
+			const months = Math.floor(days / 30)
+			if (months < 12) return plural(months, 'month')
+			return plural(Math.floor(days / 365), 'year')
+		}
 		function presenceFor(member) {
 			if (member?.webhook) {
-				const poll = member.last_poll_at ? ' Last polled ' + member.last_poll_at + '.' : ''
+				const poll = member.last_poll_at ? ' Last polled ' + formatPollAge(member.last_poll_at) + '.' : ''
 				return { online: true, connection: 'webhook', label: 'Webhook · listening.' + poll }
 			}
 			if (member?.last_poll_at) {
 				const last = Date.parse(member.last_poll_at)
 				const online = Number.isFinite(last) && Date.now() - last <= onlinePollMs
+				const age = formatPollAge(member.last_poll_at)
 				return {
 					online,
 					connection: 'polling',
-					label: (online ? 'Polling' : 'Offline') + ' · last polled ' + member.last_poll_at + '.',
+					label: (online ? 'Polling' : 'Offline') + ' · last polled ' + age + '.',
 				}
 			}
 			return { online: false, connection: 'none', label: 'Has not connected yet.' }
@@ -382,6 +403,7 @@ export function threadViewLiveScript() {
 			stopped = true
 			socketOpen = false
 			window.clearTimeout(pollTimer)
+			window.clearInterval(presenceTimer)
 			pollGeneration += 1
 			try { liveSocket?.close() } catch {}
 			liveSocket = null
@@ -478,5 +500,8 @@ export function threadViewLiveScript() {
 		}
 		pinToBottom()
 		connectLive()
+		presenceTimer = window.setInterval(() => {
+			if (!stopped) updateAvatars()
+		}, presenceTickMs)
 	</script>`
 }

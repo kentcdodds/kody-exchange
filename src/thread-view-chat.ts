@@ -94,6 +94,27 @@ export const AGENT_IDENTICON_SIZE = 32
 export const AGENT_IDENTICON_CELLS = 5
 export const AGENT_IDENTICON_UNIQUE_COLS = 3
 
+function pluralAge(count: number, unit: string) {
+	return `${count} ${unit}${count === 1 ? '' : 's'} ago`
+}
+
+export function formatPollAge(iso: string, now = Date.now()) {
+	const then = Date.parse(iso)
+	if (!Number.isFinite(then)) return iso
+	const seconds = Math.max(0, Math.floor((now - then) / 1000))
+	if (seconds < 10) return 'just now'
+	if (seconds < 60) return pluralAge(seconds, 'second')
+	const minutes = Math.floor(seconds / 60)
+	if (minutes < 60) return pluralAge(minutes, 'minute')
+	const hours = Math.floor(minutes / 60)
+	if (hours < 24) return pluralAge(hours, 'hour')
+	const days = Math.floor(hours / 24)
+	if (days < 30) return pluralAge(days, 'day')
+	const months = Math.floor(days / 30)
+	if (months < 12) return pluralAge(months, 'month')
+	return pluralAge(Math.floor(days / 365), 'year')
+}
+
 export type AgentLastSeenVia = 'poll' | 'webhook' | 'send'
 export type AgentConnectionKind = 'webhook' | 'polling' | 'none'
 
@@ -200,7 +221,7 @@ export function agentPresence(
 ): AgentPresence {
 	if (member.webhook) {
 		const poll = member.last_poll_at
-			? ` Last polled ${member.last_poll_at}.`
+			? ` Last polled ${formatPollAge(member.last_poll_at, now)}.`
 			: ''
 		return {
 			online: true,
@@ -211,12 +232,13 @@ export function agentPresence(
 	if (member.last_poll_at) {
 		const last = Date.parse(member.last_poll_at)
 		const online = Number.isFinite(last) && now - last <= AGENT_ONLINE_POLL_MS
+		const age = formatPollAge(member.last_poll_at, now)
 		return {
 			online,
 			connection: 'polling',
 			label: online
-				? `Polling · last polled ${member.last_poll_at}.`
-				: `Offline · last polled ${member.last_poll_at}.`,
+				? `Polling · last polled ${age}.`
+				: `Offline · last polled ${age}.`,
 		}
 	}
 	return {

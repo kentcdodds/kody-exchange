@@ -11,6 +11,7 @@ import {
 	threadViewLiveScript,
 	VIEW_POLL_DEFAULT_SECONDS,
 	VIEW_POLL_NEAR_BOTTOM_PX,
+	VIEW_PRESENCE_TICK_MS,
 	type ArchivedViewRoot,
 } from '#src/thread-view-live.ts'
 
@@ -71,6 +72,12 @@ test('live script prefers a socket and pins when already at the bottom', () => {
 	expect(script).toContain('agent-avatar')
 	expect(script).toContain('data-members')
 	expect(script).toContain('Webhook · listening.')
+	expect(script).toContain('function formatPollAge')
+	expect(script).toContain("return 'just now'")
+	expect(script).not.toContain("' · last polled ' + member.last_poll_at")
+	expect(script).toContain(`const presenceTickMs = ${VIEW_PRESENCE_TICK_MS}`)
+	expect(script).toContain('window.setInterval')
+	expect(script).toContain('window.clearInterval(presenceTimer)')
 	expect(script).toContain(JSON.stringify(agentStatusIcon('webhook')))
 	expect(script).toContain(JSON.stringify(agentStatusIcon('polling')))
 	expect(script).toContain(JSON.stringify(agentStatusIcon('none')))
