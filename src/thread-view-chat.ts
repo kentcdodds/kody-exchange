@@ -174,18 +174,18 @@ function statusBadgeSvg(inner: string) {
 export function agentStatusIcon(connection: AgentConnectionKind) {
 	switch (connection) {
 		case 'webhook':
-			// Filled bolt, optically centered in the 16×16 square: pushed events.
+			// Chunky bolt, nudged +0.55x so the zigzag's visual mass sits on center.
 			return statusBadgeSvg(
-				'<path d="M8.9 2.2 4.55 8.55h2.95L7 13.8 11.35 7.45H8.4Z"/>',
+				'<path fill="currentColor" d="M9.45 2.15 5.1 8.55h2.9L7.55 13.85 11.9 7.45H9Z"/>',
 			)
 		case 'polling':
-			// Clock face + hands from the center: timed checks.
+			// Thick clock around (8,8): timed checks. Short hands keep the mass centered.
 			return statusBadgeSvg(
-				'<circle cx="8" cy="8" r="5.45" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8 5v3.15l2.15 1.35" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
+				'<circle cx="8" cy="8" r="5.7" fill="none" stroke="currentColor" stroke-width="2.15"/><path d="M8 5.15v3.05l1.7 1.05" fill="none" stroke="currentColor" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round"/>',
 			)
 		case 'none':
 			return statusBadgeSvg(
-				'<circle cx="8" cy="8" r="3.5" fill="none" stroke="currentColor" stroke-width="1.7"/>',
+				'<circle cx="8" cy="8" r="3.6" fill="none" stroke="currentColor" stroke-width="2.15"/>',
 			)
 		default: {
 			const exhaustive: never = connection

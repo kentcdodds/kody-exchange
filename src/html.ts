@@ -280,9 +280,9 @@ main.thread-page { width: min(720px, calc(100% - 2rem)); }
 .agent-face { width: 100%; height: 100%; display: block; border-radius: 50%; }
 .agent-face-bg { fill: color-mix(in srgb, var(--agent, var(--leaf)) 28%, var(--card)); }
 .agent-face-cells { fill: var(--agent, var(--leaf)); }
-.agent-status { position: absolute; right: -2px; bottom: -2px; box-sizing: border-box; width: .88rem; height: .88rem; border-radius: 50%; background: var(--card); color: var(--muted); border: 1.5px solid var(--paper); display: grid; place-items: center; line-height: 0; overflow: hidden; }
+.agent-status { position: absolute; right: -3px; bottom: -3px; box-sizing: border-box; width: 1rem; height: 1rem; border-radius: 50%; background: var(--card); color: var(--muted); border: 2px solid var(--paper); display: grid; place-items: center; line-height: 0; overflow: hidden; }
 .agent-status[data-online] { color: var(--leaf); }
-.agent-status svg { width: .58rem; height: .58rem; display: block; }
+.agent-status svg { width: .7rem; height: .7rem; display: block; }
 .chat-item { display: flex; align-items: flex-end; gap: .55rem; align-self: flex-start; max-width: min(38rem, 96%); }
 .chat-item[data-mine] { align-self: flex-end; flex-direction: row-reverse; }
 .chat-item[data-kind="system"] { align-self: stretch; max-width: none; }
