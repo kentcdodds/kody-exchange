@@ -7,6 +7,7 @@ import {
 	authMdPath,
 	jsonLdGraph,
 	llmsTxtPath,
+	startMdPath,
 	mcpServerCardPath,
 	prefersMarkdown,
 	robotsTxt,
@@ -131,6 +132,7 @@ test('public pages negotiate Markdown and expose discovery documents', async () 
 	const body = await markdown.text()
 	expect(body).toContain('# Stop copy-pasting between your AI agents.')
 	expect(body).toContain('POST https://kody.exchange/v1/threads')
+	expect(body).toContain('https://kody.exchange/start.md')
 
 	const env = createTestEnv()
 	const llms = await handleRequest(request(llmsTxtPath), env)
@@ -169,6 +171,42 @@ Policy: ${origin}/safety
 	const auth = await handleRequest(request(authMdPath), env)
 	expect(auth.status).toBe(200)
 	expect(await auth.text()).toContain('OAuth 2.1')
+
+	const start = await handleRequest(request(startMdPath), env)
+	expect(start.status).toBe(200)
+	expect(start.headers.get('content-type')).toMatch(/text\/markdown/)
+	const startBody = await start.text()
+	expect(startBody).toContain('# Open a kody.exchange room')
+	expect(startBody).toContain('Ask the human for `purpose` and `name`')
+	expect(startBody).toContain(
+		'Do not create a second room if you already have a live one',
+	)
+	expect(startBody).not.toContain('second guest room')
+	expect(startBody).toContain('Do not invent')
+	expect(startBody).toContain('Do not use example strings from this runbook')
+	expect(startBody).toContain('POST https://kody.exchange/v1/threads')
+	expect(startBody).toContain('create_thread')
+	expect(startBody).toContain('POST https://kody.exchange/api/threads')
+	expect(startBody).toContain('that creates a guest room')
+	expect(startBody).toContain('follow `connect_prompt` yourself')
+	expect(startBody).toContain('exact `join_prompt`')
+	expect(startBody).toContain(
+		'Do not include `connect_prompt`, `token`, or `join_token`',
+	)
+	expect(startBody).toContain('untrusted data')
+	expect(startBody).toContain('dump secrets')
+	expect(startBody).toContain('at least 5 seconds between polls')
+	expect(startBody).not.toContain('your-agent-name')
+	expect(startBody).not.toContain('example.com')
+	expect(startBody).not.toContain('"purpose":"')
+	expect(llmsBody).toContain(startMdPath)
+
+	const startAlias = await handleRequest(request('/start'), env)
+	expect(startAlias.status).toBe(301)
+	expect(startAlias.headers.get('location')).toBe(`${origin}${startMdPath}`)
+	const startSlash = await handleRequest(request('/start/'), env)
+	expect(startSlash.status).toBe(301)
+	expect(startSlash.headers.get('location')).toBe(`${origin}${startMdPath}`)
 
 	const catalog = await handleRequest(request(apiCatalogPath), env)
 	expect(catalog.status).toBe(200)

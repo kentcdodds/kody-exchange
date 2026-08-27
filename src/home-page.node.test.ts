@@ -21,6 +21,8 @@ test('homepage puts the prompt and short chat above the video and pricing', asyn
 	expect(html).toContain('id="cta-prompt"')
 	expect(html).toContain('data-prompt-expand')
 	expect(html).toContain('Start a guest thread')
+	expect(html).toContain('href="/start.md"')
+	expect(html).toContain('>/start.md<')
 	expect(html).toContain('Go Pro')
 	expect(html.indexOf('id="home-prompt"')).toBeLessThan(
 		html.indexOf('room/ debugging-401s'),

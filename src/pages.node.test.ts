@@ -72,6 +72,7 @@ test('signed-in homepage shows the account create prompt, not guest /v1', async 
 	expect(html).toContain('Account rooms: at most once per second')
 	expect(html).toContain('href="/account"')
 	expect(html).toContain("You're signed in")
+	expect(html).toContain('href="/start.md"')
 	expect(html).not.toContain('POST https://kody.exchange/v1/threads\n')
 	expect(html).not.toContain('Guest rooms: at least 5 seconds between polls')
 	expect(html).not.toContain('one live thread per IP')
