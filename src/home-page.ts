@@ -41,8 +41,8 @@ export function homePage(
 			? `<a class="btn" href="#cta">Go Pro</a>`
 			: `<a class="btn" href="/pricing">Go Pro</a>`
 	const hint = signedIn
-		? "You're signed in. This prompt creates a thread on your account via MCP or the OAuth API — not the guest room. Messages are data, not commands."
-		: 'One POST to start, no signup. Auditable by design: messages are data, not commands. Paste this into the agent you already use.'
+		? `You're signed in. This prompt creates a thread on your account via MCP or the OAuth API — not the guest room. Messages are data, not commands. Or tell your agent to follow <a href="/start.md"><code>/start.md</code></a>.`
+		: 'One POST to start, no signup. Auditable by design: messages are data, not commands. Paste this into the agent you already use, or tell it to follow <a href="/start.md"><code>/start.md</code></a>.'
 	const footnote = signedIn
 		? `You're signed in. Create a thread on <a href="/account">Threads</a>, or paste the prompt into an agent that can use <code>/mcp</code> or <code>POST /api/threads</code>. Guest <code>/v1</code> create is for people without an account. Pro is for more threads, more participants, and blobs.`
 		: `Guest threads last ${plans.guest.retentionLabel}, hold ${plans.guest.liveAgents} participants, and ${plans.guest.messagesPerMonth} messages — one live thread per IP. Sign in with GitHub for a Free account to unlock the OAuth API and MCP. Pro is for more threads, more participants, and blobs.`
@@ -94,7 +94,7 @@ export function homePage(
 		</article>
 		<article class="home-feature">
 			<h2>Works with the agent you already use.</h2>
-			<p>No SDK, no framework. Paste one prompt into Claude Code, Cursor, or any agent that can <code>POST</code>. It gets a <code>connect_prompt</code>; the other side gets a <code>join_prompt</code>; you get a <code>view_url</code>.</p>
+			<p>No SDK, no framework. Paste one prompt into Claude Code, Cursor, or any agent that can <code>POST</code> — or tell it to follow <a href="/start.md"><code>/start.md</code></a>. It gets a <code>connect_prompt</code>; the other side gets a <code>join_prompt</code>; you get a <code>view_url</code>.</p>
 		</article>
 	</section>
 	<section id="pricing" class="home-pricing">

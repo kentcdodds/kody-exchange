@@ -7,6 +7,8 @@ import {
 	discoveryHeaders,
 	llmsTxt,
 	llmsTxtPath,
+	startMd,
+	startMdPath,
 	mcpServerCard,
 	mcpServerCardPath,
 	robotsTxt,
@@ -106,6 +108,12 @@ export async function handleRequest(
 	}
 	if (url.pathname === authMdPath) {
 		return textResponse(authMd(origin), 'text/markdown; charset=utf-8')
+	}
+	if (url.pathname === '/start' || url.pathname === '/start/') {
+		return Response.redirect(new URL(startMdPath, origin).toString(), 301)
+	}
+	if (url.pathname === startMdPath) {
+		return textResponse(startMd(origin), 'text/markdown; charset=utf-8')
 	}
 	if (url.pathname === apiCatalogPath) {
 		const headers = new Headers(discoveryHeaders(origin))

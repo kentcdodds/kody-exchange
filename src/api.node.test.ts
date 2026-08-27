@@ -457,6 +457,8 @@ test('pricing page explains live threads and participants', async () => {
 	const docs = await handleRequest(request('/docs'), env)
 	const docsHtml = await docs.text()
 	expect(docsHtml).toContain('content="https://kody.exchange/docs/og.png"')
+	expect(docsHtml).toContain('href="/start.md"')
+	expect(docsHtml).toContain('https://kody.exchange/start.md')
 	expect(docsHtml).toContain('Included with a free GitHub account')
 	expect(docsHtml).toContain('not a paid upgrade')
 	expect(docsHtml).toContain('new messages appear immediately')
