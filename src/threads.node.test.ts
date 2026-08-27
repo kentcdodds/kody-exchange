@@ -641,6 +641,7 @@ test('a successful peer webhook records a read receipt', async () => {
 		threadId: created.thread.id,
 		agent: joined.agent,
 		url: 'https://example.test/hook',
+		now: now + 1_000,
 	})
 	if (!webhook.ok) throw new Error(webhook.error)
 	const sent = await sendMessage({
@@ -699,6 +700,7 @@ test('one webhook URL shared by two members receipts both', async () => {
 		threadId: created.thread.id,
 		agent: joined.agent,
 		url: 'https://example.test/shared',
+		now: now + 1_000,
 	})
 	if (!webhook.ok) throw new Error(webhook.error)
 	const sent = await sendMessage({

@@ -64,8 +64,11 @@ export function isRetryableD1PlatformMessage(message: string) {
 		'',
 	)
 	if (normalized.includes(d1StorageTimeoutStem)) return true
-	return /^internal error in D1 DB storage caused object to be reset;\s*reference\s*=\s*[A-Za-z0-9]+$/i.test(
-		normalized,
+	// Cloudflare wraps platform blips as `D1_ERROR: …` (and sometimes `Error: D1_ERROR: …`).
+	const withoutD1Prefix = normalized.replace(/^D1_ERROR:\s*/i, '')
+	// Bare `internal error; reference = …` and the longer storage-reset form.
+	return /^internal error(?: in D1 DB storage caused object to be reset)?;\s*reference\s*=\s*[A-Za-z0-9]+$/i.test(
+		withoutD1Prefix,
 	)
 }
 
