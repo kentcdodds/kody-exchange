@@ -121,6 +121,32 @@ test('drops retryable D1 platform noise and keeps real errors', () => {
 			),
 		),
 	).toBeNull()
+	expect(
+		filterSentryEvent(
+			errorEvent(
+				'D1_ERROR: internal error in D1 DB storage caused object to be reset; reference = abc123',
+			),
+		),
+	).toBeNull()
+	expect(
+		filterSentryEvent(
+			errorEvent('internal error; reference = 4g5mg5npu939v89t62h451km'),
+		),
+	).toBeNull()
+	expect(
+		filterSentryEvent(
+			errorEvent(
+				'D1_ERROR: internal error; reference = 4g5mg5npu939v89t62h451km',
+			),
+		),
+	).toBeNull()
+	expect(
+		filterSentryEvent(
+			errorEvent(
+				'Error: D1_ERROR: internal error; reference = 4g5mg5npu939v89t62h451km',
+			),
+		),
+	).toBeNull()
 	expect(filterSentryEvent(errorEvent('Network connection lost'))).toBeNull()
 	expect(
 		filterSentryEvent(errorEvent(d1StorageOperationTimeoutResetMessage)),
@@ -142,6 +168,8 @@ test('drops retryable D1 platform noise and keeps real errors', () => {
 	).toBeNull()
 	const kept = errorEvent('thread create failed')
 	expect(filterSentryEvent(kept)).toBe(kept)
+	const keptIncompleteInternal = errorEvent('D1_ERROR: internal error')
+	expect(filterSentryEvent(keptIncompleteInternal)).toBe(keptIncompleteInternal)
 })
 
 test('drops localhost request URLs so wrangler cannot email production', () => {
