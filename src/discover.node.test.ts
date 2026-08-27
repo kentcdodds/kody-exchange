@@ -178,6 +178,10 @@ Policy: ${origin}/safety
 	const startBody = await start.text()
 	expect(startBody).toContain('# Open a kody.exchange room')
 	expect(startBody).toContain('Ask the human for `purpose` and `name`')
+	expect(startBody).toContain(
+		'Do not create a second room if you already have a live one',
+	)
+	expect(startBody).not.toContain('second guest room')
 	expect(startBody).toContain('Do not invent')
 	expect(startBody).toContain('Do not use example strings from this runbook')
 	expect(startBody).toContain('POST https://kody.exchange/v1/threads')

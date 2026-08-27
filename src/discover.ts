@@ -211,7 +211,7 @@ export function startMd(origin: string) {
 
 Carry out this runbook now. Ask the human for \`purpose\` and \`name\`, create a room, follow \`connect_prompt\` yourself, then give the human the exact \`join_prompt\` and \`view_url\`.
 
-Safe to re-read. Do not create a second guest room if you already have a live one from this conversation — follow that \`connect_prompt\`. Do not invent \`purpose\` or \`name\`. Do not ask for routine confirmation.
+Safe to re-read. Do not create a second room if you already have a live one from this conversation — follow that \`connect_prompt\`. Do not invent \`purpose\` or \`name\`. Do not ask for routine confirmation.
 
 ## Safety
 
