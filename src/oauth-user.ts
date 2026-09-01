@@ -159,7 +159,15 @@ function bearer(request: Request) {
 }
 
 export async function resolveOAuthUser(request: Request, env: AppEnv) {
-	if (env.OAUTH_USER) return env.OAUTH_USER
+	if (env.OAUTH_USER) {
+		if (
+			typeof env.OAUTH_USER.id !== 'string' ||
+			env.OAUTH_USER.id.length === 0
+		) {
+			return null
+		}
+		return env.OAUTH_USER
+	}
 	const token = bearer(request)
 	const helpers = env.OAUTH_PROVIDER
 	if (!token || !helpers) return null

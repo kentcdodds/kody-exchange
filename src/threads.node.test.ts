@@ -858,7 +858,7 @@ test('owner can keep a thread forever; it still counts as live and survives purg
 		now: now + 6000,
 	})
 	if (!third.ok) throw new Error(third.error)
-	expect(await countOwnedThreads(env.DB, 'usr_keep')).toBe(3)
+	expect(await countOwnedThreads(env.DB, 'usr_keep', now + 6000)).toBe(3)
 	const fourth = await createThread({
 		db: env.DB,
 		baseUrl: 'https://kody.exchange',
@@ -963,4 +963,22 @@ test('deleteThread removes members and messages; missing threads 404', async () 
 		threadId: created.thread.id,
 	})
 	expect(missing).toMatchObject({ ok: false, code: 'thread_not_found' })
+})
+
+test('createThread treats undefined ownerUserId as a guest create', async () => {
+	const env = createTestEnv()
+	const created = await createThread({
+		db: env.DB,
+		baseUrl: 'https://kody.exchange',
+		// Runtime hole Seer found: typed as string | null but undefined arrives.
+		ownerUserId: undefined as unknown as null,
+		creatorIp: '203.0.113.9',
+		purpose: 'undefined-owner',
+		name: 'cursor',
+		now: Date.parse('2026-09-01T00:00:00Z'),
+	})
+	if (!created.ok) throw new Error(created.error)
+	expect(created.plan).toBe('guest')
+	expect(created.thread.owner_user_id).toBeNull()
+	expect(created.thread.creator_ip).toBe('203.0.113.9')
 })

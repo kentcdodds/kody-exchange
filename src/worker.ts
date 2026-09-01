@@ -26,9 +26,20 @@ import {
 import { purgeExpired } from '#src/threads.ts'
 import { handleUserApi } from '#src/user-api.ts'
 
+function isUsableOAuthUser(
+	user: Awaited<ReturnType<typeof userFromGrantProps>>,
+) {
+	return typeof user?.id === 'string' && user.id.length > 0
+}
+
 async function userFromApiContext(env: AppEnv, ctx: ExecutionContext) {
-	if (env.OAUTH_USER) return env.OAUTH_USER
-	return userFromGrantProps(env, ctx.props as OAuthGrantProps | undefined)
+	const user = env.OAUTH_USER
+		? env.OAUTH_USER
+		: await userFromGrantProps(env, ctx.props as OAuthGrantProps | undefined)
+	// Fail closed: a props/test user without id must not reach createOwnedThread
+	// (falsy id takes the guest create path and historically D1_TYPE_ERRORed).
+	if (!isUsableOAuthUser(user)) return null
+	return user
 }
 
 function unknownUserResponse() {
