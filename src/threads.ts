@@ -387,12 +387,16 @@ export async function countGuestThreadsForIp(
 	return row?.n ?? 0
 }
 
-export async function countOwnedThreads(db: D1Database, userId: string) {
+export async function countOwnedThreads(
+	db: D1Database,
+	userId: string,
+	now = Date.now(),
+) {
 	const row = await first<{ n: number }>(
 		db,
 		`SELECT COUNT(*) AS n FROM threads WHERE owner_user_id = ? AND ${sqlThreadLive()}`,
 		userId,
-		Date.now(),
+		now,
 	)
 	return row?.n ?? 0
 }
@@ -593,7 +597,7 @@ export async function createThread(input: {
 
 	const creatorIp = ownerUserId ? null : sanitizeIp(input.creatorIp)
 	if (ownerUserId) {
-		const owned = await countOwnedThreads(input.db, ownerUserId)
+		const owned = await countOwnedThreads(input.db, ownerUserId, now)
 		if (owned >= plan.threads) {
 			return fail(
 				402,

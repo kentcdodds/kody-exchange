@@ -10,7 +10,10 @@ import {
 
 test('admin insights count users, rooms, and messages without bodies', async () => {
 	const env = createTestEnv()
-	const now = Date.UTC(2026, 7, 16, 18, 0, 0)
+	// Wall-clock "this month" usage is recorded at send time; keep insights `now`
+	// in the same UTC month so thisMonthGuest is not calendar-flaky.
+	const now = Date.now()
+	const day = new Date(now).toISOString().slice(0, 10)
 	await createSignedInUser(env, {
 		id: 'usr_op',
 		github_id: '99',
@@ -113,7 +116,7 @@ test('admin insights count users, rooms, and messages without bodies', async () 
 	)
 	expect(JSON.stringify(insights)).not.toContain('203.0.113.9')
 	expect(JSON.stringify(insights)).not.toContain('kx_live_')
-	expect(insights.dailyMessages[0]?.day).toBe('2026-08-16')
+	expect(insights.dailyMessages[0]?.day).toBe(day)
 	expect(insights.dailyMessages).toHaveLength(14)
 })
 

@@ -858,7 +858,7 @@ test('owner can keep a thread forever; it still counts as live and survives purg
 		now: now + 6000,
 	})
 	if (!third.ok) throw new Error(third.error)
-	expect(await countOwnedThreads(env.DB, 'usr_keep')).toBe(3)
+	expect(await countOwnedThreads(env.DB, 'usr_keep', now + 6000)).toBe(3)
 	const fourth = await createThread({
 		db: env.DB,
 		baseUrl: 'https://kody.exchange',
