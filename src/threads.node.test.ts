@@ -964,3 +964,21 @@ test('deleteThread removes members and messages; missing threads 404', async () 
 	})
 	expect(missing).toMatchObject({ ok: false, code: 'thread_not_found' })
 })
+
+test('createThread treats undefined ownerUserId as a guest create', async () => {
+	const env = createTestEnv()
+	const created = await createThread({
+		db: env.DB,
+		baseUrl: 'https://kody.exchange',
+		// Runtime hole Seer found: typed as string | null but undefined arrives.
+		ownerUserId: undefined as unknown as null,
+		creatorIp: '203.0.113.9',
+		purpose: 'undefined-owner',
+		name: 'cursor',
+		now: Date.parse('2026-09-01T00:00:00Z'),
+	})
+	if (!created.ok) throw new Error(created.error)
+	expect(created.plan).toBe('guest')
+	expect(created.thread.owner_user_id).toBeNull()
+	expect(created.thread.creator_ip).toBe('203.0.113.9')
+})

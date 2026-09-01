@@ -581,7 +581,9 @@ export async function createThread(input: {
 	  }>
 > {
 	const now = input.now ?? Date.now()
-	const planName = await planForOwner(input.db, input.ownerUserId)
+	// D1 rejects undefined; callers may pass a missing id as undefined.
+	const ownerUserId = input.ownerUserId ?? null
+	const planName = await planForOwner(input.db, ownerUserId)
 	const plan = getPlan(planName)
 	const webhook =
 		input.webhookUrl === undefined || input.webhookUrl === null
@@ -589,9 +591,9 @@ export async function createThread(input: {
 			: parseWebhookUrl(input.webhookUrl)
 	if (!webhook.ok) return webhook
 
-	const creatorIp = input.ownerUserId ? null : sanitizeIp(input.creatorIp)
-	if (input.ownerUserId) {
-		const owned = await countOwnedThreads(input.db, input.ownerUserId)
+	const creatorIp = ownerUserId ? null : sanitizeIp(input.creatorIp)
+	if (ownerUserId) {
+		const owned = await countOwnedThreads(input.db, ownerUserId)
 		if (owned >= plan.threads) {
 			return fail(
 				402,
@@ -635,7 +637,7 @@ export async function createThread(input: {
 		`INSERT INTO threads (id, owner_user_id, purpose, thread_secret, view_token_hash, join_token_hash, webhook_url, created_at, expires_at, creator_ip)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		threadId,
-		input.ownerUserId,
+		ownerUserId,
 		purpose,
 		threadSecret,
 		await sha256Hex(viewToken),
@@ -650,7 +652,7 @@ export async function createThread(input: {
 		`INSERT INTO agents (id, user_id, thread_id, name, token_hash, created_at, revoked_at)
 		 VALUES (?, ?, ?, ?, ?, ?, NULL)`,
 		agentId,
-		input.ownerUserId,
+		ownerUserId,
 		threadId,
 		name,
 		await sha256Hex(token),

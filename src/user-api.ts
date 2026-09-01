@@ -109,6 +109,19 @@ export async function createOwnedThread(
 	input: { purpose?: unknown; name?: unknown; webhook_url?: unknown },
 	ctx?: ExecutionContext,
 ) {
+	// Owned creates must never fall through to the guest path: a missing
+	// user.id is falsy, so createThread would bind undefined/null as a guest
+	// insert and (before D1 null-coercion) throw D1_TYPE_ERROR.
+	if (typeof user.id !== 'string' || user.id.length === 0) {
+		return json(
+			{
+				ok: false,
+				error: 'Signed-in user is missing an id. Re-authorize and try again.',
+				code: 'invalid_token',
+			},
+			401,
+		)
+	}
 	const created = await createThread({
 		db: env.DB,
 		baseUrl: appBaseUrl(env, request),
