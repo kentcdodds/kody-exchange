@@ -1,3 +1,12 @@
+/**
+ * Cloudflare D1 rejects `undefined` binds with D1_TYPE_ERROR. Absent SQL
+ * values must be `null`. Coerce at the boundary so call sites cannot crash
+ * the Worker with a platform type error.
+ */
+export function d1BindParams(params: Array<unknown>) {
+	return params.map((value) => (value === undefined ? null : value))
+}
+
 export async function first<T>(
 	db: D1Database,
 	sql: string,
@@ -5,7 +14,7 @@ export async function first<T>(
 ) {
 	return db
 		.prepare(sql)
-		.bind(...params)
+		.bind(...d1BindParams(params))
 		.first<T>()
 }
 
@@ -16,7 +25,7 @@ export async function all<T>(
 ) {
 	const result = await db
 		.prepare(sql)
-		.bind(...params)
+		.bind(...d1BindParams(params))
 		.all<T>()
 	return result.results
 }
@@ -28,7 +37,7 @@ export async function run(
 ) {
 	return db
 		.prepare(sql)
-		.bind(...params)
+		.bind(...d1BindParams(params))
 		.run()
 }
 
