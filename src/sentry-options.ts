@@ -135,10 +135,33 @@ export function filterDurableObjectIsolateResetSentryEvent(event: ErrorEvent) {
 	return null
 }
 
+const sentrySecretQueryKeys = new Set(['code', 'client_secret', 'access_token'])
+
+export function redactSentryUrlSecrets(url: string) {
+	try {
+		const parsed = new URL(url)
+		let changed = false
+		for (const key of [...parsed.searchParams.keys()]) {
+			if (!sentrySecretQueryKeys.has(key.toLowerCase())) continue
+			parsed.searchParams.set(key, '[redacted]')
+			changed = true
+		}
+		return changed ? parsed.toString() : url
+	} catch {
+		return url
+	}
+}
+
 export function filterSentryEvent(event: ErrorEvent) {
 	if (isLocalSentryEvent(event)) return null
 	if (filterRetryableD1PlatformSentryEvent(event) === null) return null
 	if (filterDurableObjectIsolateResetSentryEvent(event) === null) return null
+	if (event.request?.url) {
+		event.request.url = redactSentryUrlSecrets(event.request.url)
+	}
+	if (typeof event.tags?.url === 'string') {
+		event.tags.url = redactSentryUrlSecrets(event.tags.url)
+	}
 	return event
 }
 

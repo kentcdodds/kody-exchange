@@ -8,6 +8,7 @@ import {
 	filterSentryEvent,
 	getDurableObjectSentryOptions,
 	getSentryOptions,
+	redactSentryUrlSecrets,
 } from '#src/sentry-options.ts'
 import { createTestEnv } from '#src/test-support.ts'
 
@@ -190,6 +191,35 @@ test('drops localhost request URLs so wrangler cannot email production', () => {
 	const production = errorEvent('thread create failed')
 	production.request = { url: 'https://kody.exchange/v1/threads' }
 	expect(filterSentryEvent(production)).toBe(production)
+})
+
+test('redacts OAuth codes and tokens from Sentry request URLs', () => {
+	expect(
+		redactSentryUrlSecrets(
+			'https://kody.exchange/auth/callback/github?code=oauth-used-code-xyz&state=abc&iss=https%3A%2F%2Fgithub.com%2Flogin%2Foauth',
+		),
+	).toBe(
+		'https://kody.exchange/auth/callback/github?code=%5Bredacted%5D&state=abc&iss=https%3A%2F%2Fgithub.com%2Flogin%2Foauth',
+	)
+	expect(
+		redactSentryUrlSecrets(
+			'https://example.com/token?access_token=gho_secret&client_secret=super-secret',
+		),
+	).toBe(
+		'https://example.com/token?access_token=%5Bredacted%5D&client_secret=%5Bredacted%5D',
+	)
+
+	const event = errorEvent('GitHub token exchange failed')
+	event.request = {
+		url: 'https://kody.exchange/auth/callback/github?code=oauth-used-code-xyz&state=abc',
+	}
+	event.tags = {
+		url: 'https://kody.exchange/auth/callback/github?code=oauth-used-code-xyz&state=abc',
+	}
+	const filtered = filterSentryEvent(event)
+	expect(filtered?.request?.url).toContain('code=%5Bredacted%5D')
+	expect(filtered?.request?.url).not.toContain('oauth-used-code-xyz')
+	expect(filtered?.tags?.url).not.toContain('oauth-used-code-xyz')
 })
 
 test('drops bare Durable Object platform resets only', () => {

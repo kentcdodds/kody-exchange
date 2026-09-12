@@ -1,8 +1,10 @@
+import * as Sentry from '@sentry/cloudflare'
 import { hmacSha256Hex, signPayload, verifyPayload } from '#src/crypto.ts'
 import { first, run } from '#src/db.ts'
 import { type AppEnv, appBaseUrl } from '#src/env.ts'
 import { createId } from '#src/ids.ts'
 import { applyGrantedPlan } from '#src/grants.ts'
+import { githubTokenExchangeFailedPage, layout } from '#src/html.ts'
 import { accountPlan, type AccountPlanName } from '#src/limits.ts'
 import { type SessionUser } from '#src/permissions.ts'
 import { ensureAccountRoles, loadAccessOrEmpty } from '#src/permissions-db.ts'
@@ -144,33 +146,19 @@ export async function finishGithubOAuth(request: Request, env: AppEnv) {
 		return new Response('OAuth state mismatch.', { status: 400 })
 	}
 
-	const tokenResponse = await fetch(
-		'https://github.com/login/oauth/access_token',
-		{
-			method: 'POST',
-			headers: {
-				accept: 'application/json',
-				'content-type': 'application/json',
-			},
-			body: JSON.stringify({
-				client_id: env.GITHUB_CLIENT_ID,
-				client_secret: env.GITHUB_CLIENT_SECRET,
-				code,
-				redirect_uri: `${appBaseUrl(env, request)}/auth/callback/github`,
-			}),
-		},
-	)
-	const tokenJson = (await tokenResponse.json()) as {
-		access_token?: string
-		error?: string
-	}
-	if (!tokenJson.access_token) {
-		return new Response('GitHub token exchange failed.', { status: 502 })
+	const token = await exchangeGithubAccessToken({
+		clientId: env.GITHUB_CLIENT_ID,
+		clientSecret: env.GITHUB_CLIENT_SECRET,
+		code,
+		redirectUri: `${appBaseUrl(env, request)}/auth/callback/github`,
+	})
+	if (!token.ok) {
+		return githubTokenExchangeFailedResponse(env, token.failure)
 	}
 
 	const profileResponse = await fetch('https://api.github.com/user', {
 		headers: {
-			authorization: `Bearer ${tokenJson.access_token}`,
+			authorization: `Bearer ${token.accessToken}`,
 			accept: 'application/vnd.github+json',
 			'user-agent': 'kody.exchange',
 		},
@@ -190,7 +178,7 @@ export async function finishGithubOAuth(request: Request, env: AppEnv) {
 	if (!email) {
 		const emailsResponse = await fetch('https://api.github.com/user/emails', {
 			headers: {
-				authorization: `Bearer ${tokenJson.access_token}`,
+				authorization: `Bearer ${token.accessToken}`,
 				accept: 'application/vnd.github+json',
 				'user-agent': 'kody.exchange',
 			},
@@ -333,4 +321,204 @@ export function clearThreadFlashCookie() {
 
 export function planOf(user: UserRow): AccountPlanName {
 	return accountPlan(user.plan)
+}
+
+export type GithubTokenBodyKind = 'json' | 'empty' | 'non-json' | 'network'
+
+export type GithubTokenExchangeFailure = {
+	httpStatus: number | null
+	bodyKind: GithubTokenBodyKind
+	error?: string
+	errorDescription?: string
+}
+
+export function githubTokenExchangeUserMessage(error: string | undefined) {
+	switch (error) {
+		case 'bad_verification_code':
+			return 'This sign-in link was already used or expired. Start again to get a fresh one.'
+		case 'incorrect_client_credentials':
+			return 'GitHub rejected the app credentials. That is on our side. Try again in a moment, or contact support if it keeps happening.'
+		case 'redirect_uri_mismatch':
+			return 'GitHub rejected the return address for this sign-in. Try again, or contact support if it keeps happening.'
+		case 'application_suspended':
+			return 'The GitHub app is suspended, so sign-in cannot complete right now.'
+		case 'unverified_user_email':
+			return 'GitHub needs a verified email on your account before you can sign in here.'
+		default:
+			return 'GitHub could not complete sign-in. This is often a used or expired link. Start again to get a fresh one.'
+	}
+}
+
+function isNonRetryableGithubTokenError(error: string) {
+	switch (error) {
+		case 'bad_verification_code':
+		case 'incorrect_client_credentials':
+		case 'redirect_uri_mismatch':
+			return true
+		default:
+			return false
+	}
+}
+
+export function shouldRetryGithubTokenExchange(
+	failure: GithubTokenExchangeFailure,
+) {
+	if (failure.error && isNonRetryableGithubTokenError(failure.error)) {
+		return false
+	}
+	switch (failure.bodyKind) {
+		case 'network':
+		case 'empty':
+			return true
+		case 'json':
+		case 'non-json':
+			return failure.httpStatus != null && failure.httpStatus >= 500
+		default: {
+			const exhaustive: never = failure.bodyKind
+			return exhaustive
+		}
+	}
+}
+
+export function githubTokenExchangeSentryExtra(
+	failure: GithubTokenExchangeFailure,
+) {
+	return {
+		github_error: failure.error ?? null,
+		github_error_description: failure.errorDescription ?? null,
+		http_status: failure.httpStatus,
+		body_kind: failure.bodyKind,
+	}
+}
+
+function reportGithubTokenExchangeFailure(failure: GithubTokenExchangeFailure) {
+	Sentry.captureException(new Error('GitHub token exchange failed'), {
+		tags: {
+			github_error: failure.error ?? 'none',
+			github_token_body: failure.bodyKind,
+		},
+		extra: githubTokenExchangeSentryExtra(failure),
+	})
+}
+
+function githubTokenExchangeFailedResponse(
+	env: AppEnv,
+	failure: GithubTokenExchangeFailure,
+) {
+	reportGithubTokenExchangeFailure(failure)
+	const html = layout({
+		title: 'Sign-in failed',
+		path: '/auth/callback/github',
+		user: null,
+		env,
+		body: githubTokenExchangeFailedPage(
+			githubTokenExchangeUserMessage(failure.error),
+		),
+	})
+	return new Response(html, {
+		status: 502,
+		headers: {
+			'content-type': 'text/html; charset=utf-8',
+			'cache-control': 'no-store',
+		},
+	})
+}
+
+function safeGithubErrorField(value: unknown, max: number) {
+	if (typeof value !== 'string') return undefined
+	const trimmed = value.trim()
+	if (!trimmed) return undefined
+	return trimmed.length > max ? trimmed.slice(0, max) : trimmed
+}
+
+async function postGithubAccessToken(input: {
+	clientId: string
+	clientSecret: string
+	code: string
+	redirectUri: string
+}): Promise<
+	| { ok: true; accessToken: string }
+	| { ok: false; failure: GithubTokenExchangeFailure }
+> {
+	let response: Response
+	try {
+		response = await fetch('https://github.com/login/oauth/access_token', {
+			method: 'POST',
+			headers: {
+				accept: 'application/json',
+				'content-type': 'application/json',
+			},
+			body: JSON.stringify({
+				client_id: input.clientId,
+				client_secret: input.clientSecret,
+				code: input.code,
+				redirect_uri: input.redirectUri,
+			}),
+		})
+	} catch {
+		return { ok: false, failure: { httpStatus: null, bodyKind: 'network' } }
+	}
+
+	let text: string
+	try {
+		text = await response.text()
+	} catch {
+		return {
+			ok: false,
+			failure: { httpStatus: response.status, bodyKind: 'empty' },
+		}
+	}
+
+	if (!text.trim()) {
+		return {
+			ok: false,
+			failure: { httpStatus: response.status, bodyKind: 'empty' },
+		}
+	}
+
+	let parsed: unknown
+	try {
+		parsed = JSON.parse(text) as unknown
+	} catch {
+		return {
+			ok: false,
+			failure: { httpStatus: response.status, bodyKind: 'non-json' },
+		}
+	}
+
+	if (!parsed || typeof parsed !== 'object') {
+		return {
+			ok: false,
+			failure: { httpStatus: response.status, bodyKind: 'json' },
+		}
+	}
+
+	const tokenJson = parsed as Record<string, unknown>
+	const accessToken =
+		typeof tokenJson.access_token === 'string'
+			? tokenJson.access_token.trim()
+			: ''
+	if (accessToken) return { ok: true, accessToken }
+
+	return {
+		ok: false,
+		failure: {
+			httpStatus: response.status,
+			bodyKind: 'json',
+			error: safeGithubErrorField(tokenJson.error, 200),
+			errorDescription: safeGithubErrorField(tokenJson.error_description, 500),
+		},
+	}
+}
+
+async function exchangeGithubAccessToken(input: {
+	clientId: string
+	clientSecret: string
+	code: string
+	redirectUri: string
+}) {
+	const first = await postGithubAccessToken(input)
+	if (first.ok) return first
+	if (!shouldRetryGithubTokenExchange(first.failure)) return first
+	return postGithubAccessToken(input)
 }
