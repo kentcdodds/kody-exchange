@@ -135,11 +135,75 @@ export function filterDurableObjectIsolateResetSentryEvent(event: ErrorEvent) {
 	return null
 }
 
+const sentrySecretQueryKeys = new Set(['code', 'client_secret', 'access_token'])
+
+export function redactSentryUrlSecrets(url: string) {
+	try {
+		const parsed = new URL(url)
+		let changed = false
+		for (const key of parsed.searchParams.keys()) {
+			if (!sentrySecretQueryKeys.has(key.toLowerCase())) continue
+			parsed.searchParams.set(key, '[redacted]')
+			changed = true
+		}
+		return changed ? parsed.toString() : url
+	} catch {
+		return url
+	}
+}
+
+export function redactSentryQuerySecrets(
+	query: string | Record<string, string> | Array<[string, string]>,
+) {
+	if (typeof query === 'string') {
+		const leadingQuestion = query.startsWith('?')
+		const params = new URLSearchParams(leadingQuestion ? query.slice(1) : query)
+		let changed = false
+		for (const key of params.keys()) {
+			if (!sentrySecretQueryKeys.has(key.toLowerCase())) continue
+			params.set(key, '[redacted]')
+			changed = true
+		}
+		if (!changed) return query
+		const redacted = params.toString()
+		return leadingQuestion ? `?${redacted}` : redacted
+	}
+	if (Array.isArray(query)) {
+		return query.map(([key, value]) =>
+			sentrySecretQueryKeys.has(key.toLowerCase())
+				? ([key, '[redacted]'] as [string, string])
+				: ([key, value] as [string, string]),
+		)
+	}
+	const redacted: Record<string, string> = {}
+	for (const [key, value] of Object.entries(query)) {
+		redacted[key] = sentrySecretQueryKeys.has(key.toLowerCase())
+			? '[redacted]'
+			: value
+	}
+	return redacted
+}
+
+function redactSentryEventRequestSecrets(event: ErrorEvent) {
+	if (event.request?.url) {
+		event.request.url = redactSentryUrlSecrets(event.request.url)
+	}
+	if (event.request?.query_string != null) {
+		event.request.query_string = redactSentryQuerySecrets(
+			event.request.query_string,
+		)
+	}
+	if (typeof event.tags?.url === 'string') {
+		event.tags.url = redactSentryUrlSecrets(event.tags.url)
+	}
+	return event
+}
+
 export function filterSentryEvent(event: ErrorEvent) {
 	if (isLocalSentryEvent(event)) return null
 	if (filterRetryableD1PlatformSentryEvent(event) === null) return null
 	if (filterDurableObjectIsolateResetSentryEvent(event) === null) return null
-	return event
+	return redactSentryEventRequestSecrets(event)
 }
 
 export function buildSentryOptions(env: AppEnv): CloudflareOptions {

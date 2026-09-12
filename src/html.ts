@@ -840,6 +840,14 @@ export function threadNotFoundPage() {
 	`
 }
 
+export function githubTokenExchangeFailedPage(reason: string) {
+	return `
+	<h1>Could not sign in with GitHub</h1>
+	<p class="lede">${escapeHtml(reason)}</p>
+	<p class="row"><a class="btn" href="/auth/github">Try signing in again</a></p>
+	`
+}
+
 export function homepageDemoVideoHtml() {
 	const playLabel = `Play Video: ${homepageDemoVideoTitle}`
 	return `
