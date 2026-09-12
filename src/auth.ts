@@ -153,7 +153,11 @@ export async function finishGithubOAuth(request: Request, env: AppEnv) {
 		redirectUri: `${appBaseUrl(env, request)}/auth/callback/github`,
 	})
 	if (!token.ok) {
-		return githubTokenExchangeFailedResponse(env, token.failure)
+		return githubTokenExchangeFailedResponse(env, token.failure, {
+			code,
+			clientSecret: env.GITHUB_CLIENT_SECRET,
+			accessToken: token.rejectedAccessToken,
+		})
 	}
 
 	const profileResponse = await fetch('https://api.github.com/user', {
@@ -380,32 +384,64 @@ export function shouldRetryGithubTokenExchange(
 	}
 }
 
+export type GithubTokenExchangeSecrets = {
+	code?: string
+	clientSecret?: string
+	accessToken?: string
+}
+
+export function redactGithubTokenSecrets(
+	value: string | undefined,
+	secrets: GithubTokenExchangeSecrets,
+) {
+	if (!value) return value
+	const replacements = [secrets.code, secrets.clientSecret, secrets.accessToken]
+		.filter((item): item is string => Boolean(item && item.length > 0))
+		.toSorted((left, right) => right.length - left.length)
+	let redacted = value
+	for (const secret of replacements) {
+		redacted = redacted.split(secret).join('[redacted]')
+	}
+	return redacted
+}
+
 export function githubTokenExchangeSentryExtra(
 	failure: GithubTokenExchangeFailure,
+	secrets: GithubTokenExchangeSecrets = {},
 ) {
+	const error = redactGithubTokenSecrets(failure.error, secrets)
+	const errorDescription = redactGithubTokenSecrets(
+		failure.errorDescription,
+		secrets,
+	)
 	return {
-		github_error: failure.error ?? null,
-		github_error_description: failure.errorDescription ?? null,
+		github_error: error ?? null,
+		github_error_description: errorDescription ?? null,
 		http_status: failure.httpStatus,
 		body_kind: failure.bodyKind,
 	}
 }
 
-function reportGithubTokenExchangeFailure(failure: GithubTokenExchangeFailure) {
+function reportGithubTokenExchangeFailure(
+	failure: GithubTokenExchangeFailure,
+	secrets: GithubTokenExchangeSecrets,
+) {
+	const extra = githubTokenExchangeSentryExtra(failure, secrets)
 	Sentry.captureException(new Error('GitHub token exchange failed'), {
 		tags: {
-			github_error: failure.error ?? 'none',
+			github_error: extra.github_error ?? 'none',
 			github_token_body: failure.bodyKind,
 		},
-		extra: githubTokenExchangeSentryExtra(failure),
+		extra,
 	})
 }
 
 function githubTokenExchangeFailedResponse(
 	env: AppEnv,
 	failure: GithubTokenExchangeFailure,
+	secrets: GithubTokenExchangeSecrets,
 ) {
-	reportGithubTokenExchangeFailure(failure)
+	reportGithubTokenExchangeFailure(failure, secrets)
 	const html = layout({
 		title: 'Sign-in failed',
 		path: '/auth/callback/github',
@@ -424,11 +460,15 @@ function githubTokenExchangeFailedResponse(
 	})
 }
 
-function safeGithubErrorField(value: unknown, max: number) {
+function safeGithubErrorField(
+	value: unknown,
+	max: number,
+	secrets: GithubTokenExchangeSecrets,
+) {
 	if (typeof value !== 'string') return undefined
-	const trimmed = value.trim()
-	if (!trimmed) return undefined
-	return trimmed.length > max ? trimmed.slice(0, max) : trimmed
+	const redacted = redactGithubTokenSecrets(value, secrets)?.trim() ?? ''
+	if (!redacted) return undefined
+	return redacted.length > max ? redacted.slice(0, max) : redacted
 }
 
 async function postGithubAccessToken(input: {
@@ -438,7 +478,11 @@ async function postGithubAccessToken(input: {
 	redirectUri: string
 }): Promise<
 	| { ok: true; accessToken: string }
-	| { ok: false; failure: GithubTokenExchangeFailure }
+	| {
+			ok: false
+			failure: GithubTokenExchangeFailure
+			rejectedAccessToken?: string
+	  }
 > {
 	let response: Response
 	try {
@@ -498,16 +542,26 @@ async function postGithubAccessToken(input: {
 		typeof tokenJson.access_token === 'string'
 			? tokenJson.access_token.trim()
 			: ''
-	if (accessToken) return { ok: true, accessToken }
+	const secrets: GithubTokenExchangeSecrets = {
+		code: input.code,
+		clientSecret: input.clientSecret,
+		accessToken: accessToken || undefined,
+	}
+	if (response.ok && accessToken) return { ok: true, accessToken }
 
 	return {
 		ok: false,
 		failure: {
 			httpStatus: response.status,
 			bodyKind: 'json',
-			error: safeGithubErrorField(tokenJson.error, 200),
-			errorDescription: safeGithubErrorField(tokenJson.error_description, 500),
+			error: safeGithubErrorField(tokenJson.error, 200, secrets),
+			errorDescription: safeGithubErrorField(
+				tokenJson.error_description,
+				500,
+				secrets,
+			),
 		},
+		rejectedAccessToken: accessToken || undefined,
 	}
 }
 
@@ -516,9 +570,23 @@ async function exchangeGithubAccessToken(input: {
 	clientSecret: string
 	code: string
 	redirectUri: string
-}) {
+}): Promise<
+	| { ok: true; accessToken: string }
+	| {
+			ok: false
+			failure: GithubTokenExchangeFailure
+			rejectedAccessToken?: string
+	  }
+> {
 	const firstAttempt = await postGithubAccessToken(input)
 	if (firstAttempt.ok) return firstAttempt
 	if (!shouldRetryGithubTokenExchange(firstAttempt.failure)) return firstAttempt
-	return postGithubAccessToken(input)
+	const retry = await postGithubAccessToken(input)
+	if (retry.ok) return retry
+	return {
+		ok: false,
+		failure: retry.failure,
+		rejectedAccessToken:
+			retry.rejectedAccessToken ?? firstAttempt.rejectedAccessToken,
+	}
 }

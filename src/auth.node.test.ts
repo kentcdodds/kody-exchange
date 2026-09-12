@@ -114,6 +114,31 @@ test('token exchange Sentry extras never include the code, secret, or access tok
 	expect(serialized).not.toContain(leakedAccessToken)
 })
 
+test('redacts each OAuth secret from both GitHub error fields in Sentry extras', () => {
+	const secrets = {
+		code: oauthCode,
+		clientSecret,
+		accessToken: leakedAccessToken,
+	}
+	for (const secret of [oauthCode, clientSecret, leakedAccessToken]) {
+		const extra = githubTokenExchangeSentryExtra(
+			{
+				httpStatus: 401,
+				bodyKind: 'json',
+				error: `failed:${secret}`,
+				errorDescription: `GitHub echoed ${secret} in the description`,
+			},
+			secrets,
+		)
+		const serialized = JSON.stringify(extra)
+		expect(serialized).not.toContain(secret)
+		expect(extra.github_error).toBe('failed:[redacted]')
+		expect(extra.github_error_description).toBe(
+			'GitHub echoed [redacted] in the description',
+		)
+	}
+})
+
 test('does not retry clear GitHub client errors', () => {
 	expect(
 		shouldRetryGithubTokenExchange({
@@ -178,6 +203,48 @@ test('retries a transient empty token response once, then shows the generic page
 	expect(html).toContain('href="/auth/github"')
 	expect(html).not.toContain(clientSecret)
 	expect(html).not.toContain(oauthCode)
+})
+
+test('does not accept an access_token from a non-2xx token response', async () => {
+	const { env, state, cookie } = await startGithubSignIn()
+	let tokenPosts = 0
+
+	const response = await withMockedFetch(
+		async (input) => {
+			const url = String(input)
+			if (url === 'https://github.com/login/oauth/access_token') {
+				tokenPosts += 1
+				if (tokenPosts === 1) {
+					return Response.json(
+						{ access_token: leakedAccessToken },
+						{ status: 500 },
+					)
+				}
+				return Response.json({
+					error: 'bad_verification_code',
+					error_description: `token was ${leakedAccessToken}`,
+				})
+			}
+			throw new Error(`unexpected fetch ${url}`)
+		},
+		() => handleRequest(callbackRequest(state, cookie), env),
+	)
+
+	expect(tokenPosts).toBe(2)
+	expect(response.status).toBe(502)
+	const html = await response.text()
+	expect(html).toContain(
+		githubTokenExchangeUserMessage('bad_verification_code'),
+	)
+	expect(html).not.toContain(leakedAccessToken)
+	expect(html).not.toContain(clientSecret)
+	expect(html).not.toContain(oauthCode)
+	const created = await first<UserRow>(
+		env.DB,
+		'SELECT * FROM users WHERE login = ?',
+		'noah',
+	)
+	expect(created).toBeNull()
 })
 
 test('retries a network throw once and can still complete sign-in', async () => {
