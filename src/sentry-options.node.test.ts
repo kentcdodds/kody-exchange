@@ -8,6 +8,7 @@ import {
 	filterSentryEvent,
 	getDurableObjectSentryOptions,
 	getSentryOptions,
+	redactSentryQuerySecrets,
 	redactSentryUrlSecrets,
 } from '#src/sentry-options.ts'
 import { createTestEnv } from '#src/test-support.ts'
@@ -212,6 +213,7 @@ test('redacts OAuth codes and tokens from Sentry request URLs', () => {
 	const event = errorEvent('GitHub token exchange failed')
 	event.request = {
 		url: 'https://kody.exchange/auth/callback/github?code=oauth-used-code-xyz&state=abc',
+		query_string: 'code=oauth-used-code-xyz&state=abc',
 	}
 	event.tags = {
 		url: 'https://kody.exchange/auth/callback/github?code=oauth-used-code-xyz&state=abc',
@@ -219,7 +221,34 @@ test('redacts OAuth codes and tokens from Sentry request URLs', () => {
 	const filtered = filterSentryEvent(event)
 	expect(filtered?.request?.url).toContain('code=%5Bredacted%5D')
 	expect(filtered?.request?.url).not.toContain('oauth-used-code-xyz')
+	expect(filtered?.request?.query_string).toBe('code=%5Bredacted%5D&state=abc')
 	expect(filtered?.tags?.url).not.toContain('oauth-used-code-xyz')
+})
+
+test('redacts OAuth secrets from Sentry query_string shapes', () => {
+	expect(redactSentryQuerySecrets('code=oauth-used-code-xyz&state=abc')).toBe(
+		'code=%5Bredacted%5D&state=abc',
+	)
+	expect(
+		redactSentryQuerySecrets({
+			code: 'oauth-used-code-xyz',
+			state: 'abc',
+			access_token: 'gho_secret',
+		}),
+	).toEqual({
+		code: '[redacted]',
+		state: 'abc',
+		access_token: '[redacted]',
+	})
+	expect(
+		redactSentryQuerySecrets([
+			['client_secret', 'super-secret'],
+			['state', 'abc'],
+		]),
+	).toEqual([
+		['client_secret', '[redacted]'],
+		['state', 'abc'],
+	])
 })
 
 test('drops bare Durable Object platform resets only', () => {
