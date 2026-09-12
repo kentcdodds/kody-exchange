@@ -517,8 +517,8 @@ async function exchangeGithubAccessToken(input: {
 	code: string
 	redirectUri: string
 }) {
-	const first = await postGithubAccessToken(input)
-	if (first.ok) return first
-	if (!shouldRetryGithubTokenExchange(first.failure)) return first
+	const firstAttempt = await postGithubAccessToken(input)
+	if (firstAttempt.ok) return firstAttempt
+	if (!shouldRetryGithubTokenExchange(firstAttempt.failure)) return firstAttempt
 	return postGithubAccessToken(input)
 }

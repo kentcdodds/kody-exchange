@@ -141,7 +141,7 @@ export function redactSentryUrlSecrets(url: string) {
 	try {
 		const parsed = new URL(url)
 		let changed = false
-		for (const key of [...parsed.searchParams.keys()]) {
+		for (const key of parsed.searchParams.keys()) {
 			if (!sentrySecretQueryKeys.has(key.toLowerCase())) continue
 			parsed.searchParams.set(key, '[redacted]')
 			changed = true

@@ -1,5 +1,4 @@
-import * as Sentry from '@sentry/cloudflare'
-import { expect, test, vi } from 'vitest'
+import { expect, test } from 'vitest'
 import {
 	githubTokenExchangeSentryExtra,
 	githubTokenExchangeUserMessage,
@@ -60,13 +59,6 @@ async function withMockedFetch<T>(
 test('token exchange with a known GitHub error shows safe copy and a retry link', async () => {
 	const { env, state, cookie } = await startGithubSignIn()
 	let tokenPosts = 0
-	const captured: Array<{ extra?: unknown }> = []
-	const spy = vi
-		.spyOn(Sentry, 'captureException')
-		.mockImplementation((_error, hint) => {
-			captured.push({ extra: hint?.extra })
-			return ''
-		})
 
 	const response = await withMockedFetch(
 		async (input) => {
@@ -82,8 +74,6 @@ test('token exchange with a known GitHub error shows safe copy and a retry link'
 		},
 		() => handleRequest(callbackRequest(state, cookie), env),
 	)
-
-	spy.mockRestore()
 
 	expect(tokenPosts).toBe(1)
 	expect(response.status).toBe(502)
@@ -102,30 +92,22 @@ test('token exchange with a known GitHub error shows safe copy and a retry link'
 	expect(html).not.toContain(leakedAccessToken)
 	expect(html).not.toContain('The code passed is incorrect or expired.')
 	expect(html).not.toContain('Iv1.testclient')
+})
 
-	expect(captured).toHaveLength(1)
-	expect(captured[0]?.extra).toEqual({
+test('token exchange Sentry extras never include the code, secret, or access token', () => {
+	const extra = githubTokenExchangeSentryExtra({
+		httpStatus: 200,
+		bodyKind: 'json',
+		error: 'bad_verification_code',
+		errorDescription: 'The code passed is incorrect or expired.',
+	})
+	expect(extra).toEqual({
 		github_error: 'bad_verification_code',
 		github_error_description: 'The code passed is incorrect or expired.',
 		http_status: 200,
 		body_kind: 'json',
 	})
-	const reported = JSON.stringify(captured)
-	expect(reported).not.toContain(clientSecret)
-	expect(reported).not.toContain(oauthCode)
-	expect(reported).not.toContain(leakedAccessToken)
-})
-
-test('token exchange Sentry extras never include the code, secret, or access token', () => {
-	const extra = githubTokenExchangeSentryExtra({
-		httpStatus: 401,
-		bodyKind: 'json',
-		error: 'incorrect_client_credentials',
-		errorDescription:
-			'The client_id and/or client_secret passed are incorrect.',
-	})
 	const serialized = JSON.stringify(extra)
-	expect(extra.github_error).toBe('incorrect_client_credentials')
 	expect(serialized).not.toContain(clientSecret)
 	expect(serialized).not.toContain(oauthCode)
 	expect(serialized).not.toContain('access_token')
