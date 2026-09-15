@@ -135,6 +135,29 @@ export function filterDurableObjectIsolateResetSentryEvent(event: ErrorEvent) {
 	return null
 }
 
+/**
+ * Transient R2 binding platform unavailability. Public-asset callers treat
+ * get throws as a miss; these should not open or regress Sentry issues.
+ */
+const r2InternalErrorPattern =
+	/^(?:get|put|head|delete):\s*We encountered an internal error\. Please try again\. \(10001\)$/i
+
+export function isRetryableR2PlatformMessage(message: string) {
+	return r2InternalErrorPattern.test(withoutErrorPrefix(message))
+}
+
+export function isRetryableR2PlatformSentryEvent(event: ErrorEvent) {
+	return sentryEventMessages(event).some(
+		(message) =>
+			typeof message === 'string' && isRetryableR2PlatformMessage(message),
+	)
+}
+
+export function filterRetryableR2PlatformSentryEvent(event: ErrorEvent) {
+	if (!isRetryableR2PlatformSentryEvent(event)) return event
+	return null
+}
+
 const sentrySecretQueryKeys = new Set(['code', 'client_secret', 'access_token'])
 
 export function redactSentryUrlSecrets(url: string) {
@@ -203,6 +226,7 @@ export function filterSentryEvent(event: ErrorEvent) {
 	if (isLocalSentryEvent(event)) return null
 	if (filterRetryableD1PlatformSentryEvent(event) === null) return null
 	if (filterDurableObjectIsolateResetSentryEvent(event) === null) return null
+	if (filterRetryableR2PlatformSentryEvent(event) === null) return null
 	return redactSentryEventRequestSecrets(event)
 }
 

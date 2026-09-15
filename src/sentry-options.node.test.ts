@@ -264,3 +264,51 @@ test('drops bare Durable Object platform resets only', () => {
 	)
 	expect(filterSentryEvent(wrapped)).toBe(wrapped)
 })
+
+test('drops retryable R2 10001 platform noise and keeps real errors', () => {
+	expect(
+		filterSentryEvent(
+			errorEvent(
+				'get: We encountered an internal error. Please try again. (10001)',
+			),
+		),
+	).toBeNull()
+	expect(
+		filterSentryEvent(
+			errorEvent(
+				'Error: get: We encountered an internal error. Please try again. (10001)',
+			),
+		),
+	).toBeNull()
+	expect(
+		filterSentryEvent(
+			errorEvent(
+				'put: We encountered an internal error. Please try again. (10001)',
+			),
+		),
+	).toBeNull()
+	expect(
+		filterSentryEvent(
+			errorEvent(
+				'head: We encountered an internal error. Please try again. (10001)',
+			),
+		),
+	).toBeNull()
+	expect(
+		filterSentryEvent(
+			errorEvent(
+				'delete: We encountered an internal error. Please try again. (10001)',
+			),
+		),
+	).toBeNull()
+	const kept = errorEvent('thread create failed')
+	expect(filterSentryEvent(kept)).toBe(kept)
+	const keptOtherR2 = errorEvent(
+		'get: The specified key does not exist. (10007)',
+	)
+	expect(filterSentryEvent(keptOtherR2)).toBe(keptOtherR2)
+	const keptIncomplete = errorEvent(
+		'get: We encountered an internal error. Please try again.',
+	)
+	expect(filterSentryEvent(keptIncomplete)).toBe(keptIncomplete)
+})

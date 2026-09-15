@@ -1,6 +1,7 @@
 import { initWasm, Resvg } from '@resvg/resvg-wasm'
 import satori, { init as initSatori } from 'satori/standalone'
 import { type AppEnv } from '#src/env.ts'
+import { getR2ObjectOrNull } from '#src/r2.ts'
 import {
 	ensureOgFontsReady,
 	getFraunces700FontData,
@@ -103,7 +104,7 @@ async function readR2ObjectBytes(object: {
 }
 
 export async function loadIconBytes(env: AppEnv): Promise<Uint8Array> {
-	const fromBlobs = await env.BLOBS.get('public/icon.png')
+	const fromBlobs = await getR2ObjectOrNull(env.BLOBS, 'public/icon.png')
 	if (fromBlobs) return readR2ObjectBytes(fromBlobs)
 	if (env.ASSETS) {
 		const response = await env.ASSETS.fetch(

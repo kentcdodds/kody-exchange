@@ -30,6 +30,7 @@ import {
 } from '#src/billing.ts'
 import { type AppEnv, appBaseUrl } from '#src/env.ts'
 import { httpsRedirect } from '#src/https.ts'
+import { getR2ObjectOrNull } from '#src/r2.ts'
 import {
 	handleMcp,
 	isMcpBrowserNavigation,
@@ -253,7 +254,7 @@ export async function handleRequest(
 
 	const publicAsset = publicAssetKey(url.pathname)
 	if (publicAsset) {
-		const object = await env.BLOBS.get(publicAsset.key)
+		const object = await getR2ObjectOrNull(env.BLOBS, publicAsset.key)
 		if (object) {
 			return new Response(object.body, {
 				headers: {
