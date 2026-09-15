@@ -405,7 +405,7 @@ test('loadIconBytes falls through to ASSETS when R2 get throws', async () => {
 					headers: { 'content-type': 'image/png' },
 				})
 			},
-		} as Fetcher,
+		} as unknown as Fetcher,
 	})
 	const bytes = await loadIconBytes(env)
 	expect(bytes).toEqual(oneByOnePng)

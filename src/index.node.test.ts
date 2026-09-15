@@ -22,29 +22,21 @@ function assetsFetcher(body: string, status = 200): Fetcher {
 				headers: { 'content-type': 'image/png' },
 			})
 		},
-	} as Fetcher
+	} as unknown as Fetcher
 }
 
 test('favicon.png and icon.png serve from R2 when the object exists', async () => {
 	const env = createTestEnv({
 		ASSETS: assetsFetcher('from-assets'),
 	})
-	const faviconBytes = new TextEncoder().encode('from-r2-favicon')
-	const iconBytes = new TextEncoder().encode('from-r2-icon')
 	await env.BLOBS.put(
 		'public/favicon.png',
-		faviconBytes.buffer.slice(
-			faviconBytes.byteOffset,
-			faviconBytes.byteOffset + faviconBytes.byteLength,
-		),
+		new TextEncoder().encode('from-r2-favicon'),
 		{ httpMetadata: { contentType: 'image/png' } },
 	)
 	await env.BLOBS.put(
 		'public/icon.png',
-		iconBytes.buffer.slice(
-			iconBytes.byteOffset,
-			iconBytes.byteOffset + iconBytes.byteLength,
-		),
+		new TextEncoder().encode('from-r2-icon'),
 		{ httpMetadata: { contentType: 'image/png' } },
 	)
 
