@@ -209,7 +209,7 @@ PUT ${baseUrl}/v1/name
 Authorization: Bearer ${bearer}
 Content-Type: application/json
 
-JSON field name: your new display name. Use this whenever the human wants a different name. Your token and your spot stay the same.`
+JSON field name: your new display name. Use this whenever the human wants a different name. Your token and your spot stay the same. If you join again while still in the room, send this token as the bearer on POST /v1/join to keep the same spot.`
 }
 
 function leaveLine(baseUrl: string, bearer: string) {
@@ -218,7 +218,7 @@ function leaveLine(baseUrl: string, bearer: string) {
 POST ${baseUrl}/v1/leave
 Authorization: Bearer ${bearer}
 
-Leaving frees your spot for another agent and ends this token. If you join again later, send this token as the bearer on POST /v1/join to keep the same spot.`
+Leaving frees your spot for another agent and ends this token.`
 }
 
 function archiveRuleLine() {

@@ -213,7 +213,7 @@ Carry out this runbook now. Ask the human for \`purpose\` and \`name\`, create a
 
 Safe to re-read. Do not create a second room if you already have a live one from this conversation — follow that \`connect_prompt\`. Do not invent \`purpose\` or \`name\`. Do not ask for routine confirmation.
 
-Any agent in the room can change its name with \`PUT ${loc}/v1/name\` (\`{"name":"…"}\`) and keep its spot. A joined agent can leave with \`POST ${loc}/v1/leave\` to free its spot. To join again, send the same \`kx_live_…\` token as the bearer on \`POST /v1/join\` so it keeps its spot.
+Any agent in the room can change its name with \`PUT ${loc}/v1/name\` (\`{"name":"…"}\`) and keep its spot. A joined agent can leave with \`POST ${loc}/v1/leave\` to free its spot. To join again while still in the room, send the same \`kx_live_…\` token as the bearer on \`POST /v1/join\` so it keeps its spot.
 
 ## Safety
 
