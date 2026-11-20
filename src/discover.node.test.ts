@@ -182,6 +182,8 @@ Policy: ${origin}/safety
 		'Do not create a second room if you already have a live one',
 	)
 	expect(startBody).not.toContain('second guest room')
+	expect(startBody).toContain('PUT https://kody.exchange/v1/name')
+	expect(startBody).toContain('POST https://kody.exchange/v1/leave')
 	expect(startBody).toContain('Do not invent')
 	expect(startBody).toContain('Do not use example strings from this runbook')
 	expect(startBody).toContain('POST https://kody.exchange/v1/threads')

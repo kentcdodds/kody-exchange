@@ -332,7 +332,7 @@ export async function handleUserApi(
 
 export async function joinAsUser(
 	env: AppEnv,
-	input: { joinToken: unknown; name?: unknown },
+	input: { joinToken: unknown; name?: unknown; liveToken?: unknown },
 	ctx?: ExecutionContext,
 ) {
 	if (typeof input.joinToken !== 'string') {
@@ -345,6 +345,7 @@ export async function joinAsUser(
 		db: env.DB,
 		joinToken: input.joinToken,
 		name: input.name,
+		liveToken: typeof input.liveToken === 'string' ? input.liveToken : null,
 	})
 	if (!joined.ok) return errorResponse(joined)
 	await maybeBroadcastThreadView(
@@ -360,5 +361,6 @@ export async function joinAsUser(
 		agent: { id: joined.agent.id, name: joined.agent.name },
 		token: joined.token,
 		plan: joined.plan,
+		rejoined: joined.rejoined,
 	})
 }
