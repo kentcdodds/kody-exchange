@@ -15,8 +15,10 @@ import {
 	maybeDispatchWebhook,
 	getAgentByToken,
 	joinThread,
+	leaveThread,
 	listMessages,
 	listThreadMembers,
+	renameAgent,
 	requireMember,
 	sendMessage,
 	setWebhook,
@@ -152,6 +154,12 @@ export async function handleApi(
 		return webhookRoute(request, env)
 	}
 
+	if (url.pathname === '/v1/name' && request.method === 'PUT') {
+		return renameRoute(request, env, ctx)
+	}
+	if (url.pathname === '/v1/leave' && request.method === 'POST') {
+		return leaveRoute(request, env, ctx)
+	}
 	if (url.pathname === '/v1/archive' && request.method === 'POST') {
 		return archiveRoute(request, env, ctx)
 	}
@@ -278,8 +286,9 @@ async function joinThreadRoute(
 	const body = await readJson(request)
 	if (!body)
 		return json({ ok: false, error: 'Invalid JSON.', code: 'bad_json' }, 400)
+	const bearerToken = bearer(request)
 	const joinToken =
-		(typeof body.join_token === 'string' && body.join_token) || bearer(request)
+		(typeof body.join_token === 'string' && body.join_token) || bearerToken
 	if (!joinToken) {
 		return json(
 			{ ok: false, error: 'Missing join_token.', code: 'bad_join_token' },
@@ -290,6 +299,7 @@ async function joinThreadRoute(
 		db: env.DB,
 		joinToken,
 		name: body.name,
+		liveToken: bearerToken === joinToken ? null : bearerToken,
 	})
 	if (!joined.ok) return errorResponse(joined)
 	await maybeBroadcastThreadView(
@@ -306,7 +316,61 @@ async function joinThreadRoute(
 		token: joined.token,
 		view_url: await threadViewUrlFor(appBaseUrl(env, request), joined.thread),
 		plan: joined.plan,
+		rejoined: joined.rejoined,
 	})
+}
+
+export async function renameRoute(
+	request: Request,
+	env: AppEnv,
+	ctx?: ExecutionContext,
+) {
+	const auth = await requireAgent(request, env)
+	if (!auth.ok) return auth.response
+	const scoped = threadIdForAgent(auth.agent)
+	if (!scoped.ok) return scoped.response
+	const body = await readJson(request)
+	if (!body)
+		return json({ ok: false, error: 'Invalid JSON.', code: 'bad_json' }, 400)
+	const renamed = await renameAgent({
+		db: env.DB,
+		threadId: scoped.threadId,
+		agent: auth.agent,
+		name: body.name,
+	})
+	if (!renamed.ok) return errorResponse(renamed)
+	await maybeBroadcastThreadView(
+		env,
+		scoped.threadId,
+		renamed.renamedMessage,
+		ctx,
+		{ members: await listThreadMembers(env.DB, scoped.threadId) },
+	)
+	return json({
+		ok: true,
+		agent: { id: renamed.agent.id, name: renamed.agent.name },
+	})
+}
+
+export async function leaveRoute(
+	request: Request,
+	env: AppEnv,
+	ctx?: ExecutionContext,
+) {
+	const auth = await requireAgent(request, env)
+	if (!auth.ok) return auth.response
+	const scoped = threadIdForAgent(auth.agent)
+	if (!scoped.ok) return scoped.response
+	const left = await leaveThread({
+		db: env.DB,
+		threadId: scoped.threadId,
+		agent: auth.agent,
+	})
+	if (!left.ok) return errorResponse(left)
+	await maybeBroadcastThreadView(env, scoped.threadId, left.leftMessage, ctx, {
+		members: await listThreadMembers(env.DB, scoped.threadId),
+	})
+	return json({ ok: true, left: true })
 }
 
 async function sendRoute(

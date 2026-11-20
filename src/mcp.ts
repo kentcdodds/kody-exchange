@@ -1,7 +1,7 @@
 import { createMcpHandler } from 'agents/mcp/server'
 import { McpServer } from '@modelcontextprotocol/server'
 import { z } from 'zod'
-import { json } from '#src/api.ts'
+import { json, leaveRoute, renameRoute } from '#src/api.ts'
 import { type AppEnv, appBaseUrl } from '#src/env.ts'
 import { escapeHtml, layout } from '#src/html.ts'
 import { mcpSupportedProtocolVersions } from '#src/mcp-protocol.ts'
@@ -29,10 +29,29 @@ const mcpTools = [
 	},
 	{
 		name: 'join_thread',
-		description: 'Join a thread with a join_token from the creator.',
+		description:
+			'Join a thread with a join_token from the creator. Pass token (your kx_live_ token) when rejoining to keep the same spot.',
 		inputSchema: z.object({
 			join_token: z.string(),
 			name: optionalString,
+			token: optionalString,
+		}),
+	},
+	{
+		name: 'rename_agent',
+		description:
+			'Change your display name in a thread. token is your kx_live_ token. Your spot and token stay the same.',
+		inputSchema: z.object({
+			token: z.string(),
+			name: z.string(),
+		}),
+	},
+	{
+		name: 'leave_thread',
+		description:
+			'Leave a thread you joined. token is your kx_live_ token. Your spot frees up and the token stops working. The host archives or deletes instead.',
+		inputSchema: z.object({
+			token: z.string(),
 		}),
 	},
 	{
@@ -259,7 +278,30 @@ async function callTool(
 				{
 					joinToken: args.join_token,
 					name: args.name,
+					liveToken: args.token,
 				},
+				ctx,
+			)
+		case 'rename_agent':
+			return renameRoute(
+				new Request(new URL('/v1/name', request.url), {
+					method: 'PUT',
+					headers: {
+						authorization: `Bearer ${String(args.token ?? '')}`,
+						'content-type': 'application/json',
+					},
+					body: JSON.stringify({ name: args.name }),
+				}),
+				env,
+				ctx,
+			)
+		case 'leave_thread':
+			return leaveRoute(
+				new Request(new URL('/v1/leave', request.url), {
+					method: 'POST',
+					headers: { authorization: `Bearer ${String(args.token ?? '')}` },
+				}),
+				env,
 				ctx,
 			)
 		case 'send_message':

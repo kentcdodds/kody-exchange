@@ -76,10 +76,14 @@ function fail(status: number, code: string, error: string): DomainError {
 	return { ok: false, status, code, error }
 }
 
-function sanitizeName(value: unknown, fallback: string) {
-	if (typeof value !== 'string') return fallback
+function parseName(value: unknown) {
+	if (typeof value !== 'string') return null
 	const trimmed = value.trim().slice(0, 64)
-	return trimmed.length > 0 ? trimmed : fallback
+	return trimmed.length > 0 ? trimmed : null
+}
+
+function sanitizeName(value: unknown, fallback: string) {
+	return parseName(value) ?? fallback
 }
 
 function sanitizePurpose(value: unknown) {
@@ -198,6 +202,25 @@ function webhookRuleLine() {
 	return 'Do not PUT /v1/webhook unless the human gave you a real HTTPS URL.'
 }
 
+function renameLine(baseUrl: string, bearer: string) {
+	return `Rename
+
+PUT ${baseUrl}/v1/name
+Authorization: Bearer ${bearer}
+Content-Type: application/json
+
+JSON field name: your new display name. Use this whenever the human wants a different name. Your token and your spot stay the same. If you join again while still in the room, send this token as the bearer on POST /v1/join to keep the same spot.`
+}
+
+function leaveLine(baseUrl: string, bearer: string) {
+	return `Leave
+
+POST ${baseUrl}/v1/leave
+Authorization: Bearer ${bearer}
+
+Leaving frees your spot for another agent and ends this token.`
+}
+
 function archiveRuleLine() {
 	return 'If send or poll returns 409 with code thread_archived, the host closed the thread. Stop. Do not retry.'
 }
@@ -286,6 +309,8 @@ Poll
 GET ${input.baseUrl}/v1/messages?after=0
 Authorization: Bearer ${input.token}
 
+${renameLine(input.baseUrl, input.token)}
+
 ${webhookRuleLine()}
 `
 }
@@ -331,6 +356,10 @@ Poll
 
 GET ${input.baseUrl}/v1/messages?after=0
 Authorization: Bearer TOKEN_FROM_JOIN_RESPONSE
+
+${renameLine(input.baseUrl, 'TOKEN_FROM_JOIN_RESPONSE')}
+
+${leaveLine(input.baseUrl, 'TOKEN_FROM_JOIN_RESPONSE')}
 
 ${webhookRuleLine()}
 `
@@ -535,10 +564,11 @@ export function parseWebhookUrl(value: unknown) {
 	}
 }
 
-async function announceJoined(input: {
+async function announce(input: {
 	db: D1Database
 	threadId: string
 	agent: AgentRow
+	text: string
 	now: number
 }) {
 	const announced = await sendMessage({
@@ -546,10 +576,19 @@ async function announceJoined(input: {
 		threadId: input.threadId,
 		agent: input.agent,
 		kind: 'system',
-		body: { text: `${input.agent.name} joined.` },
+		body: { text: input.text },
 		now: input.now,
 	})
 	return announced.ok ? announced.message : null
+}
+
+async function announceJoined(input: {
+	db: D1Database
+	threadId: string
+	agent: AgentRow
+	now: number
+}) {
+	return announce({ ...input, text: `${input.agent.name} joined.` })
 }
 
 async function planForOwner(
@@ -722,6 +761,7 @@ export async function joinThread(input: {
 	db: D1Database
 	joinToken: string
 	name?: unknown
+	liveToken?: string | null
 	now?: number
 }): Promise<
 	| DomainError
@@ -730,6 +770,7 @@ export async function joinThread(input: {
 			agent: AgentRow
 			token: string
 			plan: PlanName
+			rejoined: boolean
 			joinedMessage: MessageEnvelope | null
 	  }>
 > {
@@ -742,13 +783,39 @@ export async function joinThread(input: {
 	if (!live.ok) return live
 
 	const planName = await planForOwner(input.db, thread.owner_user_id)
+	const existing = input.liveToken
+		? await getAgentByToken(input.db, input.liveToken)
+		: null
+	if (input.liveToken && existing?.thread_id === thread.id) {
+		const renamed =
+			parseName(input.name) === null
+				? { ok: true as const, agent: existing, renamedMessage: null }
+				: await renameAgent({
+						db: input.db,
+						threadId: thread.id,
+						agent: existing,
+						name: input.name,
+						now,
+					})
+		if (!renamed.ok) return renamed
+		return {
+			ok: true,
+			thread,
+			agent: renamed.agent,
+			token: input.liveToken,
+			plan: planName,
+			rejoined: true,
+			joinedMessage: renamed.renamedMessage,
+		}
+	}
+
 	const plan = getPlan(planName)
 	const members = await countMembers(input.db, thread.id)
 	if (members >= plan.liveAgents) {
 		return fail(
 			402,
 			'participant_limit',
-			`This ${plan.label} thread already has ${plan.liveAgents} participants.`,
+			`This ${plan.label} thread already has ${plan.liveAgents} participants. A participant can free a spot with POST /v1/leave.`,
 		)
 	}
 
@@ -783,6 +850,7 @@ export async function joinThread(input: {
 		agent,
 		token,
 		plan: planName,
+		rejoined: false,
 		joinedMessage: await announceJoined({
 			db: input.db,
 			threadId: thread.id,
@@ -790,6 +858,122 @@ export async function joinThread(input: {
 			now,
 		}),
 	}
+}
+
+export async function renameAgent(input: {
+	db: D1Database
+	threadId: string
+	agent: AgentRow
+	name: unknown
+	now?: number
+}): Promise<
+	| DomainError
+	| DomainOk<{ agent: AgentRow; renamedMessage: MessageEnvelope | null }>
+> {
+	const now = input.now ?? Date.now()
+	const membership = await requireMember({
+		db: input.db,
+		threadId: input.threadId,
+		agent: input.agent,
+		now,
+	})
+	if (!membership.ok) return membership
+	const live = assertThreadLive(membership.thread)
+	if (!live.ok) return live
+	const name = parseName(input.name)
+	if (name === null) {
+		return fail(400, 'bad_name', 'name must be a non-empty string.')
+	}
+	if (name === input.agent.name) {
+		return { ok: true, agent: input.agent, renamedMessage: null }
+	}
+	await run(
+		input.db,
+		'UPDATE agents SET name = ? WHERE id = ?',
+		name,
+		input.agent.id,
+	)
+	const agent: AgentRow = { ...input.agent, name }
+	return {
+		ok: true,
+		agent,
+		renamedMessage: await announce({
+			db: input.db,
+			threadId: membership.thread.id,
+			agent,
+			text: `${input.agent.name} is now ${name}.`,
+			now,
+		}),
+	}
+}
+
+export async function leaveThread(input: {
+	db: D1Database
+	threadId: string
+	agent: AgentRow
+	now?: number
+}): Promise<
+	| DomainError
+	| DomainOk<{ thread: ThreadRow; leftMessage: MessageEnvelope | null }>
+> {
+	const now = input.now ?? Date.now()
+	const membership = await requireMember({
+		db: input.db,
+		threadId: input.threadId,
+		agent: input.agent,
+		now,
+	})
+	if (!membership.ok) return membership
+	const live = assertThreadLive(membership.thread)
+	if (!live.ok) return live
+	const host = await getHostAgent(input.db, membership.thread.id)
+	if (!host || host.id === input.agent.id) {
+		return fail(
+			403,
+			'host_cannot_leave',
+			'The host keeps the room open. Archive or delete the thread instead.',
+		)
+	}
+	const leftMessage = await announce({
+		db: input.db,
+		threadId: membership.thread.id,
+		agent: input.agent,
+		text: `${input.agent.name} left.`,
+		now,
+	})
+	const member = await first<{ webhook_url: string | null }>(
+		input.db,
+		'SELECT webhook_url FROM thread_members WHERE thread_id = ? AND agent_id = ?',
+		membership.thread.id,
+		input.agent.id,
+	)
+	await run(
+		input.db,
+		'DELETE FROM thread_members WHERE thread_id = ? AND agent_id = ?',
+		membership.thread.id,
+		input.agent.id,
+	)
+	await run(
+		input.db,
+		'UPDATE agents SET revoked_at = ? WHERE id = ?',
+		now,
+		input.agent.id,
+	)
+	if (member?.webhook_url) {
+		await run(
+			input.db,
+			`UPDATE threads SET webhook_url = NULL
+			 WHERE id = ? AND webhook_url = ?
+			   AND NOT EXISTS (
+				 SELECT 1 FROM thread_members WHERE thread_id = ? AND webhook_url = ?
+			   )`,
+			membership.thread.id,
+			member.webhook_url,
+			membership.thread.id,
+			member.webhook_url,
+		)
+	}
+	return { ok: true, thread: membership.thread, leftMessage }
 }
 
 export async function requireMember(input: {
