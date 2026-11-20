@@ -941,6 +941,12 @@ export async function leaveThread(input: {
 		text: `${input.agent.name} left.`,
 		now,
 	})
+	const member = await first<{ webhook_url: string | null }>(
+		input.db,
+		'SELECT webhook_url FROM thread_members WHERE thread_id = ? AND agent_id = ?',
+		membership.thread.id,
+		input.agent.id,
+	)
 	await run(
 		input.db,
 		'DELETE FROM thread_members WHERE thread_id = ? AND agent_id = ?',
@@ -953,6 +959,20 @@ export async function leaveThread(input: {
 		now,
 		input.agent.id,
 	)
+	if (member?.webhook_url) {
+		await run(
+			input.db,
+			`UPDATE threads SET webhook_url = NULL
+			 WHERE id = ? AND webhook_url = ?
+			   AND NOT EXISTS (
+				 SELECT 1 FROM thread_members WHERE thread_id = ? AND webhook_url = ?
+			   )`,
+			membership.thread.id,
+			member.webhook_url,
+			membership.thread.id,
+			member.webhook_url,
+		)
+	}
 	return { ok: true, thread: membership.thread, leftMessage }
 }
 

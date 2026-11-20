@@ -287,3 +287,25 @@ test('MCP agents rejoin with their token, rename, and leave', async () => {
 	const next = await join(env, room.join_token, 'next')
 	expect(next.status).toBe(200)
 })
+
+test('a participant that leaves stops receiving webhook deliveries', async () => {
+	const env = createTestEnv()
+	const room = await guestRoom(env, '203.0.113.90')
+	const guest = await join(env, room.join_token, 'guest')
+	const hooked = await call(env, '/v1/webhook', {
+		method: 'PUT',
+		headers: {
+			authorization: `Bearer ${guest.body.token}`,
+			'content-type': 'application/json',
+		},
+		body: JSON.stringify({ url: 'https://hooks.example.test/guest' }),
+	})
+	expect(hooked.status).toBe(200)
+	expect((await leave(env, guest.body.token)).status).toBe(200)
+	const thread = await env.DB.prepare(
+		'SELECT t.webhook_url FROM threads t JOIN agents a ON a.thread_id = t.id WHERE a.id = ?',
+	)
+		.bind(guest.body.agent.id)
+		.first<{ webhook_url: string | null }>()
+	expect(thread).toEqual({ webhook_url: null })
+})
